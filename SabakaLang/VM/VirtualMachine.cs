@@ -39,9 +39,15 @@ public class VirtualMachine
                     _stack.Push(a / b);
                     break;
                 }
+                case OpCode.Print:
+                {
+                    var value = _stack.Pop();
+                    Console.WriteLine(value);
+                    break;
+                }
             }
         }
 
-        return _stack.Pop();
+        return _stack.Count > 0 ? _stack.Peek() : 0;
     }
 }

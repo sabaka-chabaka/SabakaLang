@@ -7,9 +7,13 @@ public class Compiler
 {
     private readonly List<Instruction> _instructions = new();
     
-    public List<Instruction> Compile(Expr expr)
+    public List<Instruction> Compile(List<Expr> expressions)
     {
-        Emit(expr);
+        foreach (var expr in expressions)
+        {
+            Emit(expr);
+        }
+
         return _instructions;
     }
 
@@ -41,6 +45,19 @@ public class Compiler
                 case TokenType.Slash:
                     _instructions.Add(new Instruction(OpCode.Div));
                     break;
+            }
+        }
+        else if (expr is CallExpr call)
+        {
+            Emit(call.Argument);
+
+            if (call.Name == "print")
+            {
+                _instructions.Add(new Instruction(OpCode.Print));
+            }
+            else
+            {
+                throw new Exception($"Unknown function '{call.Name}'");
             }
         }
     }

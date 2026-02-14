@@ -31,9 +31,29 @@ public class Parser
         return Consume();
     }
 
-    public Expr Parse()
+    public List<Expr> ParseProgram()
     {
-        return ParseExpression();
+        var expressions = new List<Expr>();
+
+        while (Current.Type != TokenType.EOF)
+        {
+            var expr = ParseExpression();
+            expressions.Add(expr);
+
+            if (Current.Type == TokenType.Semicolon)
+            {
+                Consume(); // съели ;
+            }
+            else if (Current.Type != TokenType.EOF)
+            {
+                throw new ParserException(
+                    "Expected ';' after expression",
+                    _position
+                );
+            }
+        }
+
+        return expressions;
     }
     
     private Expr ParseExpression()
@@ -74,6 +94,27 @@ public class Parser
             return new NumberExpr(double.Parse(number.Value));
         }
 
+        if (Current.Type == TokenType.Identifier)
+        {
+            var identifier = Consume();
+
+            if (Current.Type == TokenType.LParen)
+            {
+                Consume(); // (
+
+                var argument = ParseExpression();
+
+                Expect(TokenType.RParen);
+
+                return new CallExpr(identifier.Value, argument);
+            }
+
+            throw new ParserException(
+                "Expected '(' after function name",
+                _position
+            );
+        }
+
         if (Current.Type == TokenType.LParen)
         {
             Consume();
@@ -82,6 +123,10 @@ public class Parser
             return expr;
         }
 
-        throw new ParserException($"Unexpected token {Current.Type}", _position);
+        throw new ParserException(
+            $"Unexpected token {Current.Type}",
+            _position
+        );
     }
+
 }

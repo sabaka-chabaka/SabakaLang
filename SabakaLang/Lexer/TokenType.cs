@@ -12,5 +12,8 @@ public enum TokenType
     LParen,
     RParen,
     
+    Semicolon,
+    Identifier,
+    
     EOF
 }

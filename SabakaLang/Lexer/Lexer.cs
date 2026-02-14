@@ -33,6 +33,13 @@ public class Lexer
                 tokens.Add(ReadNumber());
                 continue;
             }
+            
+            if (char.IsLetter(Current))
+            {
+                tokens.Add(ReadIdentifier());
+                continue;
+            }
+
 
             switch (Current)
             {
@@ -53,6 +60,9 @@ public class Lexer
                     break;
                 case ')':
                     tokens.Add(new Token(TokenType.RParen));
+                    break;
+                case ';':
+                    tokens.Add(new Token(TokenType.Semicolon));
                     break;
                 default:
                     throw new LexerException($"Unexpected character '{Current}'", _position);
@@ -76,5 +86,18 @@ public class Lexer
         }
         
         return new Token(TokenType.Number, sb.ToString());
+    }
+    
+    private Token ReadIdentifier()
+    {
+        var sb = new StringBuilder();
+
+        while (char.IsLetterOrDigit(Current))
+        {
+            sb.Append(Current);
+            Advance();
+        }
+
+        return new Token(TokenType.Identifier, sb.ToString());
     }
 }

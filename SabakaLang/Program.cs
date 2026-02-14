@@ -34,8 +34,7 @@ class Program
 
             try
             {
-                var result = SabakaRunner.Run(input);
-                Console.WriteLine(result);
+                SabakaRunner.Run(input);
             }
             catch (SabakaLangException ex)
             {
@@ -59,8 +58,7 @@ class Program
             }
 
             var source = File.ReadAllText(path);
-            var result = SabakaRunner.Run(source);
-            Console.WriteLine(result);
+            SabakaRunner.Run(source);
         }
         catch (SabakaLangException ex)
         {

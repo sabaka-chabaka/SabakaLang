@@ -7,5 +7,6 @@ public enum OpCode
     Add,
     Sub,
     Mul,
-    Div
+    Div,
+    Print
 }
