@@ -6,10 +6,6 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine("SabakaLang v0.1");
-        Console.WriteLine("Type 'exit' to quit");
-        Console.WriteLine();
-
         if (args.Length > 0)
         {
             RunFile(args[0]);

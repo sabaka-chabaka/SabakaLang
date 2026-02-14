@@ -5,49 +5,70 @@ namespace SabakaLang.VM;
 public class VirtualMachine
 {
     private readonly Stack<double> _stack = new();
+    private Dictionary<string, double> _variables = new();
 
-    public double Execute(List<Instruction> instructions)
+    public void Execute(List<Instruction> instructions)
     {
-        foreach (var instruction in instructions)
+        int ip = 0;
+
+        while (ip < instructions.Count)
         {
-            switch (instruction.Code)
+            var instruction = instructions[ip];
+
+            switch (instruction.OpCode)
             {
                 case OpCode.Push:
                     _stack.Push(instruction.Operand);
                     break;
 
                 case OpCode.Add:
-                    _stack.Push(_stack.Pop() + _stack.Pop());
-                    break;
-
-                case OpCode.Sub:
                 {
                     var b = _stack.Pop();
                     var a = _stack.Pop();
-                    _stack.Push(a - b);
+                    _stack.Push(a + b);
                     break;
                 }
 
-                case OpCode.Mul:
-                    _stack.Push(_stack.Pop() * _stack.Pop());
-                    break;
-
-                case OpCode.Div:
+                case OpCode.Store:
                 {
-                    var b = _stack.Pop();
-                    var a = _stack.Pop();
-                    _stack.Push(a / b);
+                    var value = _stack.Pop();
+                    _variables[instruction.Name!] = value;
                     break;
                 }
+
+                case OpCode.Load:
+                {
+                    var value = _variables[instruction.Name!];
+                    _stack.Push(value);
+                    break;
+                }
+
                 case OpCode.Print:
                 {
                     var value = _stack.Pop();
                     Console.WriteLine(value);
                     break;
                 }
-            }
-        }
 
-        return _stack.Count > 0 ? _stack.Peek() : 0;
+                case OpCode.Jump:
+                    ip = (int)instruction.Operand;
+                    continue;
+
+                case OpCode.JumpIfFalse:
+                {
+                    var condition = _stack.Pop();
+
+                    if (condition == 0)
+                    {
+                        ip = (int)instruction.Operand;
+                        continue;
+                    }
+
+                    break;
+                }
+            }
+
+            ip++;
+        }
     }
 }

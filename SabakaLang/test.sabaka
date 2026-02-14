@@ -1,1 +1,8 @@
-print(5 * 2 + (50 * 4));
+bool day = true;
+
+if (day)
+{
+    day = false;
+}
+
+print(day);

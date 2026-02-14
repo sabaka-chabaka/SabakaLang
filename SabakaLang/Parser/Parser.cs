@@ -37,19 +37,26 @@ public class Parser
 
         while (Current.Type != TokenType.EOF)
         {
-            var expr = ParseExpression();
+            Expr expr;
+
+            if (Current.Type == TokenType.If)
+            {
+                expr = ParseIf();
+            }
+            else if (Current.Type == TokenType.BoolKeyword)
+            {
+                expr = ParseVariableDeclaration();
+            }
+            else
+            {
+                expr = ParseAssignment();
+            }
+
             expressions.Add(expr);
 
             if (Current.Type == TokenType.Semicolon)
             {
-                Consume(); // съели ;
-            }
-            else if (Current.Type != TokenType.EOF)
-            {
-                throw new ParserException(
-                    "Expected ';' after expression",
-                    _position
-                );
+                Consume();
             }
         }
 
@@ -88,6 +95,19 @@ public class Parser
 
     private Expr ParseFactor()
     {
+        if (Current.Type == TokenType.True)
+        {
+            Consume();
+            return new NumberExpr(1);
+        }
+
+        if (Current.Type == TokenType.False)
+        {
+            Consume();
+            return new NumberExpr(0);
+        }
+
+        
         if (Current.Type == TokenType.Number)
         {
             var number = Consume();
@@ -109,11 +129,10 @@ public class Parser
                 return new CallExpr(identifier.Value, argument);
             }
 
-            throw new ParserException(
-                "Expected '(' after function name",
-                _position
-            );
+            // если нет скобок — это переменная
+            return new VariableExpr(identifier.Value);
         }
+
 
         if (Current.Type == TokenType.LParen)
         {
@@ -129,4 +148,90 @@ public class Parser
         );
     }
 
+    private Expr ParseVariableDeclaration()
+    {
+        Consume(); // bool
+
+        var nameToken = Expect(TokenType.Identifier);
+
+        Expect(TokenType.Equal);
+
+        var value = ParseExpression();
+
+        return new VariableDeclaration(nameToken.Value, value);
+    }
+    
+    private Expr ParseIf()
+    {
+        Consume(); // if
+
+        Expect(TokenType.LParen);
+        var condition = ParseExpression();
+        Expect(TokenType.RParen);
+
+        var thenBlock = ParseBlock();
+
+        List<Expr>? elseBlock = null;
+
+        if (Current.Type == TokenType.Else)
+        {
+            Consume();
+            elseBlock = ParseBlock();
+        }
+
+        return new IfStatement(condition, thenBlock, elseBlock);
+    }
+    
+    private List<Expr> ParseBlock()
+    {
+        Expect(TokenType.LBrace);
+
+        var statements = new List<Expr>();
+
+        while (Current.Type != TokenType.RBrace &&
+               Current.Type != TokenType.EOF)
+        {
+            Expr stmt;
+
+            if (Current.Type == TokenType.If)
+                stmt = ParseIf();
+            else if (Current.Type == TokenType.BoolKeyword)
+                stmt = ParseVariableDeclaration();
+            else
+                stmt = ParseAssignment();
+
+            statements.Add(stmt);
+
+            if (Current.Type == TokenType.Semicolon)
+                Consume();
+        }
+
+        Expect(TokenType.RBrace);
+
+        return statements;
+    }
+
+    private Expr ParseAssignment()
+    {
+        if (Current.Type == TokenType.Identifier &&
+            Peek().Type == TokenType.Equal)
+        {
+            var name = Consume().Value; // identifier
+            Consume(); // =
+
+            var value = ParseAssignment(); // важно! рекурсивно
+
+            return new AssignmentExpr(name, value);
+        }
+
+        return ParseExpression();
+    }
+
+    private Token Peek(int offset = 1)
+    {
+        if (_position + offset >= _tokens.Count)
+            return _tokens[^1];
+
+        return _tokens[_position + offset];
+    }
 }

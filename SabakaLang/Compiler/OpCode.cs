@@ -8,5 +8,9 @@ public enum OpCode
     Sub,
     Mul,
     Div,
-    Print
+    Print,
+    Store,
+    Jump,
+    JumpIfFalse,
+    Load
 }

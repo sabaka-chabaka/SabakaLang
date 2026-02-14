@@ -15,5 +15,16 @@ public enum TokenType
     Semicolon,
     Identifier,
     
+    BoolKeyword,
+    True,
+    False,
+    Equal,
+    
+    If,
+    Else,
+    LBrace,
+    RBrace,
+
+    
     EOF
 }

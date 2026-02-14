@@ -2,19 +2,13 @@ namespace SabakaLang.Compiler;
 
 public class Instruction
 {
-    public OpCode Code { get; }
-    public double Operand { get; }
+    public OpCode OpCode { get; }
+    public double Operand { get; set; }
+    public string? Name { get; set; }
 
-    public Instruction(OpCode code, double operand = 0)
+    public Instruction(OpCode opCode, double operand = 0)
     {
-        Code = code;
+        OpCode = opCode;
         Operand = operand;
-    }
-
-    public override string ToString()
-    {
-        return Code == OpCode.Push
-            ? $"Push {Operand}"
-            : Code.ToString();
     }
 }

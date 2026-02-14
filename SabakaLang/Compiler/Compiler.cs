@@ -60,5 +60,65 @@ public class Compiler
                 throw new Exception($"Unknown function '{call.Name}'");
             }
         }
+        
+        else if (expr is VariableDeclaration varDecl)
+        {
+            Emit(varDecl.Value);
+            _instructions.Add(new Instruction(OpCode.Store, 0)
+            {
+                Name = varDecl.Name
+            });
+        }
+        
+        else if (expr is VariableExpr variable)
+        {
+            _instructions.Add(new Instruction(OpCode.Load)
+            {
+                Name = variable.Name
+            });
+        }
+        else if (expr is IfStatement ifStmt)
+        {
+            Emit(ifStmt.Condition);
+
+            var jumpIfFalseIndex = _instructions.Count;
+            _instructions.Add(new Instruction(OpCode.JumpIfFalse));
+
+            // then block
+            foreach (var stmt in ifStmt.ThenBlock)
+                Emit(stmt);
+
+            if (ifStmt.ElseBlock != null)
+            {
+                var jumpIndex = _instructions.Count;
+                _instructions.Add(new Instruction(OpCode.Jump));
+
+                // patch jumpIfFalse
+                _instructions[jumpIfFalseIndex].Operand =
+                    _instructions.Count;
+
+                foreach (var stmt in ifStmt.ElseBlock)
+                    Emit(stmt);
+
+                // patch jump
+                _instructions[jumpIndex].Operand =
+                    _instructions.Count;
+            }
+            else
+            {
+                _instructions[jumpIfFalseIndex].Operand =
+                    _instructions.Count;
+            }
+        }
+        else if (expr is AssignmentExpr assign)
+        {
+            Emit(assign.Value);
+
+            _instructions.Add(new Instruction(OpCode.Store)
+            {
+                Name = assign.Name
+            });
+        }
+
     }
 }

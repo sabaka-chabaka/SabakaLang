@@ -64,6 +64,16 @@ public class Lexer
                 case ';':
                     tokens.Add(new Token(TokenType.Semicolon));
                     break;
+                case '=':
+                    tokens.Add(new Token(TokenType.Equal));
+                    break;
+                case '{':
+                    tokens.Add(new Token(TokenType.LBrace));
+                    break;
+                case '}':
+                    tokens.Add(new Token(TokenType.RBrace));
+                    break;
+
                 default:
                     throw new LexerException($"Unexpected character '{Current}'", _position);
             }
@@ -98,6 +108,16 @@ public class Lexer
             Advance();
         }
 
-        return new Token(TokenType.Identifier, sb.ToString());
+        var text = sb.ToString();
+
+        return text switch
+        {
+            "bool" => new Token(TokenType.BoolKeyword, text),
+            "true" => new Token(TokenType.True, text),
+            "false" => new Token(TokenType.False, text),
+            "if" => new Token(TokenType.If, text),
+            "else" => new Token(TokenType.Else, text),
+            _ => new Token(TokenType.Identifier, text)
+        };
     }
 }
