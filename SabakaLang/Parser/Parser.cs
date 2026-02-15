@@ -92,7 +92,13 @@ public class Parser
 
     private Expr ParseVariableDeclaration()
     {
-        var typeToken = Consume(); // int / float / bool
+        var typeToken = Consume(); // int / float / bool / string
+
+        if (Current.Type == TokenType.LBracket)
+        {
+            Consume();
+            Expect(TokenType.RBracket);
+        }
 
         var nameToken = Expect(TokenType.Identifier);
 
@@ -183,15 +189,42 @@ public class Parser
 
     private Expr ParseAssignment()
     {
-        if (Current.Type == TokenType.Identifier &&
-            Peek().Type == TokenType.Equal)
+        if (Current.Type == TokenType.Identifier)
         {
-            var name = Consume().Value;
-            Consume();
+            if (Peek().Type == TokenType.Equal)
+            {
+                var name = Consume().Value;
+                Consume(); // =
 
-            var value = ParseAssignment();
+                var value = ParseAssignment();
 
-            return new AssignmentExpr(name, value);
+                return new AssignmentExpr(name, value);
+            }
+            
+            if (Peek().Type == TokenType.LBracket)
+            {
+                // Potential array assignment: identifier[index] = value
+                // Need to check if it's followed by ] and =
+                int offset = 2;
+                int depth = 1;
+                while (_position + offset < _tokens.Count && depth > 0)
+                {
+                    if (_tokens[_position + offset].Type == TokenType.LBracket) depth++;
+                    else if (_tokens[_position + offset].Type == TokenType.RBracket) depth--;
+                    offset++;
+                }
+
+                if (_position + offset < _tokens.Count && _tokens[_position + offset].Type == TokenType.Equal)
+                {
+                    var identifier = Consume();
+                    Consume(); // [
+                    var index = ParseAssignment();
+                    Expect(TokenType.RBracket);
+                    Expect(TokenType.Equal);
+                    var value = ParseAssignment();
+                    return new ArrayStoreExpr(new VariableExpr(identifier.Value), index, value);
+                }
+            }
         }
 
         return ParseLogicalOr();
@@ -344,10 +377,18 @@ public class Parser
                 return new CallExpr(identifier.Value, arguments);
             }
 
+            if (Current.Type == TokenType.LBracket)
+            {
+                Consume();
+                var index = ParseAssignment();
+                Expect(TokenType.RBracket);
+
+                return new ArrayAccessExpr(new VariableExpr(identifier.Value), index);
+            }
+
+            
             return new VariableExpr(identifier.Value);
         }
-
-
 
         if (Current.Type == TokenType.LParen)
         {
@@ -357,6 +398,30 @@ public class Parser
             return expr;
         }
 
+        if (Current.Type == TokenType.LBracket)
+        {
+            Consume();
+
+            var elements = new List<Expr>();
+
+            if (Current.Type != TokenType.RBracket)
+            {
+                do
+                {
+                    elements.Add(ParseAssignment());
+
+                    if (Current.Type != TokenType.Comma)
+                        break;
+
+                    Consume();
+                }
+                while (true);
+            }
+
+            Expect(TokenType.RBracket);
+
+            return new ArrayExpr(elements);
+        }
 
 
 

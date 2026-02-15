@@ -137,6 +137,51 @@ public class VirtualMachine
                 }
 
 
+                case OpCode.CreateArray:
+                {
+                    int count = (int)instruction.Operand!;
+                    var list = new List<Value>();
+
+                    for (int i = 0; i < count; i++)
+                        list.Add(_stack.Pop());
+
+                    list.Reverse();
+
+                    _stack.Push(Value.FromArray(list));
+                    break;
+                }
+
+                
+                case OpCode.ArrayLoad:
+                {
+                    var index = _stack.Pop();
+                    var array = _stack.Pop();
+
+                    if (array.Type != SabakaType.Array)
+                        throw new Exception("Not an array");
+
+                    if (index.Type != SabakaType.Int)
+                        throw new Exception("Index must be int");
+
+                    _stack.Push(array.Array![index.Int]);
+                    break;
+                }
+
+                case OpCode.ArrayStore:
+                {
+                    var value = _stack.Pop();
+                    var index = _stack.Pop();
+                    var array = _stack.Pop();
+
+                    if (array.Type != SabakaType.Array)
+                        throw new Exception("Not an array");
+
+                    if (index.Type != SabakaType.Int)
+                        throw new Exception("Index must be int");
+
+                    array.Array![index.Int] = value;
+                    break;
+                }
 
 
                 

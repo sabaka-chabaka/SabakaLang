@@ -49,6 +49,8 @@ public enum TokenType
     OrOr,      // ||
     Bang,       // !
 
+    LBracket,
+    RBracket,
     
     EOF
 }

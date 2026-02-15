@@ -162,6 +162,14 @@ public class Lexer
                     tokens.Add(new Token(TokenType.Comma, ","));
                     break;
                 }
+                
+                case '[':
+                    tokens.Add(new Token(TokenType.LBracket, "["));
+                    break;
+
+                case ']':
+                    tokens.Add(new Token(TokenType.RBracket, "]"));
+                    break;
 
                 
                 default:

@@ -155,8 +155,30 @@ public class Compiler
             });
         }
 
+        else if (expr is ArrayExpr arr)
+        {
+            foreach (var element in arr.Elements)
+                Emit(element);
 
+            _instructions.Add(new Instruction(OpCode.CreateArray, arr.Elements.Count));
+        }
 
+        else if (expr is ArrayAccessExpr access)
+        {
+            Emit(access.Array);
+            Emit(access.Index);
+            _instructions.Add(new Instruction(OpCode.ArrayLoad));
+        }
+
+        else if (expr is ArrayStoreExpr store)
+        {
+            Emit(store.Array);
+            Emit(store.Index);
+            Emit(store.Value);
+            _instructions.Add(new Instruction(OpCode.ArrayStore));
+        }
+
+        
         else if (expr is ReturnStatement ret)
         {
             if (ret.Value != null)

@@ -28,5 +28,9 @@ public enum OpCode
     Return,
     FunctionStart,
     Function,
-    JumpIfTrue
+    JumpIfTrue,
+    CreateArray,
+    ArrayLoad,
+    ArrayStore
+
 }
