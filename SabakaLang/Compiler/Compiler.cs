@@ -36,33 +36,22 @@ public class Compiler
         }
         else if (expr is FunctionDeclaration func)
         {
-            var funcStart = new Instruction(OpCode.Function)
-            {
-                Name = func.Name
-            };
-            _instructions.Add(funcStart);
+            var functionInstr = new Instruction(OpCode.Function);
+            functionInstr.Name = func.Name;
+            functionInstr.Extra = func.Parameters.Select(p => p.Name).ToList();
 
-            _functions[func.Name] = _instructions.Count;
-
-            // Emit parameters as declarations from arguments on stack
-            // Arguments are pushed in order, so they are in reverse on stack?
-            // foo(1, 2) -> Push 1, Push 2. Stack: [1, 2].
-            // To get 1 and then 2, we need to pop 2 then 1.
-            for (int i = func.Parameters.Count - 1; i >= 0; i--)
-            {
-                var param = func.Parameters[i];
-                var instr = new Instruction(OpCode.Declare) { Name = param.Name };
-                _instructions.Add(instr);
-            }
+            _instructions.Add(functionInstr);
+            var bodyStart = _instructions.Count;
 
             foreach (var stmt in func.Body)
                 Emit(stmt);
 
-            _instructions.Add(new Instruction(OpCode.Push, Value.FromInt(0)));
             _instructions.Add(new Instruction(OpCode.Return));
-
-            funcStart.Operand = _instructions.Count;
+            
+            functionInstr.Operand = _instructions.Count;
+            _functions[func.Name] = bodyStart;
         }
+
 
         else if (expr is BinaryExpr bin)
         {
@@ -150,20 +139,23 @@ public class Compiler
         {
             if (call.Name == "print")
             {
-                if (call.Argument != null)
-                    Emit(call.Argument);
+                foreach (var arg in call.Arguments)
+                    Emit(arg);
+
                 _instructions.Add(new Instruction(OpCode.Print));
                 return;
             }
 
-            if (call.Argument != null)
-                Emit(call.Argument);
+            foreach (var arg in call.Arguments)
+                Emit(arg);
 
-            _instructions.Add(new Instruction(OpCode.Call)
+            _instructions.Add(new Instruction(OpCode.Call, call.Arguments.Count)
             {
                 Name = call.Name
             });
         }
+
+
 
         else if (expr is ReturnStatement ret)
         {

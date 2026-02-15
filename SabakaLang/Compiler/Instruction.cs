@@ -7,6 +7,8 @@ public class Instruction
     public OpCode OpCode { get; }
     public object? Operand { get; set; }
     public string? Name { get; set; }
+    public object? Extra { get; set; }
+
 
     public Instruction(OpCode opCode, object? operand = null, string? name = null)
     {

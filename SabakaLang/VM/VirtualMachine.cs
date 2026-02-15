@@ -8,7 +8,9 @@ public class VirtualMachine
     private readonly Stack<Value> _stack = new();
     private readonly Stack<Dictionary<string, Value>> _scopes = new();
     private Stack<int> _callStack = new();
-    private readonly Dictionary<string, int> _functions = new();
+    private Stack<int> _scopeDepthStack = new();
+    private readonly Dictionary<string, FunctionInfo> _functions = new();
+
 
 
     public void Execute(List<Instruction> instructions)
@@ -21,8 +23,15 @@ public class VirtualMachine
         {
             if (instructions[i].OpCode == OpCode.Function)
             {
-                _functions[instructions[i].Name!] = i + 1;
+                var info = new FunctionInfo
+                {
+                    Address = i + 1,
+                    Parameters = (List<string>)instructions[i].Extra!
+                };
+
+                _functions[instructions[i].Name!] = info;
             }
+
         }
 
         
@@ -37,11 +46,12 @@ public class VirtualMachine
                     break;
 
                 case OpCode.Add:
-                    var ba = _stack.Pop();
-                    var ab = _stack.Pop();
-
-                    if (ab.Type == SabakaType.String || ba.Type == SabakaType.String)
+                    if (_stack.Count < 2) throw new Exception("Stack empty in Add");
+                    
+                    if (IsStringAtTop())
                     {
+                        var ba = _stack.Pop();
+                        var ab = _stack.Pop();
                         _stack.Push(Value.FromString(ab.ToString() + ba.ToString()));
                     }
                     else
@@ -52,19 +62,23 @@ public class VirtualMachine
                     break;
 
                 case OpCode.Sub:
+                    if (_stack.Count < 2) throw new Exception("Stack empty in Sub");
                     BinaryNumeric((a, b) => a - b);
                     break;
 
                 case OpCode.Mul:
+                    if (_stack.Count < 2) throw new Exception("Stack empty in Mul");
                     BinaryNumeric((a, b) => a * b);
                     break;
 
                 case OpCode.Div:
+                    if (_stack.Count < 2) throw new Exception("Stack empty in Div");
                     BinaryNumeric((a, b) => a / b);
                     break;
 
                 case OpCode.Store:
                 {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in Store");
                     var value = _stack.Pop();
                     var name = instruction.Name!;
                     Assign(name, value);
@@ -85,6 +99,7 @@ public class VirtualMachine
 
                 case OpCode.Print:
                 {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in Print");
                     var value = _stack.Pop();
                     Console.WriteLine(value);
                     break;
@@ -92,26 +107,68 @@ public class VirtualMachine
 
                 case OpCode.Call:
                 {
+                    int argCount = (int)instruction.Operand!;
+                    var args = new List<Value>();
+
+                    for (int i = 0; i < argCount; i++)
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in Call");
+                        args.Add(_stack.Pop());
+                    }
+
+                    args.Reverse();
+
+                    if (!_functions.TryGetValue(instruction.Name!, out var function))
+                        throw new Exception($"Undefined function '{instruction.Name}'");
+
                     _callStack.Push(ip + 1);
-                    EnterScope();              // 👈 обязательно
-                    ip = _functions[instruction.Name!];
+                    _scopeDepthStack.Push(_scopes.Count);
+
+                    EnterScope();
+
+                    for (int i = 0; i < function.Parameters.Count; i++)
+                    {
+                        // Ensure the parameter is declared in the new scope
+                        _scopes.Peek()[function.Parameters[i]] = args[i];
+                    }
+
+                    ip = function.Address;
                     continue;
                 }
+
+
 
 
                 
                 case OpCode.Return:
                 {
-                    ExitScope();               // 👈 выйти из scope функции
-                    if (_callStack.Count == 0)
+                    Value returnValue = Value.FromInt(0); // Default for void
+                    if (_stack.Count > 0)
                     {
-                        // Мы в глобальном коде или что-то пошло не так
-                        // В данном случае, это конец программы
-                        return;
+                        returnValue = _stack.Pop();
                     }
+
+                    if (_scopeDepthStack.Count > 0)
+                    {
+                        int targetDepth = _scopeDepthStack.Pop();
+                        while (_scopes.Count > targetDepth)
+                        {
+                            ExitScope();
+                        }
+                    }
+                    else
+                    {
+                        ExitScope();
+                    }
+
+                    if (_callStack.Count == 0)
+                        return;
+
                     ip = _callStack.Pop();
+                    _stack.Push(returnValue);
                     continue;
                 }
+
 
 
                 case OpCode.Jump:
@@ -120,6 +177,7 @@ public class VirtualMachine
 
                 case OpCode.JumpIfFalse:
                 {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in JumpIfFalse");
                     var condition = _stack.Pop();
 
                     if (condition.Type != SabakaType.Bool)
@@ -136,6 +194,7 @@ public class VirtualMachine
 
                 case OpCode.Equal:
                 {
+                    if (_stack.Count < 2) throw new Exception("Stack empty in Equal");
                     var b = _stack.Pop();
                     var a = _stack.Pop();
 
@@ -158,6 +217,7 @@ public class VirtualMachine
 
                 case OpCode.NotEqual:
                 {
+                    if (_stack.Count < 2) throw new Exception("Stack empty in NotEqual");
                     var b = _stack.Pop();
                     var a = _stack.Pop();
 
@@ -196,6 +256,7 @@ public class VirtualMachine
 
                 case OpCode.Negate:
                 {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in Negate");
                     var value = _stack.Pop();
 
                     if (value.Type == SabakaType.Int)
@@ -210,6 +271,7 @@ public class VirtualMachine
                 
                 case OpCode.Declare:
                 {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in Declare");
                     var value = _stack.Pop();
                     var currentScope = _scopes.Peek();
 
@@ -231,6 +293,7 @@ public class VirtualMachine
 
                 case OpCode.Not:
                 {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in Not");
                     var a = _stack.Pop();
 
                     if (a.Type != SabakaType.Bool)
@@ -242,6 +305,7 @@ public class VirtualMachine
 
                 case OpCode.JumpIfTrue:
                 {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in JumpIfTrue");
                     var condition = _stack.Pop();
 
                     if (condition.Type != SabakaType.Bool)
@@ -275,8 +339,16 @@ public class VirtualMachine
     // 🔥 Helpers
     // ================================
 
+    private bool IsStringAtTop()
+    {
+        if (_stack.Count < 2) return false;
+        var top = _stack.ToArray();
+        return top[0].Type == SabakaType.String || top[1].Type == SabakaType.String;
+    }
+
     private void BinaryNumeric(Func<double, double, double> operation)
     {
+        if (_stack.Count < 2) throw new Exception("Stack empty in BinaryNumeric");
         var b = _stack.Pop();
         var a = _stack.Pop();
 
@@ -299,6 +371,7 @@ public class VirtualMachine
 
     private void Compare(Func<Value, Value, bool> comparison)
     {
+        if (_stack.Count < 2) throw new Exception("Stack empty in Compare");
         var b = _stack.Pop();
         var a = _stack.Pop();
 
@@ -310,6 +383,7 @@ public class VirtualMachine
 
     private void CompareNumeric(Func<double, double, bool> comparison)
     {
+        if (_stack.Count < 2) throw new Exception("Stack empty in CompareNumeric");
         var b = _stack.Pop();
         var a = _stack.Pop();
 
@@ -383,4 +457,10 @@ public class VirtualMachine
         throw new Exception($"Undefined variable '{name}'");
     }
 
+}
+
+public class FunctionInfo
+{
+    public int Address { get; set; }
+    public List<string> Parameters { get; set; } = new();
 }

@@ -323,20 +323,30 @@ public class Parser
             {
                 Consume();
 
-                Expr? argument = null;
+                var arguments = new List<Expr>();
 
                 if (Current.Type != TokenType.RParen)
                 {
-                    argument = ParseAssignment();
+                    do
+                    {
+                        arguments.Add(ParseAssignment());
+
+                        if (Current.Type != TokenType.Comma)
+                            break;
+
+                        Consume();
+                    }
+                    while (true);
                 }
 
                 Expect(TokenType.RParen);
 
-                return new CallExpr(identifier.Value, argument!);
+                return new CallExpr(identifier.Value, arguments);
             }
 
             return new VariableExpr(identifier.Value);
         }
+
 
 
         if (Current.Type == TokenType.LParen)
@@ -346,6 +356,9 @@ public class Parser
             Expect(TokenType.RParen);
             return expr;
         }
+
+
+
 
         throw new ParserException(
             $"Unexpected token {Current.Type}",
@@ -408,16 +421,20 @@ public class Parser
         {
             do
             {
+                // тип параметра
                 var paramType = Consume().Type;
+
+                // имя параметра
                 var paramName = Expect(TokenType.Identifier).Value;
+
                 parameters.Add(new Parameter(paramType, paramName));
 
-                if (Current.Type == TokenType.Comma)
-                    Consume();
-                else
+                if (Current.Type != TokenType.Comma)
                     break;
 
-            } while (true);
+                Consume();
+            }
+            while (true);
         }
 
         Expect(TokenType.RParen);
@@ -426,6 +443,7 @@ public class Parser
 
         return new FunctionDeclaration(returnType, name, parameters, body);
     }
+
 
     private Expr ParseReturn()
     {

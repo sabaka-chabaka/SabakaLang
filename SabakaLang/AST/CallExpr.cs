@@ -3,11 +3,11 @@ namespace SabakaLang.AST;
 public class CallExpr : Expr
 {
     public string Name { get; }
-    public Expr? Argument { get; }
+    public List<Expr> Arguments { get; }
 
-    public CallExpr(string name, Expr argument)
+    public CallExpr(string name, List<Expr> arguments)
     {
         Name = name;
-        Argument = argument;
+        Arguments = arguments;
     }
 }

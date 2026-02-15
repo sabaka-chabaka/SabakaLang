@@ -157,6 +157,12 @@ public class Lexer
                     break;
                 }
 
+                case ',':
+                {
+                    tokens.Add(new Token(TokenType.Comma, ","));
+                    break;
+                }
+
                 
                 default:
                     throw new LexerException($"Unexpected character '{Current}'", _position);
