@@ -107,7 +107,7 @@ public class Parser
 
         Expect(TokenType.Equal);
 
-        var value = ParseExpression();
+        var value = ParseAssignment();
 
         return new VariableDeclaration(typeToken.Type, nameToken.Value, value);
     }
@@ -185,7 +185,7 @@ public class Parser
             return new AssignmentExpr(name, value);
         }
 
-        return ParseComparison();
+        return ParseLogicalOr();
     }
 
 
@@ -255,12 +255,19 @@ public class Parser
         {
             var op = Consume().Type;
             var right = ParseUnary();
+            return new UnaryExpr(op, right);
+        }
 
+        if (Current.Type == TokenType.Bang)
+        {
+            var op = Consume().Type;
+            var right = ParseUnary();
             return new UnaryExpr(op, right);
         }
 
         return ParsePrimary();
     }
+
 
 
     private Expr ParsePrimary()
@@ -336,4 +343,33 @@ public class Parser
 
         return new WhileExpr(condition, body);
     }
+    
+    private Expr ParseLogicalOr()
+    {
+        var left = ParseLogicalAnd();
+
+        while (Current.Type == TokenType.OrOr)
+        {
+            var op = Consume().Type;
+            var right = ParseLogicalAnd();
+            left = new BinaryExpr(left, op, right);
+        }
+
+        return left;
+    }
+
+    private Expr ParseLogicalAnd()
+    {
+        var left = ParseComparison();
+
+        while (Current.Type == TokenType.AndAnd)
+        {
+            var op = Consume().Type;
+            var right = ParseComparison();
+            left = new BinaryExpr(left, op, right);
+        }
+
+        return left;
+    }
+
 }

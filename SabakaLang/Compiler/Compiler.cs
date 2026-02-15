@@ -78,6 +78,15 @@ public class Compiler
                 case TokenType.LessEqual:
                     _instructions.Add(new Instruction(OpCode.LessEqual));
                     break;
+                
+                case TokenType.AndAnd:
+                    _instructions.Add(new Instruction(OpCode.And));
+                    break;
+
+                case TokenType.OrOr:
+                    _instructions.Add(new Instruction(OpCode.Or));
+                    break;
+
             }
         }
         else if (expr is CallExpr call)
@@ -189,7 +198,11 @@ public class Compiler
 
             if (unary.Operator == TokenType.Minus)
                 _instructions.Add(new Instruction(OpCode.Negate));
+
+            else if (unary.Operator == TokenType.Bang)
+                _instructions.Add(new Instruction(OpCode.Not));
         }
+
         else if (expr is BoolExpr b)
         {
             _instructions.Add(

@@ -22,5 +22,8 @@ public enum OpCode
     Negate,
     Declare,
     EnterScope,
-    ExitScope
+    ExitScope,
+    And,
+    Or,
+    Not
 }

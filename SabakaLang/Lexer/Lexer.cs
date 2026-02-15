@@ -81,13 +81,6 @@ public class Lexer
                         tokens.Add(new Token(TokenType.Equal));
                     }
                     break;
-                case '!':
-                    if (PeekChar() == '=')
-                    {
-                        Advance();
-                        tokens.Add(new Token(TokenType.NotEqual));
-                    }
-                    break;
 
                 case '>':
                     if (PeekChar() == '=')
@@ -112,6 +105,49 @@ public class Lexer
                         tokens.Add(new Token(TokenType.Less));
                     }
                     break;
+                
+                case '&':
+                {
+                    if (PeekChar() == '&')
+                    {
+                        Advance();
+                        Advance();
+                        tokens.Add(new Token(TokenType.AndAnd, "&&"));
+                        continue;
+                    }
+
+                    throw new LexerException("Unexpected character '&'", _position);
+                }
+
+
+                case '|':
+                {
+                    if (PeekChar() == '|')
+                    {
+                        Advance();
+                        Advance();
+                        tokens.Add(new Token(TokenType.OrOr, "||"));
+                        continue;
+                    }
+
+                    throw new LexerException("Unexpected character '|'", _position);
+                }
+
+
+                case '!':
+                {
+                    if (PeekChar() == '=')
+                    {
+                        Advance(); // !
+                        Advance(); // =
+                        tokens.Add(new Token(TokenType.NotEqual, "!="));
+                    }
+                    else
+                    {
+                        tokens.Add(new Token(TokenType.Bang, "!"));
+                    }
+                    break;
+                }
 
                 
                 default:

@@ -166,6 +166,41 @@ public class VirtualMachine
                     ExitScope();
                     break;
 
+                case OpCode.And:
+                {
+                    var b = _stack.Pop();
+                    var a = _stack.Pop();
+
+                    if (a.Type != SabakaType.Bool || b.Type != SabakaType.Bool)
+                        throw new Exception("&& requires bool");
+
+                    _stack.Push(Value.FromBool(a.Bool && b.Bool));
+                    break;
+                }
+
+                case OpCode.Or:
+                {
+                    var b = _stack.Pop();
+                    var a = _stack.Pop();
+
+                    if (a.Type != SabakaType.Bool || b.Type != SabakaType.Bool)
+                        throw new Exception("|| requires bool");
+
+                    _stack.Push(Value.FromBool(a.Bool || b.Bool));
+                    break;
+                }
+
+                case OpCode.Not:
+                {
+                    var a = _stack.Pop();
+
+                    if (a.Type != SabakaType.Bool)
+                        throw new Exception("! requires bool");
+
+                    _stack.Push(Value.FromBool(!a.Bool));
+                    break;
+                }
+
 
                 default:
                     throw new Exception($"Unknown opcode {instruction.OpCode}");

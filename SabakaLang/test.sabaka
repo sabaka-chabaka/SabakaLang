@@ -1,9 +1,7 @@
-int x = 1;
+bool a = false;
+bool b = false;
 
-if (true)
+if (a || b)
 {
-    int x = 2;
-    print(x); 
+    print(true);
 }
-
-print(x); 

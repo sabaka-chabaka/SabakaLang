@@ -38,5 +38,10 @@ public enum TokenType
     IntKeyword,
     FloatKeyword,
     
+    AndAnd,    // &&
+    OrOr,      // ||
+    Bang,       // !
+
+    
     EOF
 }
