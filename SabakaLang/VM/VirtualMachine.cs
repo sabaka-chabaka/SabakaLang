@@ -24,7 +24,18 @@ public class VirtualMachine
                     break;
 
                 case OpCode.Add:
-                    BinaryNumeric((a, b) => a + b);
+                    var ba = _stack.Pop();
+                    var ab = _stack.Pop();
+
+                    if (ab.Type == SabakaType.String || ba.Type == SabakaType.String)
+                    {
+                        _stack.Push(Value.FromString(ab.ToString() + ba.ToString()));
+                    }
+                    else
+                    {
+                        BinaryNumeric((a, b) => a + b);
+                    }
+
                     break;
 
                 case OpCode.Sub:
@@ -99,6 +110,7 @@ public class VirtualMachine
                         SabakaType.Int => a.Int == b.Int,
                         SabakaType.Float => a.Float == b.Float,
                         SabakaType.Bool => a.Bool == b.Bool,
+                        SabakaType.String => a.String == b.String,
                         _ => throw new Exception("Invalid type for ==")
                     };
 
@@ -120,6 +132,7 @@ public class VirtualMachine
                         SabakaType.Int => a.Int != b.Int,
                         SabakaType.Float => a.Float != b.Float,
                         SabakaType.Bool => a.Bool != b.Bool,
+                        SabakaType.String => a.String != b.String,
                         _ => throw new Exception("Invalid type for !=")
                     };
 

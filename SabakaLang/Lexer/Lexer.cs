@@ -39,6 +39,13 @@ public class Lexer
                 tokens.Add(ReadIdentifier());
                 continue;
             }
+            
+            if (Current == '"')
+            {
+                tokens.Add(ReadString());
+                continue;
+            }
+
 
 
             switch (Current)
@@ -211,6 +218,7 @@ public class Lexer
             "while" => new Token(TokenType.While, text),
             "int" => new Token(TokenType.IntKeyword, text),
             "float" => new Token(TokenType.FloatKeyword, text),
+            "string" => new Token(TokenType.StringKeyword, text),
             _ => new Token(TokenType.Identifier, text)
         };
     }
@@ -226,6 +234,26 @@ public class Lexer
     private bool IsAtEnd()
     {
         return _position >= _text.Length;
+    }
+
+    private Token ReadString()
+    {
+        Advance();
+
+        var sb = new StringBuilder();
+
+        while (Current != '"' && Current != '\0')
+        {
+            sb.Append(Current);
+            Advance();
+        }
+
+        if (Current != '"')
+            throw new LexerException("Unterminated string", _position);
+
+        Advance();
+
+        return new Token(TokenType.StringLiteral, sb.ToString());
     }
 
 }

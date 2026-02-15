@@ -37,6 +37,9 @@ public enum TokenType
     FloatLiteral,
     IntKeyword,
     FloatKeyword,
+    StringLiteral,
+    StringKeyword,
+
     
     AndAnd,    // &&
     OrOr,      // ||

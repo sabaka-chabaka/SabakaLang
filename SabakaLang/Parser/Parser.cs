@@ -49,10 +49,12 @@ public class Parser
             }
             else if (Current.Type == TokenType.BoolKeyword ||
                      Current.Type == TokenType.IntKeyword ||
-                     Current.Type == TokenType.FloatKeyword)
+                     Current.Type == TokenType.FloatKeyword ||
+                     Current.Type == TokenType.StringKeyword)
             {
                 expr = ParseVariableDeclaration();
             }
+
             else
             {
                 expr = ParseAssignment();
@@ -150,10 +152,12 @@ public class Parser
                 stmt = ParseIf();
             else if (Current.Type == TokenType.BoolKeyword ||
                      Current.Type == TokenType.IntKeyword ||
-                     Current.Type == TokenType.FloatKeyword)
+                     Current.Type == TokenType.FloatKeyword ||
+                     Current.Type == TokenType.StringKeyword)
             {
                 stmt = ParseVariableDeclaration();
             }
+
             else if (Current.Type == TokenType.While)
             {
                 stmt = ParseWhile();
@@ -285,6 +289,14 @@ public class Parser
             Consume();
             return new FloatExpr(value);
         }
+        
+        if (Current.Type == TokenType.StringLiteral)
+        {
+            var value = Current.Value;
+            Consume();
+            return new StringExpr(value);
+        }
+
 
         if (Current.Type == TokenType.True)
         {

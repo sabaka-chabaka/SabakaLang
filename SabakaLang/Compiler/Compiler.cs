@@ -227,6 +227,12 @@ public class Compiler
                 new Instruction(OpCode.Push, Value.FromBool(b.Value))
             );
         }
+        else if (expr is StringExpr s)
+        {
+            _instructions.Add(
+                new Instruction(OpCode.Push, Value.FromString(s.Value))
+            );
+        }
 
     }
 }

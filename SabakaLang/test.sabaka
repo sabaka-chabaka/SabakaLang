@@ -1,10 +1,2 @@
-bool a = false;
-bool b = true;
-
-if (true)
-{
-    if (a || b)
-    {
-        print(true);
-    }
-}
+string summer = "picun F6";
+print(summer);
