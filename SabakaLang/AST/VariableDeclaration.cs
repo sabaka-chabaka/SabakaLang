@@ -1,13 +1,17 @@
+using SabakaLang.Lexer;
+
 namespace SabakaLang.AST;
 
 public class VariableDeclaration : Expr
 {
+    public TokenType TypeToken { get; }   // IntKeyword / FloatKeyword / BoolKeyword
     public string Name { get; }
-    public Expr Value { get; }
+    public Expr Initializer { get; }
 
-    public VariableDeclaration(string name, Expr value)
+    public VariableDeclaration(TokenType typeToken, string name, Expr initializer)
     {
+        TypeToken = typeToken;
         Name = name;
-        Value = value;
+        Initializer = initializer;
     }
 }

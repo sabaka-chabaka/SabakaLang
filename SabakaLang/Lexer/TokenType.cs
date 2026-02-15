@@ -22,6 +22,7 @@ public enum TokenType
     
     If,
     Else,
+    While,
     LBrace,
     RBrace,
     
@@ -31,8 +32,11 @@ public enum TokenType
     Less,
     GreaterEqual,
     LessEqual,
-
-
+    
+    IntLiteral,
+    FloatLiteral,
+    IntKeyword,
+    FloatKeyword,
     
     EOF
 }

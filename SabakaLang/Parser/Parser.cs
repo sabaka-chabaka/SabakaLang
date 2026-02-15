@@ -8,12 +8,12 @@ public class Parser
 {
     private readonly List<Token> _tokens;
     private int _position;
-    
+
     public Parser(List<Token> tokens)
     {
         _tokens = tokens;
     }
-    
+
     private Token Current => _position >= _tokens.Count ? _tokens[^1] : _tokens[_position];
 
     private Token Consume()
@@ -22,7 +22,7 @@ public class Parser
         _position++;
         return current;
     }
-    
+
     private Token Expect(TokenType type)
     {
         if (Current.Type != type)
@@ -43,10 +43,14 @@ public class Parser
             {
                 expr = ParseIf();
             }
-            else if (Current.Type == TokenType.BoolKeyword)
+            else if (Current.Type == TokenType.BoolKeyword ||
+                     Current.Type == TokenType.IntKeyword ||
+                     Current.Type == TokenType.FloatKeyword)
             {
                 expr = ParseVariableDeclaration();
             }
+
+
             else
             {
                 expr = ParseAssignment();
@@ -62,7 +66,7 @@ public class Parser
 
         return expressions;
     }
-    
+
     private Expr ParseExpression()
     {
         var left = ParseTerm();
@@ -95,7 +99,7 @@ public class Parser
 
     private Expr ParseVariableDeclaration()
     {
-        Consume(); // bool
+        var typeToken = Consume(); // int / float / bool
 
         var nameToken = Expect(TokenType.Identifier);
 
@@ -103,9 +107,10 @@ public class Parser
 
         var value = ParseExpression();
 
-        return new VariableDeclaration(nameToken.Value, value);
+        return new VariableDeclaration(typeToken.Type, nameToken.Value, value);
     }
-    
+
+
     private Expr ParseIf()
     {
         Consume(); // if
@@ -127,7 +132,7 @@ public class Parser
 
         return new IfStatement(condition, thenBlock, elseBlock);
     }
-    
+
     private List<Expr> ParseBlock()
     {
         Expect(TokenType.LBrace);
@@ -141,8 +146,14 @@ public class Parser
 
             if (Current.Type == TokenType.If)
                 stmt = ParseIf();
-            else if (Current.Type == TokenType.BoolKeyword)
+            else if (Current.Type == TokenType.BoolKeyword ||
+                     Current.Type == TokenType.IntKeyword ||
+                     Current.Type == TokenType.FloatKeyword)
+            {
                 stmt = ParseVariableDeclaration();
+            }
+
+
             else
                 stmt = ParseAssignment();
 
@@ -181,7 +192,7 @@ public class Parser
 
         return _tokens[_position + offset];
     }
-    
+
     private Expr ParseComparison()
     {
         var left = ParseAdditive();
@@ -193,14 +204,13 @@ public class Parser
                Current.Type == TokenType.GreaterEqual ||
                Current.Type == TokenType.LessEqual)
         {
-            var op = Consume().Type;   // ← вот тут Consume правильно
+            var op = Consume().Type; // ← вот тут Consume правильно
             var right = ParseAdditive();
             left = new BinaryExpr(left, op, right);
         }
 
         return left;
     }
-
 
 
     private Expr ParseAdditive()
@@ -242,34 +252,39 @@ public class Parser
             var op = Consume().Type;
             var right = ParseUnary();
 
-            return new BinaryExpr(
-                new NumberExpr(0),
-                op,
-                right
-            );
+            return new UnaryExpr(op, right);
         }
 
         return ParsePrimary();
     }
 
+
     private Expr ParsePrimary()
     {
-        if (Current.Type == TokenType.Number)
+        if (Current.Type == TokenType.IntLiteral)
         {
-            var number = Consume();
-            return new NumberExpr(double.Parse(number.Value));
+            var value = int.Parse(Current.Value);
+            Consume();
+            return new IntExpr(value);
+        }
+
+        if (Current.Type == TokenType.FloatLiteral)
+        {
+            var value = double.Parse(Current.Value);
+            Consume();
+            return new FloatExpr(value);
         }
 
         if (Current.Type == TokenType.True)
         {
             Consume();
-            return new NumberExpr(1);
+            return new BoolExpr(true);
         }
 
         if (Current.Type == TokenType.False)
         {
             Consume();
-            return new NumberExpr(0);
+            return new BoolExpr(false);
         }
 
         if (Current.Type == TokenType.Identifier)
@@ -304,4 +319,17 @@ public class Parser
         );
     }
 
+
+    private Expr ParseWhile()
+    {
+        Consume(); // while
+
+        Expect(TokenType.LParen);
+        var condition = ParseAssignment();
+        Expect(TokenType.RParen);
+
+        var body = ParseBlock(); // у тебя уже есть ParseBlock()
+
+        return new WhileExpr(condition, body);
+    }
 }

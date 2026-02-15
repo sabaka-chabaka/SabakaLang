@@ -1,12 +1,13 @@
 using SabakaLang.AST;
 using SabakaLang.Lexer;
+using SabakaLang.Types;
 
 namespace SabakaLang.Compiler;
 
 public class Compiler
 {
     private readonly List<Instruction> _instructions = new();
-    
+
     public List<Instruction> Compile(List<Expr> expressions)
     {
         foreach (var expr in expressions)
@@ -19,9 +20,17 @@ public class Compiler
 
     private void Emit(Expr expr)
     {
-        if (expr is NumberExpr num)
+        if (expr is IntExpr i)
         {
-            _instructions.Add(new Instruction(OpCode.Push, num.Value));
+            _instructions.Add(
+                new Instruction(OpCode.Push, Value.FromInt(i.Value))
+            );
+        }
+        else if (expr is FloatExpr f)
+        {
+            _instructions.Add(
+                new Instruction(OpCode.Push, Value.FromFloat(f.Value))
+            );
         }
         else if (expr is BinaryExpr bin)
         {
@@ -45,7 +54,7 @@ public class Compiler
                 case TokenType.Slash:
                     _instructions.Add(new Instruction(OpCode.Div));
                     break;
-                
+
                 case TokenType.EqualEqual:
                     _instructions.Add(new Instruction(OpCode.Equal));
                     break;
@@ -84,16 +93,17 @@ public class Compiler
                 throw new Exception($"Unknown function '{call.Name}'");
             }
         }
-        
-        else if (expr is VariableDeclaration varDecl)
+
+        else if (expr is VariableDeclaration decl)
         {
-            Emit(varDecl.Value);
-            _instructions.Add(new Instruction(OpCode.Store, 0)
-            {
-                Name = varDecl.Name
-            });
+            Emit(decl.Initializer);
+
+            var instr = new Instruction(OpCode.Store);
+            instr.Name = decl.Name;
+            _instructions.Add(instr);
         }
-        
+
+
         else if (expr is VariableExpr variable)
         {
             _instructions.Add(new Instruction(OpCode.Load)
@@ -143,5 +153,35 @@ public class Compiler
                 Name = assign.Name
             });
         }
+        else if (expr is WhileExpr whileExpr)
+        {
+            int loopStart = _instructions.Count;
+
+            Emit(whileExpr.Condition);
+
+            var jumpIfFalse = new Instruction(OpCode.JumpIfFalse, 0);
+            _instructions.Add(jumpIfFalse);
+
+            foreach (var e in whileExpr.Body)
+                Emit(e);
+
+            _instructions.Add(new Instruction(OpCode.Jump, loopStart));
+
+            jumpIfFalse.Operand = _instructions.Count;
+        }
+        else if (expr is UnaryExpr unary)
+        {
+            Emit(unary.Operand);
+
+            if (unary.Operator == TokenType.Minus)
+                _instructions.Add(new Instruction(OpCode.Negate));
+        }
+        else if (expr is BoolExpr b)
+        {
+            _instructions.Add(
+                new Instruction(OpCode.Push, Value.FromBool(b.Value))
+            );
+        }
+
     }
 }

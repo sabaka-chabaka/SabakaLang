@@ -127,16 +127,30 @@ public class Lexer
 
     private Token ReadNumber()
     {
-        var sb = new StringBuilder();
+        int start = _position;
+        bool hasDot = false;
 
-        while (char.IsDigit(Current))
+        while (!IsAtEnd() && (char.IsDigit(Current) || Current == '.'))
         {
-            sb.Append(Current);
+            if (Current == '.')
+            {
+                if (hasDot)
+                    throw new Exception("Invalid number format");
+
+                hasDot = true;
+            }
+
             Advance();
         }
-        
-        return new Token(TokenType.Number, sb.ToString());
+
+        string text = _text.Substring(start, _position - start);
+
+        if (hasDot)
+            return new Token(TokenType.FloatLiteral, text);
+        else
+            return new Token(TokenType.IntLiteral, text);
     }
+
     
     private Token ReadIdentifier()
     {
@@ -157,6 +171,9 @@ public class Lexer
             "false" => new Token(TokenType.False, text),
             "if" => new Token(TokenType.If, text),
             "else" => new Token(TokenType.Else, text),
+            "while" => new Token(TokenType.While, text),
+            "int" => new Token(TokenType.IntKeyword, text),
+            "float" => new Token(TokenType.FloatKeyword, text),
             _ => new Token(TokenType.Identifier, text)
         };
     }
@@ -167,6 +184,11 @@ public class Lexer
             return '\0';
 
         return _text[_position + 1];
+    }
+
+    private bool IsAtEnd()
+    {
+        return _position >= _text.Length;
     }
 
 }

@@ -1,10 +1,10 @@
 namespace SabakaLang.AST;
 
-public class NumberExpr : Expr
+public class FloatExpr : Expr
 {
     public double Value { get; }
 
-    public NumberExpr(double value)
+    public FloatExpr(double value)
     {
         Value = value;
     }
