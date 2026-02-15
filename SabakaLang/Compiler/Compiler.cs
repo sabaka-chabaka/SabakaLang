@@ -34,6 +34,40 @@ public class Compiler
         }
         else if (expr is BinaryExpr bin)
         {
+            if (bin.Operator == TokenType.OrOr)
+            {
+                Emit(bin.Left);
+                var jumpIfTrue = new Instruction(OpCode.JumpIfTrue, 0);
+                _instructions.Add(jumpIfTrue);
+
+                Emit(bin.Right);
+                var endJump = new Instruction(OpCode.Jump, 0);
+                _instructions.Add(endJump);
+
+                jumpIfTrue.Operand = _instructions.Count;
+                _instructions.Add(new Instruction(OpCode.Push, Value.FromBool(true)));
+
+                endJump.Operand = _instructions.Count;
+                return;
+            }
+
+            if (bin.Operator == TokenType.AndAnd)
+            {
+                Emit(bin.Left);
+                var jumpIfFalse = new Instruction(OpCode.JumpIfFalse, 0);
+                _instructions.Add(jumpIfFalse);
+
+                Emit(bin.Right);
+                var endJump = new Instruction(OpCode.Jump, 0);
+                _instructions.Add(endJump);
+
+                jumpIfFalse.Operand = _instructions.Count;
+                _instructions.Add(new Instruction(OpCode.Push, Value.FromBool(false)));
+
+                endJump.Operand = _instructions.Count;
+                return;
+            }
+
             Emit(bin.Left);
             Emit(bin.Right);
 
@@ -78,15 +112,6 @@ public class Compiler
                 case TokenType.LessEqual:
                     _instructions.Add(new Instruction(OpCode.LessEqual));
                     break;
-                
-                case TokenType.AndAnd:
-                    _instructions.Add(new Instruction(OpCode.And));
-                    break;
-
-                case TokenType.OrOr:
-                    _instructions.Add(new Instruction(OpCode.Or));
-                    break;
-
             }
         }
         else if (expr is CallExpr call)
@@ -122,11 +147,11 @@ public class Compiler
         }
         else if (expr is IfStatement ifStmt)
         {
+            _instructions.Add(new Instruction(OpCode.EnterScope));
             Emit(ifStmt.Condition);
 
             var jumpIfFalseIndex = _instructions.Count;
             _instructions.Add(new Instruction(OpCode.JumpIfFalse));
-            _instructions.Add(new Instruction(OpCode.EnterScope));
 
             // then block
             foreach (var stmt in ifStmt.ThenBlock)
@@ -141,15 +166,9 @@ public class Compiler
                 _instructions[jumpIfFalseIndex].Operand =
                     _instructions.Count;
 
-                
-                _instructions.Add(new Instruction(OpCode.EnterScope));
-                
                 foreach (var stmt in ifStmt.ElseBlock)
                     Emit(stmt);
 
-                
-                _instructions.Add(new Instruction(OpCode.ExitScope));
-                
                 // patch jump
                 _instructions[jumpIndex].Operand =
                     _instructions.Count;
@@ -159,9 +178,8 @@ public class Compiler
                 _instructions[jumpIfFalseIndex].Operand =
                     _instructions.Count;
             }
-            
-            _instructions.Add(new Instruction(OpCode.ExitScope));
 
+            _instructions.Add(new Instruction(OpCode.ExitScope));
         }
         else if (expr is AssignmentExpr assign)
         {

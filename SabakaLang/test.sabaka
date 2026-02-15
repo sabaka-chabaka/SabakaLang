@@ -1,7 +1,10 @@
 bool a = false;
-bool b = false;
+bool b = true;
 
-if (a || b)
+if (true)
 {
-    print(true);
+    if (a || b)
+    {
+        print(true);
+    }
 }

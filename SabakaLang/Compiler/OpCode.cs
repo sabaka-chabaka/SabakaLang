@@ -23,7 +23,6 @@ public enum OpCode
     Declare,
     EnterScope,
     ExitScope,
-    And,
-    Or,
-    Not
+    Not,
+    JumpIfTrue
 }

@@ -42,15 +42,22 @@ public class VirtualMachine
                 case OpCode.Store:
                 {
                     var value = _stack.Pop();
-                    _scopes.Peek()[instruction.Name!] = value;
+                    var name = instruction.Name!;
+                    Assign(name, value);
                     break;
                 }
 
+
+
                 case OpCode.Load:
                 {
-                    _stack.Push(GetVariable(instruction.Name!));
+                    var name = instruction.Name!;
+                    var value = Resolve(name);
+                    _stack.Push(value);
                     break;
                 }
+
+
 
                 case OpCode.Print:
                 {
@@ -154,9 +161,15 @@ public class VirtualMachine
                 case OpCode.Declare:
                 {
                     var value = _stack.Pop();
+                    var currentScope = _scopes.Peek();
+
+                    if (currentScope.ContainsKey(instruction.Name!))
+                        throw new Exception("Variable already declared in this scope");
+
                     _scopes.Peek()[instruction.Name!] = value;
                     break;
                 }
+
 
                 case OpCode.EnterScope:
                     EnterScope();
@@ -166,30 +179,6 @@ public class VirtualMachine
                     ExitScope();
                     break;
 
-                case OpCode.And:
-                {
-                    var b = _stack.Pop();
-                    var a = _stack.Pop();
-
-                    if (a.Type != SabakaType.Bool || b.Type != SabakaType.Bool)
-                        throw new Exception("&& requires bool");
-
-                    _stack.Push(Value.FromBool(a.Bool && b.Bool));
-                    break;
-                }
-
-                case OpCode.Or:
-                {
-                    var b = _stack.Pop();
-                    var a = _stack.Pop();
-
-                    if (a.Type != SabakaType.Bool || b.Type != SabakaType.Bool)
-                        throw new Exception("|| requires bool");
-
-                    _stack.Push(Value.FromBool(a.Bool || b.Bool));
-                    break;
-                }
-
                 case OpCode.Not:
                 {
                     var a = _stack.Pop();
@@ -198,6 +187,22 @@ public class VirtualMachine
                         throw new Exception("! requires bool");
 
                     _stack.Push(Value.FromBool(!a.Bool));
+                    break;
+                }
+
+                case OpCode.JumpIfTrue:
+                {
+                    var condition = _stack.Pop();
+
+                    if (condition.Type != SabakaType.Bool)
+                        throw new Exception("Condition must be bool");
+
+                    if (condition.Bool)
+                    {
+                        ip = (int)instruction.Operand;
+                        continue;
+                    }
+
                     break;
                 }
 
@@ -292,6 +297,31 @@ public class VirtualMachine
         {
             if (scope.TryGetValue(name, out var value))
                 return value;
+        }
+
+        throw new Exception($"Undefined variable '{name}'");
+    }
+
+    private Value Resolve(string name)
+    {
+        foreach (var scope in _scopes)
+        {
+            if (scope.ContainsKey(name))
+                return scope[name];
+        }
+
+        throw new Exception($"Undefined variable '{name}'");
+    }
+
+    private void Assign(string name, Value value)
+    {
+        foreach (var scope in _scopes)
+        {
+            if (scope.ContainsKey(name))
+            {
+                scope[name] = value;
+                return;
+            }
         }
 
         throw new Exception($"Undefined variable '{name}'");
