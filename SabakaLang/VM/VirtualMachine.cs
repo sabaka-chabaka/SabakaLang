@@ -243,19 +243,25 @@ public class VirtualMachine
                     var b = _stack.Pop();
                     var a = _stack.Pop();
 
-                    if (a.Type != b.Type)
-                        throw new Exception("Type mismatch in ==");
-
-                    bool result = a.Type switch
+                    if (IsNumber(a) && IsNumber(b))
                     {
-                        SabakaType.Int => a.Int == b.Int,
-                        SabakaType.Float => a.Float == b.Float,
-                        SabakaType.Bool => a.Bool == b.Bool,
-                        SabakaType.String => a.String == b.String,
-                        _ => throw new Exception("Invalid type for ==")
-                    };
-
-                    _stack.Push(Value.FromBool(result));
+                        _stack.Push(Value.FromBool(ToDouble(a) == ToDouble(b)));
+                    }
+                    else if (a.Type != b.Type)
+                    {
+                        throw new Exception("Type mismatch in ==");
+                    }
+                    else
+                    {
+                        bool result = a.Type switch
+                        {
+                            SabakaType.Bool => a.Bool == b.Bool,
+                            SabakaType.String => a.String == b.String,
+                            SabakaType.Array => a.Array == b.Array, // Reference equality for now
+                            _ => throw new Exception("Invalid type for ==")
+                        };
+                        _stack.Push(Value.FromBool(result));
+                    }
                     break;
                 }
 
@@ -266,19 +272,25 @@ public class VirtualMachine
                     var b = _stack.Pop();
                     var a = _stack.Pop();
 
-                    if (a.Type != b.Type)
-                        throw new Exception("Type mismatch in !=");
-
-                    bool result = a.Type switch
+                    if (IsNumber(a) && IsNumber(b))
                     {
-                        SabakaType.Int => a.Int != b.Int,
-                        SabakaType.Float => a.Float != b.Float,
-                        SabakaType.Bool => a.Bool != b.Bool,
-                        SabakaType.String => a.String != b.String,
-                        _ => throw new Exception("Invalid type for !=")
-                    };
-
-                    _stack.Push(Value.FromBool(result));
+                        _stack.Push(Value.FromBool(ToDouble(a) != ToDouble(b)));
+                    }
+                    else if (a.Type != b.Type)
+                    {
+                        throw new Exception("Type mismatch in !=");
+                    }
+                    else
+                    {
+                        bool result = a.Type switch
+                        {
+                            SabakaType.Bool => a.Bool != b.Bool,
+                            SabakaType.String => a.String != b.String,
+                            SabakaType.Array => a.Array != b.Array,
+                            _ => throw new Exception("Invalid type for !=")
+                        };
+                        _stack.Push(Value.FromBool(result));
+                    }
                     break;
                 }
 
@@ -369,6 +381,17 @@ public class VirtualMachine
                 {
                     ip = (int)instruction.Operand!;
                     continue;
+                }
+
+                case OpCode.ArrayLength:
+                {
+                    var arr = _stack.Pop();
+
+                    if (arr.Type != SabakaType.Array)
+                        throw new Exception("ArrayLength requires array");
+
+                    _stack.Push(Value.FromInt(arr.Array!.Count));
+                    break;
                 }
 
 

@@ -324,7 +324,61 @@ public class Compiler
             jumpIfFalse.Operand = _instructions.Count;
 
             _instructions.Add(new Instruction(OpCode.ExitScope));
+        }   
+        else if (expr is ForeachStatement fe)
+        {
+            _instructions.Add(new Instruction(OpCode.EnterScope));
+
+            // index = 0
+            string indexName = "__index" + _instructions.Count;
+
+            _instructions.Add(new Instruction(OpCode.Push, Value.FromInt(0)));
+            _instructions.Add(new Instruction(OpCode.Declare) { Name = indexName });
+
+            int loopStart = _instructions.Count;
+
+            // index < array.length
+            _instructions.Add(new Instruction(OpCode.Load) { Name = indexName });
+            Emit(fe.Collection);
+            _instructions.Add(new Instruction(OpCode.ArrayLength));
+            _instructions.Add(new Instruction(OpCode.Less));
+
+            var jumpIfFalse = new Instruction(OpCode.JumpIfFalse, 0);
+            _instructions.Add(jumpIfFalse);
+
+            // BODY
+            _instructions.Add(new Instruction(OpCode.EnterScope));
+
+            // x = array[index]
+            Emit(fe.Collection);
+            _instructions.Add(new Instruction(OpCode.Load) { Name = indexName });
+            _instructions.Add(new Instruction(OpCode.ArrayLoad));
+
+            _instructions.Add(new Instruction(OpCode.Declare)
+            {
+                Name = fe.VarName
+            });
+
+            foreach (var stmt in fe.Body)
+                Emit(stmt);
+
+            _instructions.Add(new Instruction(OpCode.ExitScope));
+
+            // index++
+            _instructions.Add(new Instruction(OpCode.Load) { Name = indexName });
+            _instructions.Add(new Instruction(OpCode.Push, Value.FromInt(1)));
+            _instructions.Add(new Instruction(OpCode.Add));
+            _instructions.Add(new Instruction(OpCode.Store) { Name = indexName });
+
+            _instructions.Add(new Instruction(OpCode.Jump, loopStart));
+
+            jumpIfFalse.Operand = _instructions.Count;
+
+            _instructions.Add(new Instruction(OpCode.ExitScope));
         }
+
+
+
 
     }
 }

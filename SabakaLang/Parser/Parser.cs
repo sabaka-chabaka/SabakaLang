@@ -1,3 +1,4 @@
+using System.Globalization;
 using SabakaLang.AST;
 using SabakaLang.Exceptions;
 using SabakaLang.Lexer;
@@ -31,6 +32,42 @@ public class Parser
         return Consume();
     }
 
+    private TokenType ConsumeType()
+    {
+        var type = Consume().Type;
+        while (Current.Type == TokenType.LBracket)
+        {
+            Consume();
+            Expect(TokenType.RBracket);
+        }
+        return type;
+    }
+
+    private bool IsTypeKeyword(TokenType type)
+    {
+        return type == TokenType.IntKeyword ||
+               type == TokenType.FloatKeyword ||
+               type == TokenType.BoolKeyword ||
+               type == TokenType.StringKeyword ||
+               type == TokenType.VoidKeyword;
+    }
+
+    private bool IsFunctionDeclaration()
+    {
+        if (!IsTypeKeyword(Current.Type))
+            return false;
+
+        int offset = 1;
+        while (Peek(offset).Type == TokenType.LBracket)
+        {
+            if (Peek(offset + 1).Type != TokenType.RBracket)
+                return false;
+            offset += 2;
+        }
+
+        return Peek(offset).Type == TokenType.Identifier && Peek(offset + 1).Type == TokenType.LParen;
+    }
+
     public List<Expr> ParseProgram()
     {
         var expressions = new List<Expr>();
@@ -39,13 +76,7 @@ public class Parser
         {
             Expr expr;
 
-            if ((Current.Type == TokenType.IntKeyword ||
-                 Current.Type == TokenType.FloatKeyword ||
-                 Current.Type == TokenType.BoolKeyword ||
-                 Current.Type == TokenType.StringKeyword ||
-                 Current.Type == TokenType.VoidKeyword) &&
-                Peek().Type == TokenType.Identifier &&
-                Peek(2).Type == TokenType.LParen)
+            if (IsFunctionDeclaration())
             {
                 expr = ParseFunction();
             }
@@ -92,13 +123,7 @@ public class Parser
 
     private Expr ParseVariableDeclaration()
     {
-        var typeToken = Consume(); // int / float / bool / string
-
-        if (Current.Type == TokenType.LBracket)
-        {
-            Consume();
-            Expect(TokenType.RBracket);
-        }
+        var type = ConsumeType(); 
 
         var nameToken = Expect(TokenType.Identifier);
 
@@ -106,7 +131,7 @@ public class Parser
 
         var value = ParseAssignment();
 
-        return new VariableDeclaration(typeToken.Type, nameToken.Value, value);
+        return new VariableDeclaration(type, nameToken.Value, value);
     }
 
 
@@ -124,10 +149,7 @@ public class Parser
         Expr stmt;
         if (Current.Type == TokenType.If)
             stmt = ParseIf();
-        else if (Current.Type == TokenType.BoolKeyword ||
-                 Current.Type == TokenType.IntKeyword ||
-                 Current.Type == TokenType.FloatKeyword ||
-                 Current.Type == TokenType.StringKeyword)
+        else if (IsTypeKeyword(Current.Type) && Current.Type != TokenType.VoidKeyword)
         {
             stmt = ParseVariableDeclaration();
         }
@@ -139,6 +161,11 @@ public class Parser
         {
             stmt = ParseReturn();
         }
+        else if (Current.Type == TokenType.Foreach)
+        {
+            stmt = ParseForeach();
+        }
+
         else if (Current.Type == TokenType.For)
             stmt = ParseFor();
 
@@ -320,14 +347,14 @@ public class Parser
     {
         if (Current.Type == TokenType.IntLiteral)
         {
-            var value = int.Parse(Current.Value);
+            var value = int.Parse(Current.Value, CultureInfo.InvariantCulture);
             Consume();
             return new IntExpr(value);
         }
 
         if (Current.Type == TokenType.FloatLiteral)
         {
-            var value = double.Parse(Current.Value);
+            var value = double.Parse(Current.Value, CultureInfo.InvariantCulture);
             Consume();
             return new FloatExpr(value);
         }
@@ -479,7 +506,7 @@ public class Parser
 
     private Expr ParseFunction()
     {
-        var returnType = Consume().Type;
+        var returnType = ConsumeType();
         var name = Expect(TokenType.Identifier).Value;
 
         Expect(TokenType.LParen);
@@ -491,7 +518,7 @@ public class Parser
             do
             {
                 // тип параметра
-                var paramType = Consume().Type;
+                var paramType = ConsumeType();
 
                 // имя параметра
                 var paramName = Expect(TokenType.Identifier).Value;
@@ -557,4 +584,25 @@ public class Parser
         return new ForStatement(initializer, condition, increment, body);
     }
 
+    private Expr ParseForeach()
+    {
+        Consume(); // foreach
+
+        Expect(TokenType.LParen);
+
+        // пропускаем тип
+        ConsumeType();
+
+        var varName = Expect(TokenType.Identifier).Value;
+
+        Expect(TokenType.In);
+
+        var collection = ParseAssignment();
+
+        Expect(TokenType.RParen);
+
+        var body = ParseBlock();
+
+        return new ForeachStatement(varName, collection, body);
+    }
 }

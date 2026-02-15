@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace SabakaLang.Types;
 
 public struct Value
@@ -29,8 +31,8 @@ public override string ToString()
     {
         return Type switch
         {
-            SabakaType.Int => Int.ToString(),
-            SabakaType.Float => Float.ToString(),
+            SabakaType.Int => Int.ToString(CultureInfo.InvariantCulture),
+            SabakaType.Float => Float.ToString(CultureInfo.InvariantCulture),
             SabakaType.Bool => Bool ? "true" : "false",
             SabakaType.String => String,
             SabakaType.Array => $"[{string.Join(", ", Array!.Select(v => v.ToString()))}]",

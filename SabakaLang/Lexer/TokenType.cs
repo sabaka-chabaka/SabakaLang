@@ -46,6 +46,10 @@ public enum TokenType
     VoidKeyword,
     Comma,
     
+    Foreach,
+    In,
+
+    
     AndAnd,    // &&
     OrOr,      // ||
     Bang,       // !

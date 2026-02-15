@@ -31,6 +31,6 @@ public enum OpCode
     JumpIfTrue,
     CreateArray,
     ArrayLoad,
-    ArrayStore
-
+    ArrayStore,
+    ArrayLength
 }
