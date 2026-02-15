@@ -154,8 +154,10 @@ public class Parser
             {
                 stmt = ParseVariableDeclaration();
             }
-
-
+            else if (Current.Type == TokenType.While)
+            {
+                stmt = ParseWhile();
+            }
             else
                 stmt = ParseAssignment();
 
