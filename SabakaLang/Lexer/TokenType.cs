@@ -59,5 +59,8 @@ public enum TokenType
     LBracket,
     RBracket,
     
+    Class,
+    New,
+    
     EOF
 }

@@ -35,6 +35,8 @@ public enum OpCode
     ArrayLength,
     CreateStruct,
     LoadField,
-    StoreField
-
+    StoreField,
+    CreateObject,
+    CallMethod,
+    PushThis
 }

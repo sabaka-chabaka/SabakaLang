@@ -252,6 +252,8 @@ public class Lexer
             "in"  => new Token(TokenType.In, text),
             "struct" => new Token(TokenType.StructKeyword, text),
             "enum" => new Token(TokenType.Enum, text),
+            "class" => new Token(TokenType.Class, text),
+            "new" => new Token(TokenType.New, text),
 
             _ => new Token(TokenType.Identifier, text)
         };

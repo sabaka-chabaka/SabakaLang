@@ -10,6 +10,9 @@ public class Compiler
     private Dictionary<string, int> _functions = new();
     private Dictionary<string, List<string>> _structs = new();
     private Dictionary<string, Dictionary<string, int>> _enums = new();
+    private Dictionary<string, ClassDeclaration> _classes = new();
+    private string? _currentClass = null;
+
 
 
     public List<Instruction> Compile(List<Expr> expressions)
@@ -35,6 +38,49 @@ public class Compiler
             _instructions.Add(
                 new Instruction(OpCode.Push, Value.FromFloat(f.Value))
             );
+        }
+        else if (expr is ClassDeclaration classDecl)
+        {
+            _classes[classDecl.Name] = classDecl;
+            var oldClass = _currentClass;
+            _currentClass = classDecl.Name;
+
+            var fields = classDecl.Fields.Select(f => f.Name).ToList();
+
+            foreach (var method in classDecl.Methods)
+            {
+                var methodFqn = $"{classDecl.Name}.{method.Name}";
+                var methodInstr = new Instruction(OpCode.Function)
+                {
+                    Name = methodFqn,
+                    Extra = method.Parameters.Select(p => p.Name).ToList()
+                };
+
+                _instructions.Add(methodInstr);
+                var bodyStart = _instructions.Count;
+
+                foreach (var stmt in method.Body)
+                    Emit(stmt);
+
+                _instructions.Add(new Instruction(OpCode.Return));
+
+                methodInstr.Operand = _instructions.Count;
+                _functions[methodFqn] = bodyStart;
+            }
+
+            _currentClass = oldClass;
+        }
+        else if (expr is NewExpr newExpr)
+        {
+            var fields = _classes.TryGetValue(newExpr.ClassName, out var cd)
+                ? cd.Fields.Select(f => f.Name).ToList()
+                : new List<string>();
+
+            _instructions.Add(new Instruction(OpCode.CreateObject)
+            {
+                Name = newExpr.ClassName,
+                Extra = fields
+            });
         }
         else if (expr is FunctionDeclaration func)
         {
@@ -139,7 +185,7 @@ public class Compiler
         }
         else if (expr is CallExpr call)
         {
-            if (call.Name == "print")
+            if (call.Target == null && call.Name == "print")
             {
                 foreach (var arg in call.Arguments)
                     Emit(arg);
@@ -148,13 +194,49 @@ public class Compiler
                 return;
             }
 
-            foreach (var arg in call.Arguments)
-                Emit(arg);
-
-            _instructions.Add(new Instruction(OpCode.Call, call.Arguments.Count)
+            if (call.Target == null && _classes.TryGetValue(call.Name, out var cDecl))
             {
-                Name = call.Name
-            });
+                _instructions.Add(new Instruction(OpCode.CreateObject)
+                {
+                    Name = call.Name,
+                    Extra = cDecl.Fields.Select(f => f.Name).ToList()
+                });
+                return;
+            }
+
+            if (call.Target != null)
+            {
+                Emit(call.Target);
+                foreach (var arg in call.Arguments)
+                    Emit(arg);
+
+                _instructions.Add(new Instruction(OpCode.CallMethod, call.Arguments.Count)
+                {
+                    Name = call.Name
+                });
+            }
+            else if (_currentClass != null && _classes[_currentClass].Methods.Any(m => m.Name == call.Name))
+            {
+                // Implicit this call
+                _instructions.Add(new Instruction(OpCode.PushThis));
+                foreach (var arg in call.Arguments)
+                    Emit(arg);
+
+                _instructions.Add(new Instruction(OpCode.CallMethod, call.Arguments.Count)
+                {
+                    Name = call.Name
+                });
+            }
+            else
+            {
+                foreach (var arg in call.Arguments)
+                    Emit(arg);
+
+                _instructions.Add(new Instruction(OpCode.Call, call.Arguments.Count)
+                {
+                    Name = call.Name
+                });
+            }
         }
 
         else if (expr is ArrayExpr arr)
@@ -235,6 +317,14 @@ public class Compiler
                     {
                         Name = decl.CustomType,
                         Extra = fields
+                    });
+                }
+                else if (decl.CustomType != null && _classes.TryGetValue(decl.CustomType, out var cDecl2))
+                {
+                    _instructions.Add(new Instruction(OpCode.CreateObject)
+                    {
+                        Name = decl.CustomType,
+                        Extra = cDecl2.Fields.Select(f => f.Name).ToList()
                     });
                 }
                 else

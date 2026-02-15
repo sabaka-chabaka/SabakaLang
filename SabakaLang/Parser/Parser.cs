@@ -113,36 +113,6 @@ public class Parser
         return expressions;
     }
 
-    private Expr ParseExpression()
-    {
-        var left = ParseTerm();
-
-        while (Current.Type == TokenType.Plus ||
-               Current.Type == TokenType.Minus)
-        {
-            var op = Consume().Type;
-            var right = ParseTerm();
-            left = new BinaryExpr(left, op, right);
-        }
-
-        return left;
-    }
-
-    private Expr ParseTerm()
-    {
-        var left = ParsePrimary();
-
-        while (Current.Type == TokenType.Star ||
-               Current.Type == TokenType.Slash)
-        {
-            var op = Consume().Type;
-            var right = ParsePrimary();
-            left = new BinaryExpr(left, op, right);
-        }
-
-        return left;
-    }
-
     private Expr ParseVariableDeclaration()
     {
         var typeToken = Consume();
@@ -193,6 +163,9 @@ public class Parser
         else if (IsVariableDeclaration())
         {
             stmt = ParseVariableDeclaration();
+            if (Current.Type == TokenType.Semicolon)
+                Consume();
+            return stmt;
         }
         else if (Current.Type == TokenType.While)
         {
@@ -210,6 +183,11 @@ public class Parser
             stmt = ParseFor();
         else if (Current.Type == TokenType.StructKeyword)
             return ParseStruct();
+        else if (Current.Type == TokenType.Class)
+        {
+            stmt = ParseClass();
+        }
+
         else if (Current.Type == TokenType.Enum)
         {
             stmt = ParseEnum();
@@ -421,6 +399,17 @@ public class Parser
 
     // ===== LITERALS =====
 
+    if (Current.Type == TokenType.New)
+    {
+        Consume();
+        var name = Expect(TokenType.Identifier).Value;
+
+        Expect(TokenType.LParen);
+        Expect(TokenType.RParen);
+
+        return new NewExpr(name);
+    }
+
     if (Current.Type == TokenType.IntLiteral)
     {
         expr = new IntExpr(int.Parse(Current.Value, CultureInfo.InvariantCulture));
@@ -451,6 +440,7 @@ public class Parser
         expr = new VariableExpr(Current.Value);
         Consume();
     }
+    
     else if (Current.Type == TokenType.LBracket)
     {
         Consume();
@@ -510,6 +500,8 @@ public class Parser
 
             if (expr is VariableExpr varExpr)
                 expr = new CallExpr(varExpr.Name, arguments);
+            else if (expr is MemberAccessExpr memberAccess)
+                expr = new CallExpr(memberAccess.Member, arguments, memberAccess.Object);
             else
                 throw new ParserException("Invalid function call target", _position);
 
@@ -734,4 +726,35 @@ public class Parser
 
         return new EnumDeclaration(name, members);
     }
+    
+    private Expr ParseClass()
+    {
+        Consume(); // class
+
+        var name = Expect(TokenType.Identifier).Value;
+
+        Expect(TokenType.LBrace);
+
+        var fields = new List<VariableDeclaration>();
+        var methods = new List<FunctionDeclaration>();
+
+        while (Current.Type != TokenType.RBrace)
+        {
+            if (IsFunctionDeclaration())
+            {
+                methods.Add((FunctionDeclaration)ParseFunction());
+            }
+            else
+            {
+                var field = (VariableDeclaration)ParseVariableDeclaration();
+                Expect(TokenType.Semicolon);
+                fields.Add(field);
+            }
+        }
+
+        Expect(TokenType.RBrace);
+
+        return new ClassDeclaration(name, fields, methods);
+    }
+
 }

@@ -12,6 +12,8 @@ public struct Value
     public string String;
     public List<Value>? Array;
     public Dictionary<string, Value>? Struct;
+    public Dictionary<string, Value>? ObjectFields;
+    public string? ClassName;
 
     public static Value FromInt(int v)
         => new Value { Type = SabakaType.Int, Int = v };

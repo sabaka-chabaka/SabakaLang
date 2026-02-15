@@ -9,6 +9,7 @@ public class VirtualMachine
     private readonly Stack<Dictionary<string, Value>> _scopes = new();
     private Stack<int> _callStack = new();
     private Stack<int> _scopeDepthStack = new();
+    private Stack<Value> _thisStack = new();
     private readonly Dictionary<string, FunctionInfo> _functions = new();
 
 
@@ -41,10 +42,42 @@ public class VirtualMachine
 
             switch (instruction.OpCode)
             {
+                case OpCode.CreateObject:
+                {
+                    var fieldNames = (List<string>?)instruction.Extra;
+                    var fields = new Dictionary<string, Value>();
+                    if (fieldNames != null)
+                    {
+                        foreach (var name in fieldNames)
+                        {
+                            fields[name] = Value.FromInt(0);
+                        }
+                    }
+
+                    var obj = new Value
+                    {
+                        Type = SabakaType.Object,
+                        ObjectFields = fields,
+                        ClassName = instruction.Name
+                    };
+
+                    _stack.Push(obj);
+                    break;
+                }
+
+                case OpCode.PushThis:
+                {
+                    if (_thisStack.Count == 0) throw new Exception("No 'this' in current context");
+                    _stack.Push(_thisStack.Peek());
+                    break;
+                }
+
                 case OpCode.Push:
                     _stack.Push((Value)instruction.Operand!);
                     break;
 
+                
+                
                 case OpCode.Add:
                     if (_stack.Count < 2) throw new Exception("Stack empty in Add");
                     
@@ -105,6 +138,77 @@ public class VirtualMachine
                     break;
                 }
 
+                case OpCode.LoadField:
+                {
+                    var obj = _stack.Pop();
+                    if (obj.Type != SabakaType.Object && obj.Type != SabakaType.Struct)
+                        throw new Exception("Cannot load field from non-object/struct");
+
+                    var fields = obj.Type == SabakaType.Object ? obj.ObjectFields : obj.Struct;
+                    if (fields == null) throw new Exception("Fields dictionary is null");
+
+                    if (fields.TryGetValue(instruction.Name!, out var value))
+                        _stack.Push(value);
+                    else
+                        _stack.Push(Value.FromInt(0)); // Default value
+
+                    break;
+                }
+
+                case OpCode.StoreField:
+                {
+                    var value = _stack.Pop();
+                    var obj = _stack.Pop();
+
+                    if (obj.Type != SabakaType.Object && obj.Type != SabakaType.Struct)
+                        throw new Exception("Cannot store field in non-object/struct");
+
+                    var fields = obj.Type == SabakaType.Object ? obj.ObjectFields : obj.Struct;
+                    if (fields == null) throw new Exception("Fields dictionary is null");
+
+                    fields[instruction.Name!] = value;
+                    break;
+                }
+
+                case OpCode.CallMethod:
+                {
+                    int argCount = (int)instruction.Operand!;
+                    var args = new List<Value>();
+
+                    for (int i = 0; i < argCount; i++)
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in CallMethod (args)");
+                        args.Add(_stack.Pop());
+                    }
+
+                    args.Reverse();
+
+                    if (_stack.Count == 0) throw new Exception("Stack empty in CallMethod (object)");
+                    var obj = _stack.Pop();
+
+                    if (obj.Type != SabakaType.Object)
+                        throw new Exception("Cannot call method on non-object");
+
+                    var methodName = $"{obj.ClassName}.{instruction.Name}";
+
+                    if (!_functions.TryGetValue(methodName, out var function))
+                        throw new Exception($"Undefined method '{methodName}'");
+
+                    _callStack.Push(ip + 1);
+                    _scopeDepthStack.Push(_scopes.Count);
+                    _thisStack.Push(obj);
+
+                    EnterScope();
+
+                    for (int i = 0; i < function.Parameters.Count; i++)
+                    {
+                        _scopes.Peek()[function.Parameters[i]] = args[i];
+                    }
+
+                    ip = function.Address;
+                    continue;
+                }
+
                 case OpCode.Call:
                 {
                     int argCount = (int)instruction.Operand!;
@@ -128,7 +232,6 @@ public class VirtualMachine
 
                     for (int i = 0; i < function.Parameters.Count; i++)
                     {
-                        // Ensure the parameter is declared in the new scope
                         _scopes.Peek()[function.Parameters[i]] = args[i];
                     }
 
@@ -191,6 +294,11 @@ public class VirtualMachine
                     if (_stack.Count > 0)
                     {
                         returnValue = _stack.Pop();
+                    }
+
+                    if (_thisStack.Count > 0)
+                    {
+                        _thisStack.Pop();
                     }
 
                     if (_scopeDepthStack.Count > 0)
@@ -394,31 +502,6 @@ public class VirtualMachine
                     break;
                 }
 
-                case OpCode.LoadField:
-                {
-                    var obj = _stack.Pop();
-
-                    if (obj.Type != SabakaType.Struct)
-                        throw new Exception("Not a struct");
-
-                    var value = obj.Struct![instruction.Name!];
-                    _stack.Push(value);
-                    break;
-                }
-
-                case OpCode.StoreField:
-                {
-                    var value = _stack.Pop();
-                    var obj = _stack.Pop();
-
-                    if (obj.Type != SabakaType.Struct)
-                        throw new Exception("Not a struct");
-
-                    obj.Struct![instruction.Name!] = value;
-
-                    break;
-                }
-
                 case OpCode.CreateStruct:
                 {
                     var fields = (List<string>)instruction.Extra!;
@@ -545,6 +628,13 @@ public class VirtualMachine
                 return scope[name];
         }
 
+        if (_thisStack.Count > 0)
+        {
+            var obj = _thisStack.Peek();
+            if (obj.ObjectFields != null && obj.ObjectFields.TryGetValue(name, out var value))
+                return value;
+        }
+
         throw new Exception($"Undefined variable '{name}'");
     }
 
@@ -555,6 +645,16 @@ public class VirtualMachine
             if (scope.ContainsKey(name))
             {
                 scope[name] = value;
+                return;
+            }
+        }
+
+        if (_thisStack.Count > 0)
+        {
+            var obj = _thisStack.Peek();
+            if (obj.ObjectFields != null && obj.ObjectFields.ContainsKey(name))
+            {
+                obj.ObjectFields[name] = value;
                 return;
             }
         }
