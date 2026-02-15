@@ -60,6 +60,12 @@ public class Lexer
                     tokens.Add(new Token(TokenType.Star));
                     break;
                 case '/':
+                    if (PeekChar() == '/')
+                    {
+                        while (Current != '\n' && Current != '\0')
+                            Advance();
+                        continue;
+                    }
                     tokens.Add(new Token(TokenType.Slash));
                     break;
                 case '(':
@@ -220,7 +226,7 @@ public class Lexer
     {
         var sb = new StringBuilder();
 
-        while (char.IsLetterOrDigit(Current))
+        while (char.IsLetterOrDigit(Current) || Current == '_')
         {
             sb.Append(Current);
             Advance();
@@ -245,6 +251,7 @@ public class Lexer
             "foreach" => new Token(TokenType.Foreach, text),
             "in"  => new Token(TokenType.In, text),
             "struct" => new Token(TokenType.StructKeyword, text),
+            "enum" => new Token(TokenType.Enum, text),
 
             _ => new Token(TokenType.Identifier, text)
         };

@@ -9,6 +9,7 @@ public class Compiler
     private readonly List<Instruction> _instructions = new();
     private Dictionary<string, int> _functions = new();
     private Dictionary<string, List<string>> _structs = new();
+    private Dictionary<string, Dictionary<string, int>> _enums = new();
 
 
     public List<Instruction> Compile(List<Expr> expressions)
@@ -179,12 +180,44 @@ public class Compiler
             _instructions.Add(new Instruction(OpCode.ArrayStore));
         }
 
-        
+        else if (expr is MemberAccessExpr memberAccess)
+        {
+            if (memberAccess.Object is VariableExpr varExpr && _enums.ContainsKey(varExpr.Name))
+            {
+                var enumValues = _enums[varExpr.Name];
+                if (!enumValues.ContainsKey(memberAccess.Member))
+                    throw new Exception($"Unknown enum member {memberAccess.Member} in {varExpr.Name}");
+
+                int value = enumValues[memberAccess.Member];
+                _instructions.Add(new Instruction(OpCode.Push, Value.FromInt(value)));
+            }
+            else
+            {
+                Emit(memberAccess.Object);
+                _instructions.Add(new Instruction(OpCode.LoadField)
+                {
+                    Name = memberAccess.Member
+                });
+            }
+        }
+
         else if (expr is ReturnStatement ret)
         {
             if (ret.Value != null)
                 Emit(ret.Value);
             _instructions.Add(new Instruction(OpCode.Return));
+        }
+
+        else if (expr is EnumDeclaration enumDecl)
+        {
+            var values = new Dictionary<string, int>();
+
+            for (int i = 0; i < enumDecl.Members.Count; i++)
+            {
+                values[enumDecl.Members[i]] = i;
+            }
+
+            _enums[enumDecl.Name] = values;
         }
 
 
@@ -213,15 +246,6 @@ public class Compiler
             var instr = new Instruction(OpCode.Declare);
             instr.Name = decl.Name;
             _instructions.Add(instr);
-        }
-        else if (expr is MemberAccessExpr memberAccessExpr)
-        {
-            Emit(memberAccessExpr.Object);
-
-            _instructions.Add(new Instruction(OpCode.LoadField)
-            {
-                Name = memberAccessExpr.Member
-            });
         }
         else if (expr is MemberAssignmentExpr assignmentExpr)
         {

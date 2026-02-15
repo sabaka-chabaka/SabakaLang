@@ -40,6 +40,7 @@ public class Parser
             Consume();
             Expect(TokenType.RBracket);
         }
+
         return type;
     }
 
@@ -82,6 +83,7 @@ public class Parser
                     return false;
                 offset += 2;
             }
+
             return Peek(offset).Type == TokenType.Identifier;
         }
 
@@ -174,7 +176,6 @@ public class Parser
     }
 
 
-
     private List<Expr> ParseBlockOrStatement()
     {
         if (Current.Type == TokenType.LBrace)
@@ -209,6 +210,11 @@ public class Parser
             stmt = ParseFor();
         else if (Current.Type == TokenType.StructKeyword)
             return ParseStruct();
+        else if (Current.Type == TokenType.Enum)
+        {
+            stmt = ParseEnum();
+        }
+
         else
             stmt = ParseAssignment();
 
@@ -270,7 +276,7 @@ public class Parser
 
                 return new AssignmentExpr(name, value);
             }
-            
+
             if (Peek().Type == TokenType.LBracket)
             {
                 // Potential array assignment: identifier[index] = value
@@ -295,7 +301,7 @@ public class Parser
                     return new ArrayStoreExpr(new VariableExpr(identifier.Value), index, value);
                 }
             }
-            
+
             if (Peek().Type == TokenType.Dot)
             {
                 // Look ahead to see if this is an assignment
@@ -309,7 +315,8 @@ public class Parser
                 {
                     // Member assignment
                     var obj = new VariableExpr(Consume().Value) as Expr;
-                    while (Peek().Type == TokenType.Dot && Peek(2).Type == TokenType.Identifier && Peek(3).Type != TokenType.Equal)
+                    while (Peek().Type == TokenType.Dot && Peek(2).Type == TokenType.Identifier &&
+                           Peek(3).Type != TokenType.Equal)
                     {
                         Consume(); // .
                         obj = new MemberAccessExpr(obj, Consume().Value);
@@ -322,7 +329,6 @@ public class Parser
                     return new MemberAssignmentExpr(obj, member, value);
                 }
             }
-
         }
 
         return ParseLogicalOr();
@@ -409,112 +415,88 @@ public class Parser
     }
 
 
-
     private Expr ParsePrimary()
+{
+    Expr expr;
+
+    // ===== LITERALS =====
+
+    if (Current.Type == TokenType.IntLiteral)
     {
-        if (Current.Type == TokenType.IntLiteral)
+        expr = new IntExpr(int.Parse(Current.Value, CultureInfo.InvariantCulture));
+        Consume();
+    }
+    else if (Current.Type == TokenType.FloatLiteral)
+    {
+        expr = new FloatExpr(double.Parse(Current.Value, CultureInfo.InvariantCulture));
+        Consume();
+    }
+    else if (Current.Type == TokenType.StringLiteral)
+    {
+        expr = new StringExpr(Current.Value);
+        Consume();
+    }
+    else if (Current.Type == TokenType.True)
+    {
+        expr = new BoolExpr(true);
+        Consume();
+    }
+    else if (Current.Type == TokenType.False)
+    {
+        expr = new BoolExpr(false);
+        Consume();
+    }
+    else if (Current.Type == TokenType.Identifier)
+    {
+        expr = new VariableExpr(Current.Value);
+        Consume();
+    }
+    else if (Current.Type == TokenType.LBracket)
+    {
+        Consume();
+        var elements = new List<Expr>();
+        if (Current.Type != TokenType.RBracket)
         {
-            var value = int.Parse(Current.Value, CultureInfo.InvariantCulture);
-            Consume();
-            return new IntExpr(value);
-        }
-
-        if (Current.Type == TokenType.FloatLiteral)
-        {
-            var value = double.Parse(Current.Value, CultureInfo.InvariantCulture);
-            Consume();
-            return new FloatExpr(value);
-        }
-        
-        if (Current.Type == TokenType.StringLiteral)
-        {
-            var value = Current.Value;
-            Consume();
-            return new StringExpr(value);
-        }
-
-
-        if (Current.Type == TokenType.True)
-        {
-            Consume();
-            return new BoolExpr(true);
-        }
-
-        if (Current.Type == TokenType.False)
-        {
-            Consume();
-            return new BoolExpr(false);
-        }
-
-        if (Current.Type == TokenType.Identifier)
-        {
-            var identifier = Consume();
-            Expr expr;
-
-            if (Current.Type == TokenType.LParen)
+            do
             {
+                elements.Add(ParseAssignment());
+                if (Current.Type != TokenType.Comma) break;
                 Consume();
-                var arguments = new List<Expr>();
-                if (Current.Type != TokenType.RParen)
-                {
-                    do
-                    {
-                        arguments.Add(ParseAssignment());
-                        if (Current.Type != TokenType.Comma) break;
-                        Consume();
-                    } while (true);
-                }
-                Expect(TokenType.RParen);
-                expr = new CallExpr(identifier.Value, arguments);
-            }
-            else
-            {
-                expr = new VariableExpr(identifier.Value);
-            }
-
-            while (true)
-            {
-                if (Current.Type == TokenType.LBracket)
-                {
-                    Consume();
-                    var index = ParseAssignment();
-                    Expect(TokenType.RBracket);
-                    expr = new ArrayAccessExpr(expr, index);
-                }
-                else if (Current.Type == TokenType.Dot)
-                {
-                    Consume();
-                    var member = Expect(TokenType.Identifier).Value;
-                    expr = new MemberAccessExpr(expr, member);
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            return expr;
+            } while (true);
         }
+        Expect(TokenType.RBracket);
+        expr = new ArrayExpr(elements);
+    }
+    else if (Current.Type == TokenType.LParen)
+    {
+        Consume();
+        expr = ParseAssignment();
+        Expect(TokenType.RParen);
+    }
+    else
+    {
+        throw new ParserException(
+            $"Unexpected token {Current.Type}",
+            _position
+        );
+    }
 
+    // ===== POSTFIX LOOP =====
+
+    while (true)
+    {
+        // function call
         if (Current.Type == TokenType.LParen)
         {
             Consume();
-            var expr = ParseAssignment();
-            Expect(TokenType.RParen);
-            return expr;
-        }
 
-        if (Current.Type == TokenType.LBracket)
-        {
-            Consume();
+            var arguments = new List<Expr>();
 
-            var elements = new List<Expr>();
-
-            if (Current.Type != TokenType.RBracket)
+            if (Current.Type != TokenType.RParen)
             {
                 do
                 {
-                    elements.Add(ParseAssignment());
+                    arguments.Add(ParseAssignment());
 
                     if (Current.Type != TokenType.Comma)
                         break;
@@ -524,18 +506,43 @@ public class Parser
                 while (true);
             }
 
-            Expect(TokenType.RBracket);
+            Expect(TokenType.RParen);
 
-            return new ArrayExpr(elements);
+            if (expr is VariableExpr varExpr)
+                expr = new CallExpr(varExpr.Name, arguments);
+            else
+                throw new ParserException("Invalid function call target", _position);
+
+            continue;
         }
 
+        // dot access (struct or enum)
+        if (Current.Type == TokenType.Dot)
+        {
+            Consume();
+            var member = Expect(TokenType.Identifier);
 
+            expr = new MemberAccessExpr(expr, member.Value);
+            continue;
+        }
 
-        throw new ParserException(
-            $"Unexpected token {Current.Type}",
-            _position
-        );
+        // array access
+        if (Current.Type == TokenType.LBracket)
+        {
+            Consume();
+            var index = ParseAssignment();
+            Expect(TokenType.RBracket);
+
+            expr = new ArrayAccessExpr(expr, index);
+            continue;
+        }
+
+        break;
     }
+
+    return expr;
+}
+
 
 
     private Expr ParseWhile()
@@ -550,7 +557,7 @@ public class Parser
 
         return new WhileExpr(condition, body);
     }
-    
+
     private Expr ParseLogicalOr()
     {
         var left = ParseLogicalAnd();
@@ -604,8 +611,7 @@ public class Parser
                     break;
 
                 Consume();
-            }
-            while (true);
+            } while (true);
         }
 
         Expect(TokenType.RParen);
@@ -680,7 +686,7 @@ public class Parser
 
         return new ForeachStatement(varName, collection, body);
     }
-    
+
     private Expr ParseStruct()
     {
         Consume(); // struct
@@ -705,4 +711,27 @@ public class Parser
         return new StructDeclaration(name, fields);
     }
 
+    private Expr ParseEnum()
+    {
+        Consume(); // enum
+
+        var name = Expect(TokenType.Identifier).Value;
+
+        Expect(TokenType.LBrace);
+
+        var members = new List<string>();
+
+        while (Current.Type != TokenType.RBrace)
+        {
+            var member = Expect(TokenType.Identifier);
+            members.Add(member.Value);
+
+            if (Current.Type == TokenType.Comma)
+                Consume();
+        }
+
+        Expect(TokenType.RBrace);
+
+        return new EnumDeclaration(name, members);
+    }
 }
