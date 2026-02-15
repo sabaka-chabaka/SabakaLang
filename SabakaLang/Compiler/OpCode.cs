@@ -12,5 +12,12 @@ public enum OpCode
     Store,
     Jump,
     JumpIfFalse,
-    Load
+    Load,
+    Equal,
+    NotEqual,
+    Greater,
+    Less,
+    GreaterEqual,
+    LessEqual,
+
 }

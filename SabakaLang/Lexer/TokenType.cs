@@ -24,6 +24,14 @@ public enum TokenType
     Else,
     LBrace,
     RBrace,
+    
+    EqualEqual,
+    NotEqual,
+    Greater,
+    Less,
+    GreaterEqual,
+    LessEqual,
+
 
     
     EOF

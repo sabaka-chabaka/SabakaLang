@@ -1,8 +1,0 @@
-bool day = true;
-
-if (day)
-{
-    day = false;
-}
-
-print(day);

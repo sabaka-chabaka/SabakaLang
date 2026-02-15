@@ -64,16 +64,56 @@ public class Lexer
                 case ';':
                     tokens.Add(new Token(TokenType.Semicolon));
                     break;
-                case '=':
-                    tokens.Add(new Token(TokenType.Equal));
-                    break;
                 case '{':
                     tokens.Add(new Token(TokenType.LBrace));
                     break;
                 case '}':
                     tokens.Add(new Token(TokenType.RBrace));
                     break;
+                case '=':
+                    if (PeekChar() == '=')
+                    {
+                        Advance();
+                        tokens.Add(new Token(TokenType.EqualEqual));
+                    }
+                    else
+                    {
+                        tokens.Add(new Token(TokenType.Equal));
+                    }
+                    break;
+                case '!':
+                    if (PeekChar() == '=')
+                    {
+                        Advance();
+                        tokens.Add(new Token(TokenType.NotEqual));
+                    }
+                    break;
 
+                case '>':
+                    if (PeekChar() == '=')
+                    {
+                        Advance();
+                        tokens.Add(new Token(TokenType.GreaterEqual));
+                    }
+                    else
+                    {
+                        tokens.Add(new Token(TokenType.Greater));
+                    }
+                    break;
+
+                case '<':
+                    if (PeekChar() == '=')
+                    {
+                        Advance();
+                        tokens.Add(new Token(TokenType.LessEqual));
+                    }
+                    else
+                    {
+                        tokens.Add(new Token(TokenType.Less));
+                    }
+                    break;
+
+                
                 default:
                     throw new LexerException($"Unexpected character '{Current}'", _position);
             }
@@ -120,4 +160,13 @@ public class Lexer
             _ => new Token(TokenType.Identifier, text)
         };
     }
+    
+    private char PeekChar()
+    {
+        if (_position + 1 >= _text.Length)
+            return '\0';
+
+        return _text[_position + 1];
+    }
+
 }

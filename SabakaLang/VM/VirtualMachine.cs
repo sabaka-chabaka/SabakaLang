@@ -66,6 +66,57 @@ public class VirtualMachine
 
                     break;
                 }
+
+                
+                case OpCode.Equal:
+                {
+                    var b = _stack.Pop();
+                    var a = _stack.Pop();
+                    _stack.Push(a == b ? 1 : 0);
+                    break;
+                }
+
+                case OpCode.NotEqual:
+                {
+                    var right = _stack.Pop();
+                    var left = _stack.Pop();
+
+                    _stack.Push(left != right ? 1 : 0);
+                    break;
+                }
+
+                case OpCode.Greater:
+                {
+                    var b = _stack.Pop();
+                    var a = _stack.Pop();
+                    _stack.Push(a > b ? 1 : 0);
+                    break;
+                }
+
+                case OpCode.Less:
+                {
+                    var b = _stack.Pop();
+                    var a = _stack.Pop();
+                    _stack.Push(a < b ? 1 : 0);
+                    break;
+                }
+
+                case OpCode.GreaterEqual:
+                {
+                    var b = _stack.Pop();
+                    var a = _stack.Pop();
+                    _stack.Push(a >= b ? 1 : 0);
+                    break;
+                }
+
+                case OpCode.LessEqual:
+                {
+                    var b = _stack.Pop();
+                    var a = _stack.Pop();
+                    _stack.Push(a <= b ? 1 : 0);
+                    break;
+                }
+
             }
 
             ip++;

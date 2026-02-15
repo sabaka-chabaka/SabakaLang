@@ -70,7 +70,7 @@ public class Parser
         while (Current.Type == TokenType.Plus ||
                Current.Type == TokenType.Minus)
         {
-            var op = Consume();
+            var op = Consume().Type;
             var right = ParseTerm();
             left = new BinaryExpr(left, op, right);
         }
@@ -80,72 +80,17 @@ public class Parser
 
     private Expr ParseTerm()
     {
-        var left = ParseFactor();
+        var left = ParsePrimary();
 
         while (Current.Type == TokenType.Star ||
                Current.Type == TokenType.Slash)
         {
-            var op = Consume();
-            var right = ParseFactor();
+            var op = Consume().Type;
+            var right = ParsePrimary();
             left = new BinaryExpr(left, op, right);
         }
 
         return left;
-    }
-
-    private Expr ParseFactor()
-    {
-        if (Current.Type == TokenType.True)
-        {
-            Consume();
-            return new NumberExpr(1);
-        }
-
-        if (Current.Type == TokenType.False)
-        {
-            Consume();
-            return new NumberExpr(0);
-        }
-
-        
-        if (Current.Type == TokenType.Number)
-        {
-            var number = Consume();
-            return new NumberExpr(double.Parse(number.Value));
-        }
-
-        if (Current.Type == TokenType.Identifier)
-        {
-            var identifier = Consume();
-
-            if (Current.Type == TokenType.LParen)
-            {
-                Consume(); // (
-
-                var argument = ParseExpression();
-
-                Expect(TokenType.RParen);
-
-                return new CallExpr(identifier.Value, argument);
-            }
-
-            // если нет скобок — это переменная
-            return new VariableExpr(identifier.Value);
-        }
-
-
-        if (Current.Type == TokenType.LParen)
-        {
-            Consume();
-            var expr = ParseExpression();
-            Expect(TokenType.RParen);
-            return expr;
-        }
-
-        throw new ParserException(
-            $"Unexpected token {Current.Type}",
-            _position
-        );
     }
 
     private Expr ParseVariableDeclaration()
@@ -166,7 +111,8 @@ public class Parser
         Consume(); // if
 
         Expect(TokenType.LParen);
-        var condition = ParseExpression();
+        var condition = ParseAssignment();
+
         Expect(TokenType.RParen);
 
         var thenBlock = ParseBlock();
@@ -216,16 +162,17 @@ public class Parser
         if (Current.Type == TokenType.Identifier &&
             Peek().Type == TokenType.Equal)
         {
-            var name = Consume().Value; // identifier
-            Consume(); // =
+            var name = Consume().Value;
+            Consume();
 
-            var value = ParseAssignment(); // важно! рекурсивно
+            var value = ParseAssignment();
 
             return new AssignmentExpr(name, value);
         }
 
-        return ParseExpression();
+        return ParseComparison();
     }
+
 
     private Token Peek(int offset = 1)
     {
@@ -234,4 +181,127 @@ public class Parser
 
         return _tokens[_position + offset];
     }
+    
+    private Expr ParseComparison()
+    {
+        var left = ParseAdditive();
+
+        while (Current.Type == TokenType.EqualEqual ||
+               Current.Type == TokenType.NotEqual ||
+               Current.Type == TokenType.Greater ||
+               Current.Type == TokenType.Less ||
+               Current.Type == TokenType.GreaterEqual ||
+               Current.Type == TokenType.LessEqual)
+        {
+            var op = Consume().Type;   // ← вот тут Consume правильно
+            var right = ParseAdditive();
+            left = new BinaryExpr(left, op, right);
+        }
+
+        return left;
+    }
+
+
+
+    private Expr ParseAdditive()
+    {
+        var expr = ParseMultiplicative();
+
+        while (Current.Type == TokenType.Plus ||
+               Current.Type == TokenType.Minus)
+        {
+            var op = Consume().Type;
+            var right = ParseMultiplicative();
+
+            expr = new BinaryExpr(expr, op, right);
+        }
+
+        return expr;
+    }
+
+    private Expr ParseMultiplicative()
+    {
+        var expr = ParseUnary();
+
+        while (Current.Type == TokenType.Star ||
+               Current.Type == TokenType.Slash)
+        {
+            var op = Consume().Type;
+            var right = ParseUnary();
+
+            expr = new BinaryExpr(expr, op, right);
+        }
+
+        return expr;
+    }
+
+    private Expr ParseUnary()
+    {
+        if (Current.Type == TokenType.Minus)
+        {
+            var op = Consume().Type;
+            var right = ParseUnary();
+
+            return new BinaryExpr(
+                new NumberExpr(0),
+                op,
+                right
+            );
+        }
+
+        return ParsePrimary();
+    }
+
+    private Expr ParsePrimary()
+    {
+        if (Current.Type == TokenType.Number)
+        {
+            var number = Consume();
+            return new NumberExpr(double.Parse(number.Value));
+        }
+
+        if (Current.Type == TokenType.True)
+        {
+            Consume();
+            return new NumberExpr(1);
+        }
+
+        if (Current.Type == TokenType.False)
+        {
+            Consume();
+            return new NumberExpr(0);
+        }
+
+        if (Current.Type == TokenType.Identifier)
+        {
+            var identifier = Consume();
+
+            if (Current.Type == TokenType.LParen)
+            {
+                Consume();
+
+                var argument = ParseAssignment();
+
+                Expect(TokenType.RParen);
+
+                return new CallExpr(identifier.Value, argument);
+            }
+
+            return new VariableExpr(identifier.Value);
+        }
+
+        if (Current.Type == TokenType.LParen)
+        {
+            Consume();
+            var expr = ParseAssignment();
+            Expect(TokenType.RParen);
+            return expr;
+        }
+
+        throw new ParserException(
+            $"Unexpected token {Current.Type}",
+            _position
+        );
+    }
+
 }

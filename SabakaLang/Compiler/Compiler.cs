@@ -28,7 +28,7 @@ public class Compiler
             Emit(bin.Left);
             Emit(bin.Right);
 
-            switch (bin.Operator.Type)
+            switch (bin.Operator)
             {
                 case TokenType.Plus:
                     _instructions.Add(new Instruction(OpCode.Add));
@@ -44,6 +44,30 @@ public class Compiler
 
                 case TokenType.Slash:
                     _instructions.Add(new Instruction(OpCode.Div));
+                    break;
+                
+                case TokenType.EqualEqual:
+                    _instructions.Add(new Instruction(OpCode.Equal));
+                    break;
+
+                case TokenType.NotEqual:
+                    _instructions.Add(new Instruction(OpCode.NotEqual));
+                    break;
+
+                case TokenType.Greater:
+                    _instructions.Add(new Instruction(OpCode.Greater));
+                    break;
+
+                case TokenType.Less:
+                    _instructions.Add(new Instruction(OpCode.Less));
+                    break;
+
+                case TokenType.GreaterEqual:
+                    _instructions.Add(new Instruction(OpCode.GreaterEqual));
+                    break;
+
+                case TokenType.LessEqual:
+                    _instructions.Add(new Instruction(OpCode.LessEqual));
                     break;
             }
         }
@@ -119,6 +143,5 @@ public class Compiler
                 Name = assign.Name
             });
         }
-
     }
 }
