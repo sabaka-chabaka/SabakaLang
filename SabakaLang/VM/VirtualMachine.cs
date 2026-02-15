@@ -7,12 +7,25 @@ public class VirtualMachine
 {
     private readonly Stack<Value> _stack = new();
     private readonly Stack<Dictionary<string, Value>> _scopes = new();
+    private Stack<int> _callStack = new();
+    private readonly Dictionary<string, int> _functions = new();
+
 
     public void Execute(List<Instruction> instructions)
     {
         _scopes.Push(new Dictionary<string, Value>());
         int ip = 0;
 
+        // Сканируем инструкции и находим функции
+        for (int i = 0; i < instructions.Count; i++)
+        {
+            if (instructions[i].OpCode == OpCode.Function)
+            {
+                _functions[instructions[i].Name!] = i + 1;
+            }
+        }
+
+        
         while (ip < instructions.Count)
         {
             var instruction = instructions[ip];
@@ -76,6 +89,30 @@ public class VirtualMachine
                     Console.WriteLine(value);
                     break;
                 }
+
+                case OpCode.Call:
+                {
+                    _callStack.Push(ip + 1);
+                    EnterScope();              // 👈 обязательно
+                    ip = _functions[instruction.Name!];
+                    continue;
+                }
+
+
+                
+                case OpCode.Return:
+                {
+                    ExitScope();               // 👈 выйти из scope функции
+                    if (_callStack.Count == 0)
+                    {
+                        // Мы в глобальном коде или что-то пошло не так
+                        // В данном случае, это конец программы
+                        return;
+                    }
+                    ip = _callStack.Pop();
+                    continue;
+                }
+
 
                 case OpCode.Jump:
                     ip = (int)instruction.Operand!;
@@ -212,11 +249,17 @@ public class VirtualMachine
 
                     if (condition.Bool)
                     {
-                        ip = (int)instruction.Operand;
+                        ip = (int)instruction.Operand!;
                         continue;
                     }
 
                     break;
+                }
+
+                case OpCode.Function:
+                {
+                    ip = (int)instruction.Operand!;
+                    continue;
                 }
 
 

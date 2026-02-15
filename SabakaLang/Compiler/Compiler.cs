@@ -7,6 +7,8 @@ namespace SabakaLang.Compiler;
 public class Compiler
 {
     private readonly List<Instruction> _instructions = new();
+    private Dictionary<string, int> _functions = new();
+
 
     public List<Instruction> Compile(List<Expr> expressions)
     {
@@ -20,10 +22,10 @@ public class Compiler
 
     private void Emit(Expr expr)
     {
-        if (expr is IntExpr i)
+        if (expr is IntExpr intExpr)
         {
             _instructions.Add(
-                new Instruction(OpCode.Push, Value.FromInt(i.Value))
+                new Instruction(OpCode.Push, Value.FromInt(intExpr.Value))
             );
         }
         else if (expr is FloatExpr f)
@@ -32,6 +34,36 @@ public class Compiler
                 new Instruction(OpCode.Push, Value.FromFloat(f.Value))
             );
         }
+        else if (expr is FunctionDeclaration func)
+        {
+            var funcStart = new Instruction(OpCode.Function)
+            {
+                Name = func.Name
+            };
+            _instructions.Add(funcStart);
+
+            _functions[func.Name] = _instructions.Count;
+
+            // Emit parameters as declarations from arguments on stack
+            // Arguments are pushed in order, so they are in reverse on stack?
+            // foo(1, 2) -> Push 1, Push 2. Stack: [1, 2].
+            // To get 1 and then 2, we need to pop 2 then 1.
+            for (int i = func.Parameters.Count - 1; i >= 0; i--)
+            {
+                var param = func.Parameters[i];
+                var instr = new Instruction(OpCode.Declare) { Name = param.Name };
+                _instructions.Add(instr);
+            }
+
+            foreach (var stmt in func.Body)
+                Emit(stmt);
+
+            _instructions.Add(new Instruction(OpCode.Push, Value.FromInt(0)));
+            _instructions.Add(new Instruction(OpCode.Return));
+
+            funcStart.Operand = _instructions.Count;
+        }
+
         else if (expr is BinaryExpr bin)
         {
             if (bin.Operator == TokenType.OrOr)
@@ -116,17 +148,30 @@ public class Compiler
         }
         else if (expr is CallExpr call)
         {
-            Emit(call.Argument);
-
             if (call.Name == "print")
             {
+                if (call.Argument != null)
+                    Emit(call.Argument);
                 _instructions.Add(new Instruction(OpCode.Print));
+                return;
             }
-            else
+
+            if (call.Argument != null)
+                Emit(call.Argument);
+
+            _instructions.Add(new Instruction(OpCode.Call)
             {
-                throw new Exception($"Unknown function '{call.Name}'");
-            }
+                Name = call.Name
+            });
         }
+
+        else if (expr is ReturnStatement ret)
+        {
+            if (ret.Value != null)
+                Emit(ret.Value);
+            _instructions.Add(new Instruction(OpCode.Return));
+        }
+
 
         else if (expr is VariableDeclaration decl)
         {

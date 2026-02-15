@@ -40,6 +40,10 @@ public enum TokenType
     StringLiteral,
     StringKeyword,
 
+    Function,      // можно func если хочешь
+    Return,
+    VoidKeyword,
+    Comma,
     
     AndAnd,    // &&
     OrOr,      // ||

@@ -24,5 +24,9 @@ public enum OpCode
     EnterScope,
     ExitScope,
     Not,
+    Call,
+    Return,
+    FunctionStart,
+    Function,
     JumpIfTrue
 }

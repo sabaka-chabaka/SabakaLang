@@ -1,2 +1,1 @@
-string summer = "picun F6";
-print(summer);
+print("Hello world!");

@@ -39,33 +39,22 @@ public class Parser
         {
             Expr expr;
 
-            if (Current.Type == TokenType.If)
+            if ((Current.Type == TokenType.IntKeyword ||
+                 Current.Type == TokenType.FloatKeyword ||
+                 Current.Type == TokenType.BoolKeyword ||
+                 Current.Type == TokenType.StringKeyword ||
+                 Current.Type == TokenType.VoidKeyword) &&
+                Peek().Type == TokenType.Identifier &&
+                Peek(2).Type == TokenType.LParen)
             {
-                expr = ParseIf();
+                expr = ParseFunction();
             }
-            else if (Current.Type == TokenType.While)
-            {
-                expr = ParseWhile();
-            }
-            else if (Current.Type == TokenType.BoolKeyword ||
-                     Current.Type == TokenType.IntKeyword ||
-                     Current.Type == TokenType.FloatKeyword ||
-                     Current.Type == TokenType.StringKeyword)
-            {
-                expr = ParseVariableDeclaration();
-            }
-
             else
             {
-                expr = ParseAssignment();
+                expr = ParseStatement();
             }
 
             expressions.Add(expr);
-
-            if (Current.Type == TokenType.Semicolon)
-            {
-                Consume();
-            }
         }
 
         return expressions;
@@ -115,6 +104,44 @@ public class Parser
     }
 
 
+    private List<Expr> ParseBlockOrStatement()
+    {
+        if (Current.Type == TokenType.LBrace)
+            return ParseBlock();
+
+        var stmt = ParseStatement();
+        return new List<Expr> { stmt };
+    }
+
+    private Expr ParseStatement()
+    {
+        Expr stmt;
+        if (Current.Type == TokenType.If)
+            stmt = ParseIf();
+        else if (Current.Type == TokenType.BoolKeyword ||
+                 Current.Type == TokenType.IntKeyword ||
+                 Current.Type == TokenType.FloatKeyword ||
+                 Current.Type == TokenType.StringKeyword)
+        {
+            stmt = ParseVariableDeclaration();
+        }
+        else if (Current.Type == TokenType.While)
+        {
+            stmt = ParseWhile();
+        }
+        else if (Current.Type == TokenType.Return)
+        {
+            stmt = ParseReturn();
+        }
+        else
+            stmt = ParseAssignment();
+
+        if (Current.Type == TokenType.Semicolon)
+            Consume();
+
+        return stmt;
+    }
+
     private Expr ParseIf()
     {
         Consume(); // if
@@ -124,14 +151,14 @@ public class Parser
 
         Expect(TokenType.RParen);
 
-        var thenBlock = ParseBlock();
+        var thenBlock = ParseBlockOrStatement();
 
         List<Expr>? elseBlock = null;
 
         if (Current.Type == TokenType.Else)
         {
             Consume();
-            elseBlock = ParseBlock();
+            elseBlock = ParseBlockOrStatement();
         }
 
         return new IfStatement(condition, thenBlock, elseBlock);
@@ -146,29 +173,7 @@ public class Parser
         while (Current.Type != TokenType.RBrace &&
                Current.Type != TokenType.EOF)
         {
-            Expr stmt;
-
-            if (Current.Type == TokenType.If)
-                stmt = ParseIf();
-            else if (Current.Type == TokenType.BoolKeyword ||
-                     Current.Type == TokenType.IntKeyword ||
-                     Current.Type == TokenType.FloatKeyword ||
-                     Current.Type == TokenType.StringKeyword)
-            {
-                stmt = ParseVariableDeclaration();
-            }
-
-            else if (Current.Type == TokenType.While)
-            {
-                stmt = ParseWhile();
-            }
-            else
-                stmt = ParseAssignment();
-
-            statements.Add(stmt);
-
-            if (Current.Type == TokenType.Semicolon)
-                Consume();
+            statements.Add(ParseStatement());
         }
 
         Expect(TokenType.RBrace);
@@ -318,15 +323,21 @@ public class Parser
             {
                 Consume();
 
-                var argument = ParseAssignment();
+                Expr? argument = null;
+
+                if (Current.Type != TokenType.RParen)
+                {
+                    argument = ParseAssignment();
+                }
 
                 Expect(TokenType.RParen);
 
-                return new CallExpr(identifier.Value, argument);
+                return new CallExpr(identifier.Value, argument!);
             }
 
             return new VariableExpr(identifier.Value);
         }
+
 
         if (Current.Type == TokenType.LParen)
         {
@@ -382,6 +393,49 @@ public class Parser
         }
 
         return left;
+    }
+
+    private Expr ParseFunction()
+    {
+        var returnType = Consume().Type;
+        var name = Expect(TokenType.Identifier).Value;
+
+        Expect(TokenType.LParen);
+
+        var parameters = new List<Parameter>();
+
+        if (Current.Type != TokenType.RParen)
+        {
+            do
+            {
+                var paramType = Consume().Type;
+                var paramName = Expect(TokenType.Identifier).Value;
+                parameters.Add(new Parameter(paramType, paramName));
+
+                if (Current.Type == TokenType.Comma)
+                    Consume();
+                else
+                    break;
+
+            } while (true);
+        }
+
+        Expect(TokenType.RParen);
+
+        var body = ParseBlock();
+
+        return new FunctionDeclaration(returnType, name, parameters, body);
+    }
+
+    private Expr ParseReturn()
+    {
+        Consume(); // return
+
+        if (Current.Type == TokenType.Semicolon)
+            return new ReturnStatement(null);
+
+        var value = ParseAssignment();
+        return new ReturnStatement(value);
     }
 
 }
