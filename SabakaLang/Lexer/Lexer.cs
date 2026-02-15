@@ -235,6 +235,7 @@ public class Lexer
             "string" => new Token(TokenType.StringKeyword, text),
             "void" => new Token(TokenType.VoidKeyword, text),
             "return" => new Token(TokenType.Return, text),
+            "for" => new Token(TokenType.For, text),
 
             _ => new Token(TokenType.Identifier, text)
         };

@@ -139,8 +139,12 @@ public class Parser
         {
             stmt = ParseReturn();
         }
+        else if (Current.Type == TokenType.For)
+            stmt = ParseFor();
+
         else
             stmt = ParseAssignment();
+        
 
         if (Current.Type == TokenType.Semicolon)
             Consume();
@@ -519,6 +523,38 @@ public class Parser
 
         var value = ParseAssignment();
         return new ReturnStatement(value);
+    }
+
+    private Expr ParseFor()
+    {
+        Consume(); // for
+
+        Expect(TokenType.LParen);
+
+        // init
+        Expr? initializer = null;
+        if (Current.Type != TokenType.Semicolon)
+            initializer = ParseStatement();
+        else
+            Consume();
+
+        // condition
+        Expr? condition = null;
+        if (Current.Type != TokenType.Semicolon)
+            condition = ParseAssignment();
+
+        Expect(TokenType.Semicolon);
+
+        // increment
+        Expr? increment = null;
+        if (Current.Type != TokenType.RParen)
+            increment = ParseAssignment();
+
+        Expect(TokenType.RParen);
+
+        var body = ParseBlockOrStatement();
+
+        return new ForStatement(initializer, condition, increment, body);
     }
 
 }

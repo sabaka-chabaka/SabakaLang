@@ -23,6 +23,7 @@ public enum TokenType
     If,
     Else,
     While,
+    For,
     LBrace,
     RBrace,
     

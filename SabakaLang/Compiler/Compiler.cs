@@ -292,6 +292,39 @@ public class Compiler
                 new Instruction(OpCode.Push, Value.FromString(s.Value))
             );
         }
+        else if (expr is ForStatement forStmt)
+        {
+            _instructions.Add(new Instruction(OpCode.EnterScope));
+
+            // init
+            if (forStmt.Initializer != null)
+                Emit(forStmt.Initializer);
+
+            int loopStart = _instructions.Count;
+
+            // condition
+            if (forStmt.Condition != null)
+                Emit(forStmt.Condition);
+            else
+                _instructions.Add(new Instruction(OpCode.Push, Value.FromBool(true)));
+
+            var jumpIfFalse = new Instruction(OpCode.JumpIfFalse, 0);
+            _instructions.Add(jumpIfFalse);
+
+            // body
+            foreach (var stmt in forStmt.Body)
+                Emit(stmt);
+
+            // increment
+            if (forStmt.Increment != null)
+                Emit(forStmt.Increment);
+
+            _instructions.Add(new Instruction(OpCode.Jump, loopStart));
+
+            jumpIfFalse.Operand = _instructions.Count;
+
+            _instructions.Add(new Instruction(OpCode.ExitScope));
+        }
 
     }
 }
