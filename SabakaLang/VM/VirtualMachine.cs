@@ -394,7 +394,44 @@ public class VirtualMachine
                     break;
                 }
 
+                case OpCode.LoadField:
+                {
+                    var obj = _stack.Pop();
 
+                    if (obj.Type != SabakaType.Struct)
+                        throw new Exception("Not a struct");
+
+                    var value = obj.Struct![instruction.Name!];
+                    _stack.Push(value);
+                    break;
+                }
+
+                case OpCode.StoreField:
+                {
+                    var value = _stack.Pop();
+                    var obj = _stack.Pop();
+
+                    if (obj.Type != SabakaType.Struct)
+                        throw new Exception("Not a struct");
+
+                    obj.Struct![instruction.Name!] = value;
+
+                    break;
+                }
+
+                case OpCode.CreateStruct:
+                {
+                    var fields = (List<string>)instruction.Extra!;
+                    var structData = new Dictionary<string, Value>();
+                    foreach (var field in fields)
+                    {
+                        structData[field] = Value.FromInt(0);
+                    }
+                    _stack.Push(Value.FromStruct(structData));
+                    break;
+                }
+
+                
                 default:
                     throw new Exception($"Unknown opcode {instruction.OpCode}");
             }

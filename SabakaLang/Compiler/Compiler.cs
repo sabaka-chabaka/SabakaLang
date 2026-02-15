@@ -8,6 +8,7 @@ public class Compiler
 {
     private readonly List<Instruction> _instructions = new();
     private Dictionary<string, int> _functions = new();
+    private Dictionary<string, List<string>> _structs = new();
 
 
     public List<Instruction> Compile(List<Expr> expressions)
@@ -189,11 +190,48 @@ public class Compiler
 
         else if (expr is VariableDeclaration decl)
         {
-            Emit(decl.Initializer);
+            if (decl.Initializer != null)
+            {
+                Emit(decl.Initializer);
+            }
+            else
+            {
+                if (decl.CustomType != null && _structs.TryGetValue(decl.CustomType, out var fields))
+                {
+                    _instructions.Add(new Instruction(OpCode.CreateStruct)
+                    {
+                        Name = decl.CustomType,
+                        Extra = fields
+                    });
+                }
+                else
+                {
+                    _instructions.Add(new Instruction(OpCode.Push, Value.FromInt(0)));
+                }
+            }
 
             var instr = new Instruction(OpCode.Declare);
             instr.Name = decl.Name;
             _instructions.Add(instr);
+        }
+        else if (expr is MemberAccessExpr memberAccessExpr)
+        {
+            Emit(memberAccessExpr.Object);
+
+            _instructions.Add(new Instruction(OpCode.LoadField)
+            {
+                Name = memberAccessExpr.Member
+            });
+        }
+        else if (expr is MemberAssignmentExpr assignmentExpr)
+        {
+            Emit(assignmentExpr.Object);
+            Emit(assignmentExpr.Value);
+
+            _instructions.Add(new Instruction(OpCode.StoreField)
+            {
+                Name = assignmentExpr.Member
+            });
         }
 
 
@@ -376,9 +414,10 @@ public class Compiler
 
             _instructions.Add(new Instruction(OpCode.ExitScope));
         }
-
-
-
+        else if (expr is StructDeclaration sd)
+        {
+            _structs[sd.Name] = sd.Fields;
+        }
 
     }
 }

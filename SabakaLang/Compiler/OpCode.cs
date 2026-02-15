@@ -32,5 +32,9 @@ public enum OpCode
     CreateArray,
     ArrayLoad,
     ArrayStore,
-    ArrayLength
+    ArrayLength,
+    CreateStruct,
+    LoadField,
+    StoreField
+
 }

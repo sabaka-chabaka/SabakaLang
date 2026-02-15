@@ -162,6 +162,12 @@ public class Lexer
                     tokens.Add(new Token(TokenType.Comma, ","));
                     break;
                 }
+
+                case '.':
+                {
+                    tokens.Add(new Token(TokenType.Dot, "."));
+                    break;
+                }
                 
                 case '[':
                     tokens.Add(new Token(TokenType.LBracket, "["));
@@ -238,6 +244,7 @@ public class Lexer
             "for" => new Token(TokenType.For, text),
             "foreach" => new Token(TokenType.Foreach, text),
             "in"  => new Token(TokenType.In, text),
+            "struct" => new Token(TokenType.StructKeyword, text),
 
             _ => new Token(TokenType.Identifier, text)
         };

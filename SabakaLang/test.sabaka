@@ -1,1 +1,14 @@
-print("hello world!");
+struct dog
+{
+    string Name;
+    int Age;
+    string Friend;
+}
+
+dog d;
+
+d.Name = "sabaka-chabaka";
+d.Age = "11";
+d.Friend = "github";
+
+print("dog's name: " + d.Name + " | dog's age: " + d.Age + " | dog's friend: " + d.Friend);

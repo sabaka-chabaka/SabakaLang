@@ -48,7 +48,8 @@ public enum TokenType
     
     Foreach,
     In,
-
+    Dot,
+    StructKeyword,
     
     AndAnd,    // &&
     OrOr,      // ||

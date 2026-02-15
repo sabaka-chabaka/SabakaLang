@@ -54,7 +54,7 @@ public class Parser
 
     private bool IsFunctionDeclaration()
     {
-        if (!IsTypeKeyword(Current.Type))
+        if (!IsTypeKeyword(Current.Type) && Current.Type != TokenType.Identifier)
             return false;
 
         int offset = 1;
@@ -66,6 +66,26 @@ public class Parser
         }
 
         return Peek(offset).Type == TokenType.Identifier && Peek(offset + 1).Type == TokenType.LParen;
+    }
+
+    private bool IsVariableDeclaration()
+    {
+        if (IsTypeKeyword(Current.Type) && Current.Type != TokenType.VoidKeyword)
+            return true;
+
+        if (Current.Type == TokenType.Identifier)
+        {
+            int offset = 1;
+            while (Peek(offset).Type == TokenType.LBracket)
+            {
+                if (Peek(offset + 1).Type != TokenType.RBracket)
+                    return false;
+                offset += 2;
+            }
+            return Peek(offset).Type == TokenType.Identifier;
+        }
+
+        return false;
     }
 
     public List<Expr> ParseProgram()
@@ -123,16 +143,36 @@ public class Parser
 
     private Expr ParseVariableDeclaration()
     {
-        var type = ConsumeType(); 
+        var typeToken = Consume();
+
+        while (Current.Type == TokenType.LBracket)
+        {
+            Consume();
+            Expect(TokenType.RBracket);
+        }
+
+        string? customType = null;
+        TokenType type = typeToken.Type;
+
+        // если это не builtin тип — значит struct
+        if (typeToken.Type == TokenType.Identifier)
+        {
+            customType = typeToken.Value;
+        }
 
         var nameToken = Expect(TokenType.Identifier);
 
-        Expect(TokenType.Equal);
+        Expr? initializer = null;
 
-        var value = ParseAssignment();
+        if (Current.Type == TokenType.Equal)
+        {
+            Consume();
+            initializer = ParseAssignment();
+        }
 
-        return new VariableDeclaration(type, nameToken.Value, value);
+        return new VariableDeclaration(type, customType, nameToken.Value, initializer);
     }
+
 
 
     private List<Expr> ParseBlockOrStatement()
@@ -149,7 +189,7 @@ public class Parser
         Expr stmt;
         if (Current.Type == TokenType.If)
             stmt = ParseIf();
-        else if (IsTypeKeyword(Current.Type) && Current.Type != TokenType.VoidKeyword)
+        else if (IsVariableDeclaration())
         {
             stmt = ParseVariableDeclaration();
         }
@@ -165,13 +205,12 @@ public class Parser
         {
             stmt = ParseForeach();
         }
-
         else if (Current.Type == TokenType.For)
             stmt = ParseFor();
-
+        else if (Current.Type == TokenType.StructKeyword)
+            return ParseStruct();
         else
             stmt = ParseAssignment();
-        
 
         if (Current.Type == TokenType.Semicolon)
             Consume();
@@ -256,6 +295,34 @@ public class Parser
                     return new ArrayStoreExpr(new VariableExpr(identifier.Value), index, value);
                 }
             }
+            
+            if (Peek().Type == TokenType.Dot)
+            {
+                // Look ahead to see if this is an assignment
+                int offset = 1;
+                while (Peek(offset).Type == TokenType.Dot && Peek(offset + 1).Type == TokenType.Identifier)
+                {
+                    offset += 2;
+                }
+
+                if (Peek(offset).Type == TokenType.Equal)
+                {
+                    // Member assignment
+                    var obj = new VariableExpr(Consume().Value) as Expr;
+                    while (Peek().Type == TokenType.Dot && Peek(2).Type == TokenType.Identifier && Peek(3).Type != TokenType.Equal)
+                    {
+                        Consume(); // .
+                        obj = new MemberAccessExpr(obj, Consume().Value);
+                    }
+
+                    Consume(); // the last .
+                    var member = Expect(TokenType.Identifier).Value;
+                    Expect(TokenType.Equal);
+                    var value = ParseAssignment();
+                    return new MemberAssignmentExpr(obj, member, value);
+                }
+            }
+
         }
 
         return ParseLogicalOr();
@@ -382,43 +449,51 @@ public class Parser
         if (Current.Type == TokenType.Identifier)
         {
             var identifier = Consume();
+            Expr expr;
 
             if (Current.Type == TokenType.LParen)
             {
                 Consume();
-
                 var arguments = new List<Expr>();
-
                 if (Current.Type != TokenType.RParen)
                 {
                     do
                     {
                         arguments.Add(ParseAssignment());
-
-                        if (Current.Type != TokenType.Comma)
-                            break;
-
+                        if (Current.Type != TokenType.Comma) break;
                         Consume();
-                    }
-                    while (true);
+                    } while (true);
                 }
-
                 Expect(TokenType.RParen);
-
-                return new CallExpr(identifier.Value, arguments);
+                expr = new CallExpr(identifier.Value, arguments);
             }
-
-            if (Current.Type == TokenType.LBracket)
+            else
             {
-                Consume();
-                var index = ParseAssignment();
-                Expect(TokenType.RBracket);
-
-                return new ArrayAccessExpr(new VariableExpr(identifier.Value), index);
+                expr = new VariableExpr(identifier.Value);
             }
 
-            
-            return new VariableExpr(identifier.Value);
+            while (true)
+            {
+                if (Current.Type == TokenType.LBracket)
+                {
+                    Consume();
+                    var index = ParseAssignment();
+                    Expect(TokenType.RBracket);
+                    expr = new ArrayAccessExpr(expr, index);
+                }
+                else if (Current.Type == TokenType.Dot)
+                {
+                    Consume();
+                    var member = Expect(TokenType.Identifier).Value;
+                    expr = new MemberAccessExpr(expr, member);
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return expr;
         }
 
         if (Current.Type == TokenType.LParen)
@@ -605,4 +680,29 @@ public class Parser
 
         return new ForeachStatement(varName, collection, body);
     }
+    
+    private Expr ParseStruct()
+    {
+        Consume(); // struct
+
+        var name = Expect(TokenType.Identifier).Value;
+
+        Expect(TokenType.LBrace);
+
+        var fields = new List<string>();
+
+        while (Current.Type != TokenType.RBrace)
+        {
+            ConsumeType(); // тип
+            var fieldName = Expect(TokenType.Identifier).Value;
+            Expect(TokenType.Semicolon);
+
+            fields.Add(fieldName);
+        }
+
+        Expect(TokenType.RBrace);
+
+        return new StructDeclaration(name, fields);
+    }
+
 }

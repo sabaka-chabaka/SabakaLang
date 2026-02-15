@@ -6,5 +6,6 @@ public enum SabakaType
     Float,
     Bool,
     String,
-    Array
+    Array,
+    Struct
 }
