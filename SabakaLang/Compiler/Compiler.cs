@@ -98,7 +98,7 @@ public class Compiler
         {
             Emit(decl.Initializer);
 
-            var instr = new Instruction(OpCode.Store);
+            var instr = new Instruction(OpCode.Declare);
             instr.Name = decl.Name;
             _instructions.Add(instr);
         }
@@ -117,6 +117,7 @@ public class Compiler
 
             var jumpIfFalseIndex = _instructions.Count;
             _instructions.Add(new Instruction(OpCode.JumpIfFalse));
+            _instructions.Add(new Instruction(OpCode.EnterScope));
 
             // then block
             foreach (var stmt in ifStmt.ThenBlock)
@@ -131,9 +132,15 @@ public class Compiler
                 _instructions[jumpIfFalseIndex].Operand =
                     _instructions.Count;
 
+                
+                _instructions.Add(new Instruction(OpCode.EnterScope));
+                
                 foreach (var stmt in ifStmt.ElseBlock)
                     Emit(stmt);
 
+                
+                _instructions.Add(new Instruction(OpCode.ExitScope));
+                
                 // patch jump
                 _instructions[jumpIndex].Operand =
                     _instructions.Count;
@@ -143,6 +150,9 @@ public class Compiler
                 _instructions[jumpIfFalseIndex].Operand =
                     _instructions.Count;
             }
+            
+            _instructions.Add(new Instruction(OpCode.ExitScope));
+
         }
         else if (expr is AssignmentExpr assign)
         {
@@ -161,10 +171,14 @@ public class Compiler
 
             var jumpIfFalse = new Instruction(OpCode.JumpIfFalse, 0);
             _instructions.Add(jumpIfFalse);
+            _instructions.Add(new Instruction(OpCode.EnterScope));
 
             foreach (var e in whileExpr.Body)
                 Emit(e);
 
+            _instructions.Add(new Instruction(OpCode.ExitScope));
+
+            
             _instructions.Add(new Instruction(OpCode.Jump, loopStart));
 
             jumpIfFalse.Operand = _instructions.Count;

@@ -6,10 +6,11 @@ namespace SabakaLang.VM;
 public class VirtualMachine
 {
     private readonly Stack<Value> _stack = new();
-    private readonly Dictionary<string, Value> _variables = new();
+    private readonly Stack<Dictionary<string, Value>> _scopes = new();
 
     public void Execute(List<Instruction> instructions)
     {
+        _scopes.Push(new Dictionary<string, Value>());
         int ip = 0;
 
         while (ip < instructions.Count)
@@ -41,16 +42,13 @@ public class VirtualMachine
                 case OpCode.Store:
                 {
                     var value = _stack.Pop();
-                    _variables[instruction.Name!] = value;
+                    _scopes.Peek()[instruction.Name!] = value;
                     break;
                 }
 
                 case OpCode.Load:
                 {
-                    if (!_variables.TryGetValue(instruction.Name!, out var value))
-                        throw new Exception($"Undefined variable '{instruction.Name}'");
-
-                    _stack.Push(value);
+                    _stack.Push(GetVariable(instruction.Name!));
                     break;
                 }
 
@@ -152,6 +150,22 @@ public class VirtualMachine
 
                     break;
                 }
+                
+                case OpCode.Declare:
+                {
+                    var value = _stack.Pop();
+                    _scopes.Peek()[instruction.Name!] = value;
+                    break;
+                }
+
+                case OpCode.EnterScope:
+                    EnterScope();
+                    break;
+
+                case OpCode.ExitScope:
+                    ExitScope();
+                    break;
+
 
                 default:
                     throw new Exception($"Unknown opcode {instruction.OpCode}");
@@ -226,4 +240,26 @@ public class VirtualMachine
             _ => throw new Exception("Not a number")
         };
     }
+
+    private void EnterScope()
+    {
+        _scopes.Push(new Dictionary<string, Value>());
+    }
+
+    private void ExitScope()
+    {
+        _scopes.Pop();
+    }
+    
+    private Value GetVariable(string name)
+    {
+        foreach (var scope in _scopes)
+        {
+            if (scope.TryGetValue(name, out var value))
+                return value;
+        }
+
+        throw new Exception($"Undefined variable '{name}'");
+    }
+
 }

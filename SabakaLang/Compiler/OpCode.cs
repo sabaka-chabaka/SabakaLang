@@ -19,5 +19,8 @@ public enum OpCode
     Less,
     GreaterEqual,
     LessEqual,
-    Negate
+    Negate,
+    Declare,
+    EnterScope,
+    ExitScope
 }

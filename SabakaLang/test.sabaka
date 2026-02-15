@@ -1,6 +1,9 @@
-int i = 5;
-while (i > 0)
+int x = 1;
+
+if (true)
 {
-    i = i - 1;
-    print(i);
+    int x = 2;
+    print(x); 
 }
+
+print(x); 
