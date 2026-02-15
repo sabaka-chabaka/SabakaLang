@@ -43,14 +43,16 @@ public class Parser
             {
                 expr = ParseIf();
             }
+            else if (Current.Type == TokenType.While)
+            {
+                expr = ParseWhile();
+            }
             else if (Current.Type == TokenType.BoolKeyword ||
                      Current.Type == TokenType.IntKeyword ||
                      Current.Type == TokenType.FloatKeyword)
             {
                 expr = ParseVariableDeclaration();
             }
-
-
             else
             {
                 expr = ParseAssignment();
