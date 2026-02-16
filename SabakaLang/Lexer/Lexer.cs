@@ -169,6 +169,12 @@ public class Lexer
                     break;
                 }
 
+                case ':':
+                {
+                    tokens.Add(new Token(TokenType.Colon, ":"));
+                    break;
+                }
+
                 case '.':
                 {
                     tokens.Add(new Token(TokenType.Dot, "."));
@@ -254,6 +260,7 @@ public class Lexer
             "enum" => new Token(TokenType.Enum, text),
             "class" => new Token(TokenType.Class, text),
             "new" => new Token(TokenType.New, text),
+            "override" => new Token(TokenType.Override, text),
 
             _ => new Token(TokenType.Identifier, text)
         };

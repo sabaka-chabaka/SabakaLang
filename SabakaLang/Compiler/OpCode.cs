@@ -40,5 +40,6 @@ public enum OpCode
     CallMethod,
     PushThis,
     Dup,
-    Pop
+    Pop,
+    Inherit
 }

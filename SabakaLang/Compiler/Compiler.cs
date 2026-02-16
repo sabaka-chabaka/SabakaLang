@@ -42,10 +42,20 @@ public class Compiler
         else if (expr is ClassDeclaration classDecl)
         {
             _classes[classDecl.Name] = classDecl;
+
+            if (classDecl.BaseClassName != null)
+            {
+                _instructions.Add(new Instruction(OpCode.Inherit)
+                {
+                    Name = classDecl.Name,
+                    Operand = classDecl.BaseClassName
+                });
+            }
+
             var oldClass = _currentClass;
             _currentClass = classDecl.Name;
 
-            var fields = classDecl.Fields.Select(f => f.Name).ToList();
+            var fields = GetAllFields(classDecl.Name);
 
             foreach (var method in classDecl.Methods)
             {
@@ -72,9 +82,8 @@ public class Compiler
         }
         else if (expr is NewExpr newExpr)
         {
-            var fields = _classes.TryGetValue(newExpr.ClassName, out var cd)
-                ? cd.Fields.Select(f => f.Name).ToList()
-                : new List<string>();
+            var fields = GetAllFields(newExpr.ClassName);
+            var cd = _classes.GetValueOrDefault(newExpr.ClassName);
 
             _instructions.Add(new Instruction(OpCode.CreateObject)
             {
@@ -83,6 +92,13 @@ public class Compiler
             });
 
             bool hasConstructor = cd != null && cd.Methods.Any(m => m.Name == newExpr.ClassName);
+            if (!hasConstructor && cd?.BaseClassName != null)
+            {
+                // check base class for constructor?
+                // For now let's assume constructors are not automatically inherited or we just check the chain
+                hasConstructor = HasConstructorInChain(newExpr.ClassName);
+            }
+
             if (hasConstructor)
             {
                 _instructions.Add(new Instruction(OpCode.Dup));
@@ -91,7 +107,7 @@ public class Compiler
 
                 _instructions.Add(new Instruction(OpCode.CallMethod, newExpr.Arguments.Count)
                 {
-                    Name = newExpr.ClassName
+                    Name = newExpr.ClassName // This will be resolved by VM lookup
                 });
                 _instructions.Add(new Instruction(OpCode.Pop));
             }
@@ -360,10 +376,10 @@ public class Compiler
                     _instructions.Add(new Instruction(OpCode.CreateObject)
                     {
                         Name = decl.CustomType,
-                        Extra = cDecl2.Fields.Select(f => f.Name).ToList()
+                        Extra = GetAllFields(decl.CustomType)
                     });
 
-                    bool hasConstructor = cDecl2.Methods.Any(m => m.Name == decl.CustomType);
+                    bool hasConstructor = HasConstructorInChain(decl.CustomType);
                     if (hasConstructor)
                     {
                         _instructions.Add(new Instruction(OpCode.Dup));
@@ -580,5 +596,39 @@ public class Compiler
             _structs[sd.Name] = sd.Fields;
         }
 
+    }
+
+    private List<string> GetAllFields(string className)
+    {
+        var fields = new List<string>();
+        if (_classes.TryGetValue(className, out var cd))
+        {
+            if (cd.BaseClassName != null)
+            {
+                fields.AddRange(GetAllFields(cd.BaseClassName));
+            }
+
+            foreach (var f in cd.Fields)
+            {
+                fields.Add(f.Name);
+            }
+        }
+
+        return fields;
+    }
+
+    private bool HasConstructorInChain(string className)
+    {
+        if (_classes.TryGetValue(className, out var cd))
+        {
+            // Constructor has the same name as the class it's defined in
+            if (cd.Methods.Any(m => m.Name == cd.Name))
+                return true;
+
+            if (cd.BaseClassName != null)
+                return HasConstructorInChain(cd.BaseClassName);
+        }
+
+        return false;
     }
 }

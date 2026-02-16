@@ -13,6 +13,7 @@ public class VirtualMachine
     private Stack<Value> _thisStack = new();
     private Stack<bool> _methodCallStack = new();
     private readonly Dictionary<string, FunctionInfo> _functions = new();
+    private readonly Dictionary<string, string> _inheritance = new();
 
 
 
@@ -21,7 +22,7 @@ public class VirtualMachine
         _scopes.Push(new Dictionary<string, Value>());
         int ip = 0;
 
-        // Сканируем инструкции и находим функции
+        // Сканируем инструкции и находим функции и наследование
         for (int i = 0; i < instructions.Count; i++)
         {
             if (instructions[i].OpCode == OpCode.Function)
@@ -34,7 +35,10 @@ public class VirtualMachine
 
                 _functions[instructions[i].Name!] = info;
             }
-
+            else if (instructions[i].OpCode == OpCode.Inherit)
+            {
+                _inheritance[instructions[i].Name!] = (string)instructions[i].Operand!;
+            }
         }
 
         
@@ -207,10 +211,7 @@ public class VirtualMachine
                     if (obj.Type != SabakaType.Object)
                         throw new Exception("Cannot call method on non-object");
 
-                    var methodName = $"{obj.ClassName}.{instruction.Name}";
-
-                    if (!_functions.TryGetValue(methodName, out var function))
-                        throw new Exception($"Undefined method '{methodName}'");
+                    var function = ResolveMethod(obj.ClassName!, instruction.Name!);
 
                     _callStack.Push(ip + 1);
                     _scopeDepthStack.Push(_scopes.Count);
@@ -227,6 +228,12 @@ public class VirtualMachine
 
                     ip = function.Address;
                     continue;
+                }
+
+                case OpCode.Inherit:
+                {
+                    // Already handled in pre-scan
+                    break;
                 }
 
                 case OpCode.Call:
@@ -691,6 +698,26 @@ public class VirtualMachine
         }
 
         throw new Exception($"Undefined variable '{name}'");
+    }
+
+    private FunctionInfo ResolveMethod(string className, string methodName)
+    {
+        string fqn = $"{className}.{methodName}";
+        if (_functions.TryGetValue(fqn, out var function))
+            return function;
+
+        if (_inheritance.TryGetValue(className, out var baseClassName))
+        {
+            // If it's a constructor call (method name matches the class name),
+            // we should look for the base constructor in the base class.
+            string nextMethodName = methodName;
+            if (methodName == className)
+                nextMethodName = baseClassName;
+
+            return ResolveMethod(baseClassName, nextMethodName);
+        }
+
+        throw new Exception($"Undefined method '{methodName}' in class '{className}'");
     }
 
 }

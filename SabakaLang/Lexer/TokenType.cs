@@ -61,6 +61,8 @@ public enum TokenType
     
     Class,
     New,
+    Override,
+    Colon,
     
     EOF
 }

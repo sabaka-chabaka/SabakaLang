@@ -1,20 +1,15 @@
-class Player
+class Animal
 {
-    int hp;
-    string name;
+    void GetAge() {}
+}
 
-    void Player(int health, string inName)
+class Dog : Animal
+{
+    override void GetAge()
     {
-        hp = health;
-        name = inName;
-    }
-    
-    void printSome()
-    {
-        print(hp);
-        print(name);
+        print(15);
     }
 }
 
-Player p = new Player(100, "Junie");
-p.printSome();
+Dog d = new Dog();
+d.GetAge();

@@ -55,10 +55,14 @@ public class Parser
 
     private bool IsFunctionDeclaration()
     {
-        if (!IsTypeKeyword(Current.Type) && Current.Type != TokenType.Identifier)
+        int offset = 0;
+        if (Current.Type == TokenType.Override)
+            offset = 1;
+
+        if (!IsTypeKeyword(Peek(offset).Type) && Peek(offset).Type != TokenType.Identifier)
             return false;
 
-        int offset = 1;
+        offset++;
         while (Peek(offset).Type == TokenType.LBracket)
         {
             if (Peek(offset + 1).Type != TokenType.RBracket)
@@ -590,6 +594,13 @@ public class Parser
 
     private Expr ParseFunction()
     {
+        bool isOverride = false;
+        if (Current.Type == TokenType.Override)
+        {
+            Consume();
+            isOverride = true;
+        }
+
         var returnType = ConsumeType();
         var name = Expect(TokenType.Identifier).Value;
 
@@ -620,7 +631,7 @@ public class Parser
 
         var body = ParseBlock();
 
-        return new FunctionDeclaration(returnType, name, parameters, body);
+        return new FunctionDeclaration(returnType, name, parameters, body, isOverride);
     }
 
 
@@ -743,6 +754,13 @@ public class Parser
 
         var name = Expect(TokenType.Identifier).Value;
 
+        string? baseClassName = null;
+        if (Current.Type == TokenType.Colon)
+        {
+            Consume();
+            baseClassName = Expect(TokenType.Identifier).Value;
+        }
+
         Expect(TokenType.LBrace);
 
         var fields = new List<VariableDeclaration>();
@@ -764,7 +782,7 @@ public class Parser
 
         Expect(TokenType.RBrace);
 
-        return new ClassDeclaration(name, fields, methods);
+        return new ClassDeclaration(name, baseClassName, fields, methods);
     }
 
 }
