@@ -9,7 +9,9 @@ public class VirtualMachine
     private readonly Stack<Dictionary<string, Value>> _scopes = new();
     private Stack<int> _callStack = new();
     private Stack<int> _scopeDepthStack = new();
+    private Stack<int> _stackDepthStack = new();
     private Stack<Value> _thisStack = new();
+    private Stack<bool> _methodCallStack = new();
     private readonly Dictionary<string, FunctionInfo> _functions = new();
 
 
@@ -69,6 +71,20 @@ public class VirtualMachine
                 {
                     if (_thisStack.Count == 0) throw new Exception("No 'this' in current context");
                     _stack.Push(_thisStack.Peek());
+                    break;
+                }
+
+                case OpCode.Dup:
+                {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in Dup");
+                    _stack.Push(_stack.Peek());
+                    break;
+                }
+
+                case OpCode.Pop:
+                {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in Pop");
+                    _stack.Pop();
                     break;
                 }
 
@@ -142,7 +158,9 @@ public class VirtualMachine
                 {
                     var obj = _stack.Pop();
                     if (obj.Type != SabakaType.Object && obj.Type != SabakaType.Struct)
+                    {
                         throw new Exception("Cannot load field from non-object/struct");
+                    }
 
                     var fields = obj.Type == SabakaType.Object ? obj.ObjectFields : obj.Struct;
                     if (fields == null) throw new Exception("Fields dictionary is null");
@@ -196,7 +214,9 @@ public class VirtualMachine
 
                     _callStack.Push(ip + 1);
                     _scopeDepthStack.Push(_scopes.Count);
+                    _stackDepthStack.Push(_stack.Count);
                     _thisStack.Push(obj);
+                    _methodCallStack.Push(true);
 
                     EnterScope();
 
@@ -227,6 +247,8 @@ public class VirtualMachine
 
                     _callStack.Push(ip + 1);
                     _scopeDepthStack.Push(_scopes.Count);
+                    _stackDepthStack.Push(_stack.Count);
+                    _methodCallStack.Push(false);
 
                     EnterScope();
 
@@ -291,14 +313,23 @@ public class VirtualMachine
                 case OpCode.Return:
                 {
                     Value returnValue = Value.FromInt(0); // Default for void
-                    if (_stack.Count > 0)
+                    int targetStackDepth = _stackDepthStack.Count > 0 ? _stackDepthStack.Pop() : 0;
+
+                    if (_stack.Count > targetStackDepth)
                     {
                         returnValue = _stack.Pop();
+                        while (_stack.Count > targetStackDepth)
+                        {
+                            _stack.Pop();
+                        }
                     }
 
-                    if (_thisStack.Count > 0)
+                    if (_methodCallStack.Count > 0 && _methodCallStack.Pop())
                     {
-                        _thisStack.Pop();
+                        if (_thisStack.Count > 0)
+                        {
+                            _thisStack.Pop();
+                        }
                     }
 
                     if (_scopeDepthStack.Count > 0)

@@ -405,9 +405,19 @@ public class Parser
         var name = Expect(TokenType.Identifier).Value;
 
         Expect(TokenType.LParen);
+        var arguments = new List<Expr>();
+        if (Current.Type != TokenType.RParen)
+        {
+            do
+            {
+                arguments.Add(ParseAssignment());
+                if (Current.Type != TokenType.Comma) break;
+                Consume();
+            } while (true);
+        }
         Expect(TokenType.RParen);
 
-        return new NewExpr(name);
+        return new NewExpr(name, arguments);
     }
 
     if (Current.Type == TokenType.IntLiteral)

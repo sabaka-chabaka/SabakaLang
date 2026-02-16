@@ -38,5 +38,7 @@ public enum OpCode
     StoreField,
     CreateObject,
     CallMethod,
-    PushThis
+    PushThis,
+    Dup,
+    Pop
 }

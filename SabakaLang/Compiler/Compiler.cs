@@ -81,6 +81,24 @@ public class Compiler
                 Name = newExpr.ClassName,
                 Extra = fields
             });
+
+            bool hasConstructor = cd != null && cd.Methods.Any(m => m.Name == newExpr.ClassName);
+            if (hasConstructor)
+            {
+                _instructions.Add(new Instruction(OpCode.Dup));
+                foreach (var arg in newExpr.Arguments)
+                    Emit(arg);
+
+                _instructions.Add(new Instruction(OpCode.CallMethod, newExpr.Arguments.Count)
+                {
+                    Name = newExpr.ClassName
+                });
+                _instructions.Add(new Instruction(OpCode.Pop));
+            }
+            else if (newExpr.Arguments.Count > 0)
+            {
+                throw new Exception($"Class {newExpr.ClassName} does not have a constructor.");
+            }
         }
         else if (expr is FunctionDeclaration func)
         {
@@ -201,6 +219,24 @@ public class Compiler
                     Name = call.Name,
                     Extra = cDecl.Fields.Select(f => f.Name).ToList()
                 });
+
+                bool hasConstructor = cDecl.Methods.Any(m => m.Name == call.Name);
+                if (hasConstructor)
+                {
+                    _instructions.Add(new Instruction(OpCode.Dup));
+                    foreach (var arg in call.Arguments)
+                        Emit(arg);
+
+                    _instructions.Add(new Instruction(OpCode.CallMethod, call.Arguments.Count)
+                    {
+                        Name = call.Name
+                    });
+                    _instructions.Add(new Instruction(OpCode.Pop));
+                }
+                else if (call.Arguments.Count > 0)
+                {
+                    throw new Exception($"Class {call.Name} does not have a constructor.");
+                }
                 return;
             }
 
@@ -326,6 +362,17 @@ public class Compiler
                         Name = decl.CustomType,
                         Extra = cDecl2.Fields.Select(f => f.Name).ToList()
                     });
+
+                    bool hasConstructor = cDecl2.Methods.Any(m => m.Name == decl.CustomType);
+                    if (hasConstructor)
+                    {
+                        _instructions.Add(new Instruction(OpCode.Dup));
+                        _instructions.Add(new Instruction(OpCode.CallMethod, 0)
+                        {
+                            Name = decl.CustomType
+                        });
+                        _instructions.Add(new Instruction(OpCode.Pop));
+                    }
                 }
                 else
                 {

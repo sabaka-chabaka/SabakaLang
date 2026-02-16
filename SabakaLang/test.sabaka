@@ -3,14 +3,18 @@ class Player
     int hp;
     string name;
 
-    void printName()
+    void Player(int health, string inName)
     {
+        hp = health;
+        name = inName;
+    }
+    
+    void printSome()
+    {
+        print(hp);
         print(name);
     }
 }
 
-Player p = new Player();
-p.hp = 100;
-p.name = "Junie";
-p.printName();
-print(p.hp);
+Player p = new Player(100, "Junie");
+p.printSome();
