@@ -67,6 +67,10 @@ public enum TokenType
     Super,
     Interface,
     
+    Switch,
+    Case,
+    Default,
+    
     Public,
     Private,
     Protected,

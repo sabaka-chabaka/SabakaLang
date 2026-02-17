@@ -203,6 +203,8 @@ public class Parser
         Expr stmt;
         if (Current.Type == TokenType.If)
             stmt = ParseIf();
+        else if (Current.Type == TokenType.Switch)
+            stmt = ParseSwitch();
         else if (IsVariableDeclaration())
         {
             stmt = ParseVariableDeclaration();
@@ -270,6 +272,50 @@ public class Parser
         }
 
         return new IfStatement(condition, thenBlock, elseBlock);
+    }
+
+    private Expr ParseSwitch()
+    {
+        Consume(); // switch
+
+        Expect(TokenType.LParen);
+        var expression = ParseAssignment();
+        Expect(TokenType.RParen);
+
+        Expect(TokenType.LBrace);
+        var cases = new List<SwitchCase>();
+        bool hasDefault = false;
+
+        while (Current.Type != TokenType.RBrace && Current.Type != TokenType.EOF)
+        {
+            if (Current.Type == TokenType.Case)
+            {
+                Consume(); // case
+                var value = ParseAssignment();
+                Expect(TokenType.Colon);
+                var body = ParseBlockOrStatement();
+                cases.Add(new SwitchCase(value, body));
+            }
+            else if (Current.Type == TokenType.Default)
+            {
+                if (hasDefault)
+                    throw new ParserException("Switch statement already has a default case", _position);
+                
+                Consume(); // default
+                hasDefault = true;
+                Expect(TokenType.Colon);
+                var body = ParseBlockOrStatement();
+                cases.Add(new SwitchCase(null, body));
+            }
+            else
+            {
+                throw new ParserException($"Expected 'case' or 'default', got {Current.Type}", _position);
+            }
+        }
+
+        Expect(TokenType.RBrace);
+
+        return new SwitchStatement(expression, cases);
     }
 
     private List<Expr> ParseBlock()

@@ -86,6 +86,9 @@ public class Colorizer : DocumentColorizingTransformer
             TokenType.Private => Brushes.DodgerBlue,
             TokenType.New => Brushes.DodgerBlue,
             TokenType.Interface => Brushes.DodgerBlue,
+            TokenType.Switch => Brushes.DodgerBlue,
+            TokenType.Case => Brushes.DodgerBlue,
+            TokenType.Default => Brushes.DodgerBlue,
             
             _ => Brushes.White
         };

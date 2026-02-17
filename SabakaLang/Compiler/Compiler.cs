@@ -620,6 +620,57 @@ public class Compiler
             _instructions.Add(new Instruction(OpCode.ExitScope));
             PopScope();
         }
+        else if (expr is SwitchStatement switchStmt)
+        {
+            _instructions.Add(new Instruction(OpCode.EnterScope));
+            PushScope();
+
+            string switchVarName = "$switch_val_" + _instructions.Count;
+            Emit(switchStmt.Expression);
+            _instructions.Add(new Instruction(OpCode.Declare) { Name = switchVarName });
+            DeclareVar(switchVarName, "object");
+
+            var caseEndJumps = new List<int>();
+            SwitchCase? defaultCase = null;
+
+            foreach (var @case in switchStmt.Cases)
+            {
+                if (@case.Value == null)
+                {
+                    defaultCase = @case;
+                    continue;
+                }
+
+                _instructions.Add(new Instruction(OpCode.Load) { Name = switchVarName });
+                Emit(@case.Value);
+                _instructions.Add(new Instruction(OpCode.Equal));
+
+                var nextCaseJumpIndex = _instructions.Count;
+                _instructions.Add(new Instruction(OpCode.JumpIfFalse));
+
+                foreach (var stmt in @case.Body)
+                    Emit(stmt);
+
+                caseEndJumps.Add(_instructions.Count);
+                _instructions.Add(new Instruction(OpCode.Jump));
+
+                _instructions[nextCaseJumpIndex].Operand = _instructions.Count;
+            }
+
+            if (defaultCase != null)
+            {
+                foreach (var stmt in defaultCase.Body)
+                    Emit(stmt);
+            }
+
+            foreach (var jumpIndex in caseEndJumps)
+            {
+                _instructions[jumpIndex].Operand = _instructions.Count;
+            }
+
+            _instructions.Add(new Instruction(OpCode.ExitScope));
+            PopScope();
+        }
         else if (expr is AssignmentExpr assign)
         {
             if (_currentClass != null)
