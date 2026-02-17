@@ -15,8 +15,14 @@ public class VirtualMachine
     private Stack<bool> _methodCallStack = new();
     private readonly Dictionary<string, FunctionInfo> _functions = new();
     private readonly Dictionary<string, string> _inheritance = new();
+    private readonly TextReader _input;
+    private readonly TextWriter _output;
 
-
+    public VirtualMachine(TextReader? input = null, TextWriter? output = null)
+    {
+        _input = input ?? Console.In;
+        _output = output ?? Console.Out;
+    }
 
     public void Execute(List<Instruction> instructions)
     {
@@ -155,13 +161,13 @@ public class VirtualMachine
                 {
                     if (_stack.Count == 0) throw new Exception("Stack empty in Print");
                     var value = _stack.Pop();
-                    Console.WriteLine(value);
+                    _output.WriteLine(value.ToString());
                     break;
                 }
 
                 case OpCode.Input:
                 {
-                    var line = Console.ReadLine() ?? "";
+                    var line = _input.ReadLine() ?? "";
                     if (int.TryParse(line, out int intVal))
                     {
                         _stack.Push(Value.FromInt(intVal));
