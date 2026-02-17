@@ -12,6 +12,7 @@ public class Compiler
     private Dictionary<string, List<string>> _structs = new();
     private Dictionary<string, Dictionary<string, int>> _enums = new();
     private Dictionary<string, ClassDeclaration> _classes = new();
+    private Dictionary<string, InterfaceDeclaration> _interfaces = new();
     private string? _currentClass = null;
 
 
@@ -44,18 +45,47 @@ public class Compiler
         {
             _classes[classDecl.Name] = classDecl;
 
+            string? actualBaseClass = null;
+            var allInterfaces = new List<string>(classDecl.Interfaces);
+
             if (classDecl.BaseClassName != null)
+            {
+                if (_interfaces.ContainsKey(classDecl.BaseClassName))
+                {
+                    allInterfaces.Add(classDecl.BaseClassName);
+                }
+                else
+                {
+                    actualBaseClass = classDecl.BaseClassName;
+                }
+            }
+
+            if (actualBaseClass != null)
             {
                 _instructions.Add(new Instruction(OpCode.Inherit)
                 {
                     Name = classDecl.Name,
-                    Operand = classDecl.BaseClassName
+                    Operand = actualBaseClass
                 });
+            }
+
+            // Interface implementation check
+            foreach (var interfaceName in allInterfaces)
+            {
+                var ifaceMethods = GetAllInterfaceMethods(interfaceName);
+
+                foreach (var ifaceMethod in ifaceMethods)
+                {
+                    if (!HasMethodInChain(classDecl.Name, ifaceMethod.Name, ifaceMethod.Parameters.Count))
+                    {
+                        throw new CompilerException($"Class {classDecl.Name} does not implement interface method {ifaceMethod.Name}", 0);
+                    }
+                }
             }
 
             var oldClass = _currentClass;
             _currentClass = classDecl.Name;
-
+            
             var fields = GetAllFields(classDecl.Name);
 
             foreach (var method in classDecl.Methods)
@@ -80,6 +110,10 @@ public class Compiler
             }
 
             _currentClass = oldClass;
+        }
+        else if (expr is InterfaceDeclaration interfaceDecl)
+        {
+            _interfaces[interfaceDecl.Name] = interfaceDecl;
         }
         else if (expr is NewExpr newExpr)
         {
@@ -624,6 +658,37 @@ public class Compiler
             _structs[sd.Name] = sd.Fields;
         }
 
+    }
+
+    private List<FunctionDeclaration> GetAllInterfaceMethods(string interfaceName)
+    {
+        if (!_interfaces.TryGetValue(interfaceName, out var iface))
+        {
+            throw new CompilerException($"Interface {interfaceName} not found", 0);
+        }
+
+        var methods = new List<FunctionDeclaration>(iface.Methods);
+        foreach (var parent in iface.Parents)
+        {
+            methods.AddRange(GetAllInterfaceMethods(parent));
+        }
+        return methods;
+    }
+
+    private bool HasMethodInChain(string className, string methodName, int paramCount)
+    {
+        var cd = _classes.GetValueOrDefault(className);
+        if (cd == null) return false;
+
+        if (cd.Methods.Any(m => m.Name == methodName && m.Parameters.Count == paramCount))
+            return true;
+
+        if (cd.BaseClassName != null && _classes.ContainsKey(cd.BaseClassName))
+        {
+            return HasMethodInChain(cd.BaseClassName, methodName, paramCount);
+        }
+
+        return false;
     }
 
     private List<string> GetAllFields(string className)

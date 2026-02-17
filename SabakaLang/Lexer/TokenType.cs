@@ -65,6 +65,7 @@ public enum TokenType
     Colon,
     ColonColon,
     Super,
+    Interface,
     
     EOF
 }

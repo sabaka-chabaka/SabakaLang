@@ -192,6 +192,11 @@ public class Parser
             stmt = ParseClass();
         }
 
+        else if (Current.Type == TokenType.Interface)
+        {
+            stmt = ParseInterface();
+        }
+
         else if (Current.Type == TokenType.Enum)
         {
             stmt = ParseEnum();
@@ -625,7 +630,16 @@ public class Parser
         var name = Expect(TokenType.Identifier).Value;
 
         Expect(TokenType.LParen);
+        var parameters = ParseParameters();
+        Expect(TokenType.RParen);
 
+        var body = ParseBlock();
+
+        return new FunctionDeclaration(returnType, name, parameters, body, isOverride);
+    }
+
+    private List<Parameter> ParseParameters()
+    {
         var parameters = new List<Parameter>();
 
         if (Current.Type != TokenType.RParen)
@@ -647,11 +661,7 @@ public class Parser
             } while (true);
         }
 
-        Expect(TokenType.RParen);
-
-        var body = ParseBlock();
-
-        return new FunctionDeclaration(returnType, name, parameters, body, isOverride);
+        return parameters;
     }
 
 
@@ -775,10 +785,21 @@ public class Parser
         var name = Expect(TokenType.Identifier).Value;
 
         string? baseClassName = null;
+        var interfaces = new List<string>();
+
         if (Current.Type == TokenType.Colon)
         {
             Consume();
-            baseClassName = Expect(TokenType.Identifier).Value;
+            var first = Expect(TokenType.Identifier).Value;
+            // For now, let's assume the first one is a base class. 
+            // In a better compiler we would check if 'first' is a class or an interface.
+            baseClassName = first;
+
+            while (Current.Type == TokenType.Comma)
+            {
+                Consume();
+                interfaces.Add(Expect(TokenType.Identifier).Value);
+            }
         }
 
         Expect(TokenType.LBrace);
@@ -802,7 +823,48 @@ public class Parser
 
         Expect(TokenType.RBrace);
 
-        return new ClassDeclaration(name, baseClassName, fields, methods);
+        return new ClassDeclaration(name, baseClassName, interfaces, fields, methods);
+    }
+
+    private Expr ParseInterface()
+    {
+        Consume(); // interface
+
+        var name = Expect(TokenType.Identifier).Value;
+
+        var parents = new List<string>();
+        if (Current.Type == TokenType.Colon)
+        {
+            Consume();
+            do
+            {
+                parents.Add(Expect(TokenType.Identifier).Value);
+                if (Current.Type != TokenType.Comma) break;
+                Consume();
+            } while (true);
+        }
+
+        Expect(TokenType.LBrace);
+
+        var methods = new List<FunctionDeclaration>();
+
+        while (Current.Type != TokenType.RBrace)
+        {
+            // Interface methods don't have a body
+            var returnType = ConsumeType();
+            var methodName = Expect(TokenType.Identifier).Value;
+
+            Expect(TokenType.LParen);
+            var parameters = ParseParameters();
+            Expect(TokenType.RParen);
+            Expect(TokenType.Semicolon);
+
+            methods.Add(new FunctionDeclaration(returnType, methodName, parameters, new List<Expr>()));
+        }
+
+        Expect(TokenType.RBrace);
+
+        return new InterfaceDeclaration(name, parents, methods);
     }
 
 }

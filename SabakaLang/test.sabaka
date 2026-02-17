@@ -1,23 +1,34 @@
-class A {
-    int x;
-    void foo() {
-        print("A.foo");
-        print(x);
+interface ILogger {
+    void log(string message);
+}
+
+class ConsoleLogger : ILogger {
+    void log(string message) {
+        print("LOG: " + message);
     }
 }
 
-class B : A {
-    override void foo() {
-        print("B.foo");
-        super::x = 10;
-        print(super::x);
-        super::foo();
+interface ISerializable {
+    string serialize();
+}
+
+class Data : ILogger, ISerializable {
+    void log(string message) {
+        print("Data log: " + message);
+    }
+
+    string serialize() {
+        return "Data serialized";
     }
 }
 
 void main() {
-    var b = B();
-    b.foo();
+    var logger = ConsoleLogger();
+    logger.log("Hello from ConsoleLogger");
+
+    var data = Data();
+    data.log("Hello from Data");
+    print(data.serialize());
 }
 
 main();

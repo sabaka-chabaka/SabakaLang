@@ -267,6 +267,7 @@ public class Lexer
             "struct" => new Token(TokenType.StructKeyword, text),
             "enum" => new Token(TokenType.Enum, text),
             "class" => new Token(TokenType.Class, text),
+            "interface" => new Token(TokenType.Interface, text),
             "new" => new Token(TokenType.New, text),
             "override" => new Token(TokenType.Override, text),
             "super" => new Token(TokenType.Super, text),
