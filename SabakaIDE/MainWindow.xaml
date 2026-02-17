@@ -141,4 +141,16 @@
             </Setter>
         </Style>
     </Window.Resources>
+    <Window.CommandBindings>
+        <CommandBinding Command="Save"
+                        Executed="Save_Executed"
+                        CanExecute="Save_CanExecute"/>
+    </Window.CommandBindings>
+
+    <Window.InputBindings>
+        <KeyBinding Command="Save"
+                    Modifiers="Control"
+                    Key="S"/>
+    </Window.InputBindings>
+
 </Window>

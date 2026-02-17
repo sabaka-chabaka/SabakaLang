@@ -42,12 +42,11 @@ public partial class MainWindow : Window
             _isDirty = true;
             UpdateTitle();
         };
-
     }
 
     private async void Editor_TextChanged(object sender, EventArgs e)
     {
-        await Task.Delay(200); 
+        await Task.Delay(200);
 
         var lexer = new Lexer(Editor.Text);
         var tokens = lexer.Tokenize(true);
@@ -55,7 +54,7 @@ public partial class MainWindow : Window
         _colorizer.SetTokens(tokens);
         Editor.TextArea.TextView.Redraw();
     }
-    
+
     private void TextArea_TextEntering(object? sender, TextCompositionEventArgs e)
     {
         if (string.IsNullOrEmpty(e.Text))
@@ -148,7 +147,7 @@ public partial class MainWindow : Window
         }
 
         doc.Insert(offset, closing);
-        
+
         Editor.CaretOffset = offset;
     }
 
@@ -205,6 +204,11 @@ public partial class MainWindow : Window
 
     private void SaveButton_OnClick(object sender, RoutedEventArgs e)
     {
+        SaveFile();
+    }
+
+    private void SaveFile()
+    {
         if (_currentFilePath == null)
         {
             SaveFileAs();
@@ -215,11 +219,11 @@ public partial class MainWindow : Window
         _isDirty = false;
         UpdateTitle();
     }
-    
+
     private void UpdateTitle()
     {
-        string fileName = _currentFilePath == null 
-            ? "Untitled" 
+        string fileName = _currentFilePath == null
+            ? "Untitled"
             : System.IO.Path.GetFileName(_currentFilePath);
 
         Title = $"{fileName}{(_isDirty ? "*" : "")} - SabakaIDE";
@@ -227,8 +231,10 @@ public partial class MainWindow : Window
 
     private void SaveFileAs()
     {
-        var dialog = new SaveFileDialog();
-        dialog.Filter = "SabakaLang files (*.sabaka)|*.sabaka|All files (*.*)|*.*";
+        var dialog = new SaveFileDialog
+        {
+            Filter = "SabakaLang files (*.sabaka)|*.sabaka|All files (*.*)|*.*"
+        };
 
         if (dialog.ShowDialog() == true)
         {
@@ -246,8 +252,10 @@ public partial class MainWindow : Window
 
     private void OpenFile()
     {
-        var dialog = new OpenFileDialog();
-        dialog.Filter = "Sabaka files (*.sabaka)|*.sabaka|All files (*.*)|*.*";
+        var dialog = new OpenFileDialog
+        {
+            Filter = "Sabaka files (*.sabaka)|*.sabaka|All files (*.*)|*.*"
+        };
 
         if (dialog.ShowDialog() == true)
         {
@@ -262,5 +270,15 @@ public partial class MainWindow : Window
     private void SaveAsButton_OnClick(object sender, RoutedEventArgs e)
     {
         SaveFileAs();
+    }
+
+    private void Save_Executed(object sender, ExecutedRoutedEventArgs e)
+    {
+        SaveFile();
+    }
+
+    private void Save_CanExecute(object sender, CanExecuteRoutedEventArgs e)
+    {
+        e.CanExecute = true;
     }
 }
