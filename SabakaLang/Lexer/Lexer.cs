@@ -271,6 +271,9 @@ public class Lexer
             "new" => new Token(TokenType.New, text),
             "override" => new Token(TokenType.Override, text),
             "super" => new Token(TokenType.Super, text),
+            "public" => new Token(TokenType.Public, text),
+            "private" => new Token(TokenType.Private, text),
+            "protected" => new Token(TokenType.Protected, text),
 
             _ => new Token(TokenType.Identifier, text)
         };

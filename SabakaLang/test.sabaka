@@ -1,34 +1,38 @@
-interface ILogger {
-    void log(string message);
-}
+class Base {
+    private int privateField = 1;
+    protected int protectedField = 2;
+    public int publicField = 3;
 
-class ConsoleLogger : ILogger {
-    void log(string message) {
-        print("LOG: " + message);
+    private void privateMethod() {
+        print("Base privateMethod");
+    }
+
+    protected void protectedMethod() {
+        print("Base protectedMethod");
+    }
+
+    public void publicMethod() {
+        print("Base publicMethod");
+        // Internal access should work
+        print(privateField);
+        privateMethod();
     }
 }
 
-interface ISerializable {
-    string serialize();
-}
-
-class Data : ILogger, ISerializable {
-    void log(string message) {
-        print("Data log: " + message);
-    }
-
-    string serialize() {
-        return "Data serialized";
+class Derived : Base {
+    void testProtected() {
+        print(super::protectedField);
+        super::protectedMethod();
     }
 }
 
 void main() {
-    var logger = ConsoleLogger();
-    logger.log("Hello from ConsoleLogger");
-
-    var data = Data();
-    data.log("Hello from Data");
-    print(data.serialize());
+    Base b = Base();
+    b.publicMethod();
+    print(b.publicField);
+    
+    Derived d = Derived();
+    d.testProtected();
 }
 
 main();

@@ -32,16 +32,26 @@ public class Parser
         return Consume();
     }
 
-    private TokenType ConsumeType()
+    private (TokenType type, string? customType) ConsumeTypeFull()
     {
-        var type = Consume().Type;
+        var token = Consume();
+        var type = token.Type;
+        string? customType = null;
+        if (type == TokenType.Identifier)
+            customType = token.Value;
+
         while (Current.Type == TokenType.LBracket)
         {
             Consume();
             Expect(TokenType.RBracket);
         }
 
-        return type;
+        return (type, customType);
+    }
+
+    private TokenType ConsumeType()
+    {
+        return ConsumeTypeFull().type;
     }
 
     private bool IsTypeKeyword(TokenType type)
@@ -53,11 +63,30 @@ public class Parser
                type == TokenType.VoidKeyword;
     }
 
+    private bool IsAccessModifier(TokenType type)
+    {
+        return type == TokenType.Public || type == TokenType.Private || type == TokenType.Protected;
+    }
+
+    private AccessModifier GetAccessModifier(TokenType type)
+    {
+        return type switch
+        {
+            TokenType.Public => AccessModifier.Public,
+            TokenType.Private => AccessModifier.Private,
+            TokenType.Protected => AccessModifier.Protected,
+            _ => AccessModifier.Public
+        };
+    }
+
     private bool IsFunctionDeclaration()
     {
         int offset = 0;
-        if (Current.Type == TokenType.Override)
-            offset = 1;
+        if (IsAccessModifier(Peek(offset).Type))
+            offset++;
+
+        if (Peek(offset).Type == TokenType.Override)
+            offset++;
 
         if (!IsTypeKeyword(Peek(offset).Type) && Peek(offset).Type != TokenType.Identifier)
             return false;
@@ -75,12 +104,16 @@ public class Parser
 
     private bool IsVariableDeclaration()
     {
-        if (IsTypeKeyword(Current.Type) && Current.Type != TokenType.VoidKeyword)
+        int offset = 0;
+        if (IsAccessModifier(Peek(offset).Type))
+            offset++;
+
+        if (IsTypeKeyword(Peek(offset).Type) && Peek(offset).Type != TokenType.VoidKeyword)
             return true;
 
-        if (Current.Type == TokenType.Identifier)
+        if (Peek(offset).Type == TokenType.Identifier)
         {
-            int offset = 1;
+            offset++;
             while (Peek(offset).Type == TokenType.LBracket)
             {
                 if (Peek(offset + 1).Type != TokenType.RBracket)
@@ -117,8 +150,14 @@ public class Parser
         return expressions;
     }
 
-    private Expr ParseVariableDeclaration()
+    private Expr ParseVariableDeclaration(AccessModifier defaultAccess = AccessModifier.Public)
     {
+        AccessModifier access = defaultAccess;
+        if (IsAccessModifier(Current.Type))
+        {
+            access = GetAccessModifier(Consume().Type);
+        }
+
         var typeToken = Consume();
 
         while (Current.Type == TokenType.LBracket)
@@ -146,7 +185,7 @@ public class Parser
             initializer = ParseAssignment();
         }
 
-        return new VariableDeclaration(type, customType, nameToken.Value, initializer);
+        return new VariableDeclaration(type, customType, nameToken.Value, initializer, access);
     }
 
 
@@ -617,8 +656,14 @@ public class Parser
         return left;
     }
 
-    private Expr ParseFunction()
+    private Expr ParseFunction(AccessModifier defaultAccess = AccessModifier.Public)
     {
+        AccessModifier access = defaultAccess;
+        if (IsAccessModifier(Current.Type))
+        {
+            access = GetAccessModifier(Consume().Type);
+        }
+
         bool isOverride = false;
         if (Current.Type == TokenType.Override)
         {
@@ -635,7 +680,7 @@ public class Parser
 
         var body = ParseBlock();
 
-        return new FunctionDeclaration(returnType, name, parameters, body, isOverride);
+        return new FunctionDeclaration(returnType, name, parameters, body, isOverride, access);
     }
 
     private List<Parameter> ParseParameters()
@@ -647,12 +692,12 @@ public class Parser
             do
             {
                 // тип параметра
-                var paramType = ConsumeType();
+                var (paramType, customType) = ConsumeTypeFull();
 
                 // имя параметра
                 var paramName = Expect(TokenType.Identifier).Value;
 
-                parameters.Add(new Parameter(paramType, paramName));
+                parameters.Add(new Parameter(paramType, paramName, customType));
 
                 if (Current.Type != TokenType.Comma)
                     break;

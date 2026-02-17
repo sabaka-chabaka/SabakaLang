@@ -8,12 +8,14 @@ public class VariableDeclaration : Expr
     public string? CustomType { get; }    // Name of the struct if TypeToken is Identifier
     public string Name { get; }
     public Expr? Initializer { get; }
+    public AccessModifier AccessModifier { get; }
 
-    public VariableDeclaration(TokenType typeToken, string? customType, string name, Expr? initializer)
+    public VariableDeclaration(TokenType typeToken, string? customType, string name, Expr? initializer, AccessModifier accessModifier = AccessModifier.Public)
     {
         TypeToken = typeToken;
         CustomType = customType;
         Name = name;
         Initializer = initializer;
+        AccessModifier = accessModifier;
     }
 }

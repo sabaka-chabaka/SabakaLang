@@ -14,11 +14,25 @@ public class Compiler
     private Dictionary<string, ClassDeclaration> _classes = new();
     private Dictionary<string, InterfaceDeclaration> _interfaces = new();
     private string? _currentClass = null;
+    private Stack<Dictionary<string, string>> _typeScopes = new();
 
-
+    private void PushScope() => _typeScopes.Push(new Dictionary<string, string>());
+    private void PopScope() => _typeScopes.Pop();
+    private void DeclareVar(string name, string type) => _typeScopes.Peek()[name] = type;
+    private string? GetVarType(string name)
+    {
+        foreach (var scope in _typeScopes)
+        {
+            if (scope.TryGetValue(name, out var type)) return type;
+        }
+        return null;
+    }
 
     public List<Instruction> Compile(List<Expr> expressions)
     {
+        _typeScopes.Clear();
+        PushScope(); // Global scope
+
         foreach (var expr in expressions)
         {
             Emit(expr);
@@ -100,8 +114,22 @@ public class Compiler
                 _instructions.Add(methodInstr);
                 var bodyStart = _instructions.Count;
 
+                PushScope();
+                // Declare fields in scope so we know their types
+                foreach (var field in GetAllFieldsFull(classDecl.Name))
+                {
+                    DeclareVar(field.Name, field.CustomType ?? field.TypeToken.ToString());
+                }
+
+                foreach (var p in method.Parameters)
+                {
+                    DeclareVar(p.Name, p.CustomType ?? p.Type.ToString());
+                }
+
                 foreach (var stmt in method.Body)
                     Emit(stmt);
+
+                PopScope();
 
                 _instructions.Add(new Instruction(OpCode.Return));
 
@@ -160,8 +188,14 @@ public class Compiler
             _instructions.Add(functionInstr);
             var bodyStart = _instructions.Count;
 
+            PushScope();
+            foreach (var p in func.Parameters)
+                DeclareVar(p.Name, p.CustomType ?? p.Type.ToString());
+
             foreach (var stmt in func.Body)
                 Emit(stmt);
+
+            PopScope();
 
             _instructions.Add(new Instruction(OpCode.Return));
             
@@ -268,7 +302,7 @@ public class Compiler
                 _instructions.Add(new Instruction(OpCode.CreateObject)
                 {
                     Name = call.Name,
-                    Extra = cDecl.Fields.Select(f => f.Name).ToList()
+                    Extra = GetAllFields(call.Name)
                 });
 
                 bool hasConstructor = cDecl.Methods.Any(m => m.Name == call.Name);
@@ -314,6 +348,21 @@ public class Compiler
 
             if (call.Target != null)
             {
+                string? objType = null;
+                if (call.Target is VariableExpr ve) objType = GetVarType(ve.Name);
+                else if (call.Target is NewExpr ne) objType = ne.ClassName;
+                else if (call.Target is SuperExpr) objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd)) ? cd.BaseClassName : null;
+
+                if (objType != null)
+                {
+                    var method = GetMethodInChain(objType, call.Name, call.Arguments.Count);
+                    if (method != null)
+                    {
+                        string definingClass = GetDefiningClassForMethod(objType, call.Name, call.Arguments.Count);
+                        CheckAccess(definingClass, method.AccessModifier, "method", method.Name);
+                    }
+                }
+
                 Emit(call.Target);
                 foreach (var arg in call.Arguments)
                     Emit(arg);
@@ -323,8 +372,12 @@ public class Compiler
                     Name = call.Name
                 });
             }
-            else if (_currentClass != null && _classes[_currentClass].Methods.Any(m => m.Name == call.Name))
+            else if (_currentClass != null && GetMethodInChain(_currentClass, call.Name, call.Arguments.Count) != null)
             {
+                var method = GetMethodInChain(_currentClass, call.Name, call.Arguments.Count)!;
+                string definingClass = GetDefiningClassForMethod(_currentClass, call.Name, call.Arguments.Count);
+                CheckAccess(definingClass, method.AccessModifier, "method", method.Name);
+
                 // Implicit this call
                 _instructions.Add(new Instruction(OpCode.PushThis));
                 foreach (var arg in call.Arguments)
@@ -383,6 +436,21 @@ public class Compiler
             }
             else
             {
+                string? objType = null;
+                if (memberAccess.Object is VariableExpr ve) objType = GetVarType(ve.Name);
+                else if (memberAccess.Object is NewExpr ne) objType = ne.ClassName;
+                else if (memberAccess.Object is SuperExpr) objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd)) ? cd.BaseClassName : null;
+
+                if (objType != null)
+                {
+                    var field = GetFieldInChain(objType, memberAccess.Member);
+                    if (field != null)
+                    {
+                        string definingClass = GetDefiningClassForField(objType, memberAccess.Member);
+                        CheckAccess(definingClass, field.AccessModifier, "field", field.Name);
+                    }
+                }
+
                 Emit(memberAccess.Object);
                 _instructions.Add(new Instruction(OpCode.LoadField)
                 {
@@ -461,9 +529,26 @@ public class Compiler
             var instr = new Instruction(OpCode.Declare);
             instr.Name = decl.Name;
             _instructions.Add(instr);
+
+            DeclareVar(decl.Name, decl.CustomType ?? decl.TypeToken.ToString());
         }
         else if (expr is MemberAssignmentExpr assignmentExpr)
         {
+            string? objType = null;
+            if (assignmentExpr.Object is VariableExpr ve) objType = GetVarType(ve.Name);
+            else if (assignmentExpr.Object is NewExpr ne) objType = ne.ClassName;
+            else if (assignmentExpr.Object is SuperExpr) objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd)) ? cd.BaseClassName : null;
+
+            if (objType != null)
+            {
+                var field = GetFieldInChain(objType, assignmentExpr.Member);
+                if (field != null)
+                {
+                    string definingClass = GetDefiningClassForField(objType, assignmentExpr.Member);
+                    CheckAccess(definingClass, field.AccessModifier, "field", field.Name);
+                }
+            }
+
             Emit(assignmentExpr.Object);
             Emit(assignmentExpr.Value);
 
@@ -476,6 +561,16 @@ public class Compiler
 
         else if (expr is VariableExpr variable)
         {
+            if (_currentClass != null)
+            {
+                var field = GetFieldInChain(_currentClass, variable.Name);
+                if (field != null)
+                {
+                    string definingClass = GetDefiningClassForField(_currentClass, variable.Name);
+                    CheckAccess(definingClass, field.AccessModifier, "field", field.Name);
+                }
+            }
+
             _instructions.Add(new Instruction(OpCode.Load)
             {
                 Name = variable.Name
@@ -484,6 +579,7 @@ public class Compiler
         else if (expr is IfStatement ifStmt)
         {
             _instructions.Add(new Instruction(OpCode.EnterScope));
+            PushScope();
             Emit(ifStmt.Condition);
 
             var jumpIfFalseIndex = _instructions.Count;
@@ -516,9 +612,20 @@ public class Compiler
             }
 
             _instructions.Add(new Instruction(OpCode.ExitScope));
+            PopScope();
         }
         else if (expr is AssignmentExpr assign)
         {
+            if (_currentClass != null)
+            {
+                var field = GetFieldInChain(_currentClass, assign.Name);
+                if (field != null)
+                {
+                    string definingClass = GetDefiningClassForField(_currentClass, assign.Name);
+                    CheckAccess(definingClass, field.AccessModifier, "field", field.Name);
+                }
+            }
+
             Emit(assign.Value);
 
             _instructions.Add(new Instruction(OpCode.Store)
@@ -535,11 +642,13 @@ public class Compiler
             var jumpIfFalse = new Instruction(OpCode.JumpIfFalse, 0);
             _instructions.Add(jumpIfFalse);
             _instructions.Add(new Instruction(OpCode.EnterScope));
+            PushScope();
 
             foreach (var e in whileExpr.Body)
                 Emit(e);
 
             _instructions.Add(new Instruction(OpCode.ExitScope));
+            PopScope();
 
             
             _instructions.Add(new Instruction(OpCode.Jump, loopStart));
@@ -572,6 +681,7 @@ public class Compiler
         else if (expr is ForStatement forStmt)
         {
             _instructions.Add(new Instruction(OpCode.EnterScope));
+            PushScope();
 
             // init
             if (forStmt.Initializer != null)
@@ -601,16 +711,19 @@ public class Compiler
             jumpIfFalse.Operand = _instructions.Count;
 
             _instructions.Add(new Instruction(OpCode.ExitScope));
-        }   
+            PopScope();
+        }
         else if (expr is ForeachStatement fe)
         {
             _instructions.Add(new Instruction(OpCode.EnterScope));
+            PushScope();
 
             // index = 0
             string indexName = "__index" + _instructions.Count;
 
             _instructions.Add(new Instruction(OpCode.Push, Value.FromInt(0)));
             _instructions.Add(new Instruction(OpCode.Declare) { Name = indexName });
+            DeclareVar(indexName, "int");
 
             int loopStart = _instructions.Count;
 
@@ -625,6 +738,7 @@ public class Compiler
 
             // BODY
             _instructions.Add(new Instruction(OpCode.EnterScope));
+            PushScope();
 
             // x = array[index]
             Emit(fe.Collection);
@@ -635,11 +749,19 @@ public class Compiler
             {
                 Name = fe.VarName
             });
+            // We don't know the exact element type easily here, but we can assume something or just skip for now.
+            // If fe.Collection is an array, we'd need to know its element type.
+            // Since we don't have full type inference yet, let's just use "object" as placeholder or skip.
+            // But wait, if it's an array of class objects, we'd want to know.
+            
+            // For now let's just declare it without type info if we can't find it.
+            DeclareVar(fe.VarName, "object"); 
 
             foreach (var stmt in fe.Body)
                 Emit(stmt);
 
             _instructions.Add(new Instruction(OpCode.ExitScope));
+            PopScope();
 
             // index++
             _instructions.Add(new Instruction(OpCode.Load) { Name = indexName });
@@ -652,6 +774,7 @@ public class Compiler
             jumpIfFalse.Operand = _instructions.Count;
 
             _instructions.Add(new Instruction(OpCode.ExitScope));
+            PopScope();
         }
         else if (expr is StructDeclaration sd)
         {
@@ -710,6 +833,25 @@ public class Compiler
         return fields;
     }
 
+    private List<VariableDeclaration> GetAllFieldsFull(string className)
+    {
+        var fields = new List<VariableDeclaration>();
+        if (_classes.TryGetValue(className, out var cd))
+        {
+            if (cd.BaseClassName != null)
+            {
+                fields.AddRange(GetAllFieldsFull(cd.BaseClassName));
+            }
+
+            foreach (var f in cd.Fields)
+            {
+                fields.Add(f);
+            }
+        }
+
+        return fields;
+    }
+
     private bool HasConstructorInChain(string className)
     {
         if (_classes.TryGetValue(className, out var cd))
@@ -723,5 +865,74 @@ public class Compiler
         }
 
         return false;
+    }
+
+    private VariableDeclaration? GetFieldInChain(string className, string fieldName)
+    {
+        if (!_classes.TryGetValue(className, out var cd)) return null;
+
+        var field = cd.Fields.FirstOrDefault(f => f.Name == fieldName);
+        if (field != null) return field;
+
+        if (cd.BaseClassName != null)
+            return GetFieldInChain(cd.BaseClassName, fieldName);
+
+        return null;
+    }
+
+    private FunctionDeclaration? GetMethodInChain(string className, string methodName, int? paramCount = null)
+    {
+        if (!_classes.TryGetValue(className, out var cd)) return null;
+
+        var method = cd.Methods.FirstOrDefault(m => m.Name == methodName && (paramCount == null || m.Parameters.Count == paramCount));
+        if (method != null) return method;
+
+        if (cd.BaseClassName != null)
+            return GetMethodInChain(cd.BaseClassName, methodName, paramCount);
+
+        return null;
+    }
+
+    private void CheckAccess(string targetClassName, AccessModifier access, string kind, string name)
+    {
+        if (access == AccessModifier.Public) return;
+
+        if (_currentClass == null)
+            throw new CompilerException($"Cannot access {access.ToString().ToLower()} {kind} '{name}' from top-level", 0);
+
+        if (access == AccessModifier.Private)
+        {
+            if (_currentClass != targetClassName)
+                throw new CompilerException($"Cannot access private {kind} '{name}' of class '{targetClassName}' from class '{_currentClass}'", 0);
+        }
+        else if (access == AccessModifier.Protected)
+        {
+            if (!IsDerivedFrom(_currentClass, targetClassName))
+                throw new CompilerException($"Cannot access protected {kind} '{name}' of class '{targetClassName}' from class '{_currentClass}'", 0);
+        }
+    }
+
+    private bool IsDerivedFrom(string child, string parent)
+    {
+        if (child == parent) return true;
+        if (!_classes.TryGetValue(child, out var cd)) return false;
+        if (cd.BaseClassName == null) return false;
+        return IsDerivedFrom(cd.BaseClassName, parent);
+    }
+
+    private string GetDefiningClassForField(string className, string fieldName)
+    {
+        if (!_classes.TryGetValue(className, out var cd)) return className;
+        if (cd.Fields.Any(f => f.Name == fieldName)) return className;
+        if (cd.BaseClassName != null) return GetDefiningClassForField(cd.BaseClassName, fieldName);
+        return className;
+    }
+
+    private string GetDefiningClassForMethod(string className, string methodName, int paramCount)
+    {
+        if (!_classes.TryGetValue(className, out var cd)) return className;
+        if (cd.Methods.Any(m => m.Name == methodName && m.Parameters.Count == paramCount)) return className;
+        if (cd.BaseClassName != null) return GetDefiningClassForMethod(cd.BaseClassName, methodName, paramCount);
+        return className;
     }
 }

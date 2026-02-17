@@ -67,5 +67,9 @@ public enum TokenType
     Super,
     Interface,
     
+    Public,
+    Private,
+    Protected,
+    
     EOF
 }
