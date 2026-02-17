@@ -25,6 +25,27 @@ public class Parser
         return current;
     }
 
+    private T WithPos<T>(T expr, Token start, Token end) where T : Expr
+    {
+        expr.Start = start.TokenStart;
+        expr.End = end.TokenEnd;
+        return expr;
+    }
+
+    private T WithPos<T>(T expr, int start, int end) where T : Expr
+    {
+        expr.Start = start;
+        expr.End = end;
+        return expr;
+    }
+
+    private T WithPos<T>(T expr, Token token) where T : Expr
+    {
+        expr.Start = token.TokenStart;
+        expr.End = token.TokenEnd;
+        return expr;
+    }
+
     private Token Expect(TokenType type)
     {
         if (Current.Type != type)
@@ -153,6 +174,7 @@ public class Parser
 
     private Expr ParseVariableDeclaration(AccessModifier defaultAccess = AccessModifier.Public)
     {
+        var startToken = Current;
         AccessModifier access = defaultAccess;
         if (IsAccessModifier(Current.Type))
         {
@@ -186,7 +208,7 @@ public class Parser
             initializer = ParseAssignment();
         }
 
-        return new VariableDeclaration(type, customType, nameToken.Value, initializer, access);
+        return WithPos(new VariableDeclaration(type, customType, nameToken.Value, initializer, access), startToken, _tokens[_position - 1]);
     }
 
 
@@ -255,7 +277,7 @@ public class Parser
 
     private Expr ParseIf()
     {
-        Consume(); // if
+        var startToken = Consume(); // if
 
         Expect(TokenType.LParen);
         var condition = ParseAssignment();
@@ -272,12 +294,12 @@ public class Parser
             elseBlock = ParseBlockOrStatement();
         }
 
-        return new IfStatement(condition, thenBlock, elseBlock);
+        return WithPos(new IfStatement(condition, thenBlock, elseBlock), startToken, _tokens[_position - 1]);
     }
 
     private Expr ParseSwitch()
     {
-        Consume(); // switch
+        var startToken = Consume(); // switch
 
         Expect(TokenType.LParen);
         var expression = ParseAssignment();
@@ -316,7 +338,7 @@ public class Parser
 
         Expect(TokenType.RBrace);
 
-        return new SwitchStatement(expression, cases);
+        return WithPos(new SwitchStatement(expression, cases), startToken, _tokens[_position - 1]);
     }
 
     private List<Expr> ParseBlock()
@@ -338,16 +360,17 @@ public class Parser
 
     private Expr ParseAssignment()
     {
+        var startToken = Current;
         if (Current.Type == TokenType.Super)
         {
             if (Peek().Type == TokenType.ColonColon && Peek(2).Type == TokenType.Identifier && Peek(3).Type == TokenType.Equal)
             {
-                Consume(); // super
+                var sToken = Consume(); // super
                 Consume(); // ::
                 var member = Consume().Value;
                 Consume(); // =
                 var value = ParseAssignment();
-                return new MemberAssignmentExpr(new SuperExpr(), member, value);
+                return WithPos(new MemberAssignmentExpr(WithPos(new SuperExpr(), sToken), member, value), startToken, _tokens[_position - 1]);
             }
         }
 
@@ -360,7 +383,7 @@ public class Parser
 
                 var value = ParseAssignment();
 
-                return new AssignmentExpr(name, value);
+                return WithPos(new AssignmentExpr(name, value), startToken, _tokens[_position - 1]);
             }
 
             if (Peek().Type == TokenType.LBracket)
@@ -384,7 +407,7 @@ public class Parser
                     Expect(TokenType.RBracket);
                     Expect(TokenType.Equal);
                     var value = ParseAssignment();
-                    return new ArrayStoreExpr(new VariableExpr(identifier.Value), index, value);
+                    return WithPos(new ArrayStoreExpr(WithPos(new VariableExpr(identifier.Value), identifier), index, value), startToken, _tokens[_position - 1]);
                 }
             }
 
@@ -400,19 +423,21 @@ public class Parser
                 if (Peek(offset).Type == TokenType.Equal)
                 {
                     // Member assignment
-                    var obj = new VariableExpr(Consume().Value) as Expr;
+                    var firstToken = Current;
+                    var obj = WithPos(new VariableExpr(Consume().Value), firstToken) as Expr;
                     while (Peek().Type == TokenType.Dot && Peek(2).Type == TokenType.Identifier &&
                            Peek(3).Type != TokenType.Equal)
                     {
                         Consume(); // .
-                        obj = new MemberAccessExpr(obj, Consume().Value);
+                        var memberToken = Expect(TokenType.Identifier);
+                        obj = WithPos(new MemberAccessExpr(obj, memberToken.Value), firstToken, memberToken);
                     }
 
                     Consume(); // the last .
-                    var member = Expect(TokenType.Identifier).Value;
+                    var member = Expect(TokenType.Identifier);
                     Expect(TokenType.Equal);
                     var value = ParseAssignment();
-                    return new MemberAssignmentExpr(obj, member, value);
+                    return WithPos(new MemberAssignmentExpr(obj, member.Value, value), startToken, _tokens[_position - 1]);
                 }
             }
         }
@@ -440,9 +465,9 @@ public class Parser
                Current.Type == TokenType.GreaterEqual ||
                Current.Type == TokenType.LessEqual)
         {
-            var op = Consume().Type; // ← вот тут Consume правильно
+            var opToken = Consume();
             var right = ParseAdditive();
-            left = new BinaryExpr(left, op, right);
+            left = WithPos(new BinaryExpr(left, opToken.Type, right), left.Start, right.End);
         }
 
         return left;
@@ -456,10 +481,10 @@ public class Parser
         while (Current.Type == TokenType.Plus ||
                Current.Type == TokenType.Minus)
         {
-            var op = Consume().Type;
+            var opToken = Consume();
             var right = ParseMultiplicative();
 
-            expr = new BinaryExpr(expr, op, right);
+            expr = WithPos(new BinaryExpr(expr, opToken.Type, right), expr.Start, right.End);
         }
 
         return expr;
@@ -472,10 +497,10 @@ public class Parser
         while (Current.Type == TokenType.Star ||
                Current.Type == TokenType.Slash)
         {
-            var op = Consume().Type;
+            var opToken = Consume();
             var right = ParseUnary();
 
-            expr = new BinaryExpr(expr, op, right);
+            expr = WithPos(new BinaryExpr(expr, opToken.Type, right), expr.Start, right.End);
         }
 
         return expr;
@@ -483,18 +508,19 @@ public class Parser
 
     private Expr ParseUnary()
     {
+        var startToken = Current;
         if (Current.Type == TokenType.Minus)
         {
             var op = Consume().Type;
             var right = ParseUnary();
-            return new UnaryExpr(op, right);
+            return WithPos(new UnaryExpr(op, right), startToken, _tokens[_position - 1]);
         }
 
         if (Current.Type == TokenType.Bang)
         {
             var op = Consume().Type;
             var right = ParseUnary();
-            return new UnaryExpr(op, right);
+            return WithPos(new UnaryExpr(op, right), startToken, _tokens[_position - 1]);
         }
 
         return ParsePrimary();
@@ -504,6 +530,7 @@ public class Parser
     private Expr ParsePrimary()
 {
     Expr expr;
+    var startToken = Current;
 
     // ===== LITERALS =====
 
@@ -525,45 +552,44 @@ public class Parser
         }
         Expect(TokenType.RParen);
 
-        return new NewExpr(name, arguments);
+        expr = WithPos(new NewExpr(name, arguments), startToken, _tokens[_position - 1]);
     }
-
-    if (Current.Type == TokenType.IntLiteral)
+    else if (Current.Type == TokenType.IntLiteral)
     {
-        expr = new IntExpr(int.Parse(Current.Value, CultureInfo.InvariantCulture));
+        expr = WithPos(new IntExpr(int.Parse(Current.Value, CultureInfo.InvariantCulture)), Current);
         Consume();
     }
     else if (Current.Type == TokenType.FloatLiteral)
     {
-        expr = new FloatExpr(double.Parse(Current.Value, CultureInfo.InvariantCulture));
+        expr = WithPos(new FloatExpr(double.Parse(Current.Value, CultureInfo.InvariantCulture)), Current);
         Consume();
     }
     else if (Current.Type == TokenType.StringLiteral)
     {
-        expr = new StringExpr(Current.Value);
+        expr = WithPos(new StringExpr(Current.Value), Current);
         Consume();
     }
     else if (Current.Type == TokenType.True)
     {
-        expr = new BoolExpr(true);
+        expr = WithPos(new BoolExpr(true), Current);
         Consume();
     }
     else if (Current.Type == TokenType.False)
     {
-        expr = new BoolExpr(false);
+        expr = WithPos(new BoolExpr(false), Current);
         Consume();
     }
     else if (Current.Type == TokenType.Identifier)
     {
-        expr = new VariableExpr(Current.Value);
+        expr = WithPos(new VariableExpr(Current.Value), Current);
         Consume();
     }
     else if (Current.Type == TokenType.Super)
     {
-        Consume();
+        var sToken = Consume();
         Expect(TokenType.ColonColon);
-        var member = Expect(TokenType.Identifier).Value;
-        expr = new MemberAccessExpr(new SuperExpr(), member);
+        var memberToken = Expect(TokenType.Identifier);
+        expr = WithPos(new MemberAccessExpr(WithPos(new SuperExpr(), sToken), memberToken.Value), sToken, memberToken);
     }
     
     else if (Current.Type == TokenType.LBracket)
@@ -580,13 +606,14 @@ public class Parser
             } while (true);
         }
         Expect(TokenType.RBracket);
-        expr = new ArrayExpr(elements);
+        expr = WithPos(new ArrayExpr(elements), startToken, _tokens[_position - 1]);
     }
     else if (Current.Type == TokenType.LParen)
     {
         Consume();
         expr = ParseAssignment();
         Expect(TokenType.RParen);
+        expr = WithPos(expr, startToken.TokenStart, _tokens[_position - 1].TokenEnd);
     }
     else
     {
@@ -624,9 +651,9 @@ public class Parser
             Expect(TokenType.RParen);
 
             if (expr is VariableExpr varExpr)
-                expr = new CallExpr(varExpr.Name, arguments);
+                expr = WithPos(new CallExpr(varExpr.Name, arguments), expr.Start, _tokens[_position - 1].TokenEnd);
             else if (expr is MemberAccessExpr memberAccess)
-                expr = new CallExpr(memberAccess.Member, arguments, memberAccess.Object);
+                expr = WithPos(new CallExpr(memberAccess.Member, arguments, memberAccess.Object), expr.Start, _tokens[_position - 1].TokenEnd);
             else
                 throw new ParserException("Invalid function call target", _position);
 
@@ -639,7 +666,7 @@ public class Parser
             Consume();
             var member = Expect(TokenType.Identifier);
 
-            expr = new MemberAccessExpr(expr, member.Value);
+            expr = WithPos(new MemberAccessExpr(expr, member.Value), expr.Start, member.TokenEnd);
             continue;
         }
 
@@ -650,7 +677,7 @@ public class Parser
             var index = ParseAssignment();
             Expect(TokenType.RBracket);
 
-            expr = new ArrayAccessExpr(expr, index);
+            expr = WithPos(new ArrayAccessExpr(expr, index), expr.Start, _tokens[_position - 1].TokenEnd);
             continue;
         }
 
@@ -664,7 +691,7 @@ public class Parser
 
     private Expr ParseWhile()
     {
-        Consume(); // while
+        var startToken = Consume(); // while
 
         Expect(TokenType.LParen);
         var condition = ParseAssignment();
@@ -672,7 +699,7 @@ public class Parser
 
         var body = ParseBlock(); // у тебя уже есть ParseBlock()
 
-        return new WhileExpr(condition, body);
+        return WithPos(new WhileExpr(condition, body), startToken, _tokens[_position - 1]);
     }
 
     private Expr ParseLogicalOr()
@@ -681,9 +708,9 @@ public class Parser
 
         while (Current.Type == TokenType.OrOr)
         {
-            var op = Consume().Type;
+            var opToken = Consume();
             var right = ParseLogicalAnd();
-            left = new BinaryExpr(left, op, right);
+            left = WithPos(new BinaryExpr(left, opToken.Type, right), left.Start, right.End);
         }
 
         return left;
@@ -695,9 +722,9 @@ public class Parser
 
         while (Current.Type == TokenType.AndAnd)
         {
-            var op = Consume().Type;
+            var opToken = Consume();
             var right = ParseComparison();
-            left = new BinaryExpr(left, op, right);
+            left = WithPos(new BinaryExpr(left, opToken.Type, right), left.Start, right.End);
         }
 
         return left;
@@ -705,6 +732,7 @@ public class Parser
 
     private Expr ParseFunction(AccessModifier defaultAccess = AccessModifier.Public)
     {
+        var startToken = Current;
         AccessModifier access = defaultAccess;
         if (IsAccessModifier(Current.Type))
         {
@@ -727,7 +755,7 @@ public class Parser
 
         var body = ParseBlock();
 
-        return new FunctionDeclaration(returnType, name, parameters, body, isOverride, access);
+        return WithPos(new FunctionDeclaration(returnType, name, parameters, body, isOverride, access), startToken, _tokens[_position - 1]);
     }
 
     private List<Parameter> ParseParameters()
@@ -759,18 +787,18 @@ public class Parser
 
     private Expr ParseReturn()
     {
-        Consume(); // return
+        var startToken = Consume(); // return
 
         if (Current.Type == TokenType.Semicolon)
-            return new ReturnStatement(null);
+            return WithPos(new ReturnStatement(null), startToken);
 
         var value = ParseAssignment();
-        return new ReturnStatement(value);
+        return WithPos(new ReturnStatement(value), startToken, _tokens[_position - 1]);
     }
 
     private Expr ParseFor()
     {
-        Consume(); // for
+        var startToken = Consume(); // for
 
         Expect(TokenType.LParen);
 
@@ -797,12 +825,12 @@ public class Parser
 
         var body = ParseBlockOrStatement();
 
-        return new ForStatement(initializer, condition, increment, body);
+        return WithPos(new ForStatement(initializer, condition, increment, body), startToken, _tokens[_position - 1]);
     }
 
     private Expr ParseForeach()
     {
-        Consume(); // foreach
+        var startToken = Consume(); // foreach
 
         Expect(TokenType.LParen);
 
@@ -819,12 +847,12 @@ public class Parser
 
         var body = ParseBlock();
 
-        return new ForeachStatement(varName, collection, body);
+        return WithPos(new ForeachStatement(varName, collection, body), startToken, _tokens[_position - 1]);
     }
 
     private Expr ParseStruct()
     {
-        Consume(); // struct
+        var startToken = Consume(); // struct
 
         var name = Expect(TokenType.Identifier).Value;
 
@@ -843,12 +871,12 @@ public class Parser
 
         Expect(TokenType.RBrace);
 
-        return new StructDeclaration(name, fields);
+        return WithPos(new StructDeclaration(name, fields), startToken, _tokens[_position - 1]);
     }
 
     private Expr ParseEnum()
     {
-        Consume(); // enum
+        var startToken = Consume(); // enum
 
         var name = Expect(TokenType.Identifier).Value;
 
@@ -867,12 +895,12 @@ public class Parser
 
         Expect(TokenType.RBrace);
 
-        return new EnumDeclaration(name, members);
+        return WithPos(new EnumDeclaration(name, members), startToken, _tokens[_position - 1]);
     }
     
     private Expr ParseClass()
     {
-        Consume(); // class
+        var startToken = Consume(); // class
 
         var name = Expect(TokenType.Identifier).Value;
 
@@ -915,12 +943,12 @@ public class Parser
 
         Expect(TokenType.RBrace);
 
-        return new ClassDeclaration(name, baseClassName, interfaces, fields, methods);
+        return WithPos(new ClassDeclaration(name, baseClassName, interfaces, fields, methods), startToken, _tokens[_position - 1]);
     }
 
     private Expr ParseInterface()
     {
-        Consume(); // interface
+        var startToken = Consume(); // interface
 
         var name = Expect(TokenType.Identifier).Value;
 
@@ -942,6 +970,7 @@ public class Parser
 
         while (Current.Type != TokenType.RBrace)
         {
+            var methodStartToken = Current;
             // Interface methods don't have a body
             var returnType = ConsumeType();
             var methodName = Expect(TokenType.Identifier).Value;
@@ -951,12 +980,12 @@ public class Parser
             Expect(TokenType.RParen);
             Expect(TokenType.Semicolon);
 
-            methods.Add(new FunctionDeclaration(returnType, methodName, parameters, new List<Expr>()));
+            methods.Add(WithPos(new FunctionDeclaration(returnType, methodName, parameters, new List<Expr>()), methodStartToken, _tokens[_position - 1]));
         }
 
         Expect(TokenType.RBrace);
 
-        return new InterfaceDeclaration(name, parents, methods);
+        return WithPos(new InterfaceDeclaration(name, parents, methods), startToken, _tokens[_position - 1]);
     }
 
 }

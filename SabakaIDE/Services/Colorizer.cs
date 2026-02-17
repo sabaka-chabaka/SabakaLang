@@ -3,7 +3,7 @@ using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Rendering;
 using SabakaLang.Lexer;
 
-namespace SabakaIDE;
+namespace SabakaIDE.Services;
 
 public class Colorizer : DocumentColorizingTransformer
 {

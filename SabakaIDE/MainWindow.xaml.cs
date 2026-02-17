@@ -11,6 +11,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using Microsoft.Win32;
+using SabakaIDE.Services;
 using SabakaLang.Lexer;
 
 namespace SabakaIDE;

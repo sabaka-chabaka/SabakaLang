@@ -4,7 +4,7 @@ using System.Text;
 using System.Windows.Controls;
 using SabakaLang;
 
-namespace SabakaIDE;
+namespace SabakaIDE.Services;
 
 public class BuildRunService
 {
