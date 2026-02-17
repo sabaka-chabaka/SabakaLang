@@ -257,6 +257,27 @@ public class Compiler
                 return;
             }
 
+            if (call.Target is SuperExpr)
+            {
+                if (_currentClass == null)
+                    throw new CompilerException("super::member can only be used inside a class", 0);
+
+                var baseClass = _classes[_currentClass].BaseClassName;
+                if (baseClass == null)
+                    throw new CompilerException($"Class {_currentClass} does not have a base class", 0);
+
+                _instructions.Add(new Instruction(OpCode.PushThis));
+                foreach (var arg in call.Arguments)
+                    Emit(arg);
+
+                _instructions.Add(new Instruction(OpCode.CallMethod, call.Arguments.Count)
+                {
+                    Name = call.Name,
+                    Extra = baseClass
+                });
+                return;
+            }
+
             if (call.Target != null)
             {
                 Emit(call.Target);
@@ -336,6 +357,12 @@ public class Compiler
             }
         }
 
+        else if (expr is SuperExpr)
+        {
+            if (_currentClass == null)
+                throw new CompilerException("super can only be used inside a class", 0);
+            _instructions.Add(new Instruction(OpCode.PushThis));
+        }
         else if (expr is ReturnStatement ret)
         {
             if (ret.Value != null)

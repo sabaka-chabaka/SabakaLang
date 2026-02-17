@@ -171,7 +171,15 @@ public class Lexer
 
                 case ':':
                 {
-                    tokens.Add(new Token(TokenType.Colon, ":"));
+                    if (PeekChar() == ':')
+                    {
+                        Advance();
+                        tokens.Add(new Token(TokenType.ColonColon, "::"));
+                    }
+                    else
+                    {
+                        tokens.Add(new Token(TokenType.Colon, ":"));
+                    }
                     break;
                 }
 
@@ -261,6 +269,7 @@ public class Lexer
             "class" => new Token(TokenType.Class, text),
             "new" => new Token(TokenType.New, text),
             "override" => new Token(TokenType.Override, text),
+            "super" => new Token(TokenType.Super, text),
 
             _ => new Token(TokenType.Identifier, text)
         };

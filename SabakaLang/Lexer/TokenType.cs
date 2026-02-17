@@ -63,6 +63,8 @@ public enum TokenType
     New,
     Override,
     Colon,
+    ColonColon,
+    Super,
     
     EOF
 }

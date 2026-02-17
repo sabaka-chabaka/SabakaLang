@@ -1,11 +1,23 @@
-struct Dog
-{
-    int age;
-    string breed;
+class A {
+    int x;
+    void foo() {
+        print("A.foo");
+        print(x);
+    }
 }
 
-Dog dog;
-dog.age = 11;
-dog.breed = "golden retriever";
-print(dog.breed);
-print(dog.age);
+class B : A {
+    override void foo() {
+        print("B.foo");
+        super::x = 10;
+        print(super::x);
+        super::foo();
+    }
+}
+
+void main() {
+    var b = B();
+    b.foo();
+}
+
+main();

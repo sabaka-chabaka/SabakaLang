@@ -247,6 +247,19 @@ public class Parser
 
     private Expr ParseAssignment()
     {
+        if (Current.Type == TokenType.Super)
+        {
+            if (Peek().Type == TokenType.ColonColon && Peek(2).Type == TokenType.Identifier && Peek(3).Type == TokenType.Equal)
+            {
+                Consume(); // super
+                Consume(); // ::
+                var member = Consume().Value;
+                Consume(); // =
+                var value = ParseAssignment();
+                return new MemberAssignmentExpr(new SuperExpr(), member, value);
+            }
+        }
+
         if (Current.Type == TokenType.Identifier)
         {
             if (Peek().Type == TokenType.Equal)
@@ -453,6 +466,13 @@ public class Parser
     {
         expr = new VariableExpr(Current.Value);
         Consume();
+    }
+    else if (Current.Type == TokenType.Super)
+    {
+        Consume();
+        Expect(TokenType.ColonColon);
+        var member = Expect(TokenType.Identifier).Value;
+        expr = new MemberAccessExpr(new SuperExpr(), member);
     }
     
     else if (Current.Type == TokenType.LBracket)

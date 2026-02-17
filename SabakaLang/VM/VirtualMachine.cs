@@ -211,7 +211,13 @@ public class VirtualMachine
                     if (obj.Type != SabakaType.Object)
                         throw new Exception("Cannot call method on non-object");
 
-                    var function = ResolveMethod(obj.ClassName!, instruction.Name!);
+                    string startClassName = obj.ClassName!;
+                    if (instruction.Extra is string baseClassName)
+                    {
+                        startClassName = baseClassName;
+                    }
+
+                    var function = ResolveMethod(startClassName, instruction.Name!);
 
                     _callStack.Push(ip + 1);
                     _scopeDepthStack.Push(_scopes.Count);
