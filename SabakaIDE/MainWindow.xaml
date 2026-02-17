@@ -145,12 +145,14 @@
         <CommandBinding Command="Save"
                         Executed="Save_Executed"
                         CanExecute="Save_CanExecute"/>
+        <CommandBinding Command="Play"
+                        Executed="Run_Executed"
+                        CanExecute="Run_CanExecute"/>
     </Window.CommandBindings>
 
     <Window.InputBindings>
-        <KeyBinding Command="Save"
-                    Modifiers="Control"
-                    Key="S"/>
+        <KeyBinding Command="Play"
+                    Key="F5"/>
     </Window.InputBindings>
 
 </Window>

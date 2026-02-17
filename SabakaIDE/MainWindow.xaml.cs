@@ -281,4 +281,14 @@ public partial class MainWindow : Window
     {
         e.CanExecute = true;
     }
+    
+    private void Run_Executed(object sender, ExecutedRoutedEventArgs e)
+    {
+        RunButton_Click(sender, e);
+    }
+
+    private void Run_CanExecute(object sender, CanExecuteRoutedEventArgs e)
+    {
+        e.CanExecute = true;
+    }
 }
