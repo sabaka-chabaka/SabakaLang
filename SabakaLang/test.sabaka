@@ -1,15 +1,11 @@
-class Animal
+struct Dog
 {
-    void GetAge() {}
+    int age;
+    string breed;
 }
 
-class Dog : Animal
-{
-    override void GetAge()
-    {
-        print(15);
-    }
-}
-
-Dog d = new Dog();
-d.GetAge();
+Dog dog;
+dog.age = 11;
+dog.breed = "golden retriever";
+print(dog.breed);
+print(dog.age);

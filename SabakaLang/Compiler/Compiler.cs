@@ -1,4 +1,5 @@
 using SabakaLang.AST;
+using SabakaLang.Exceptions;
 using SabakaLang.Lexer;
 using SabakaLang.Types;
 
@@ -113,7 +114,7 @@ public class Compiler
             }
             else if (newExpr.Arguments.Count > 0)
             {
-                throw new Exception($"Class {newExpr.ClassName} does not have a constructor.");
+                throw new CompilerException($"Class {newExpr.ClassName} does not have a constructor", 0);
             }
         }
         else if (expr is FunctionDeclaration func)
@@ -251,7 +252,7 @@ public class Compiler
                 }
                 else if (call.Arguments.Count > 0)
                 {
-                    throw new Exception($"Class {call.Name} does not have a constructor.");
+                    throw new CompilerException($"Class {call.Name} does not have a constructor", 0);
                 }
                 return;
             }
@@ -320,7 +321,7 @@ public class Compiler
             {
                 var enumValues = _enums[varExpr.Name];
                 if (!enumValues.ContainsKey(memberAccess.Member))
-                    throw new Exception($"Unknown enum member {memberAccess.Member} in {varExpr.Name}");
+                    throw new CompilerException($"Unknown enum member {memberAccess.Member} in {varExpr.Name}", 0);
 
                 int value = enumValues[memberAccess.Member];
                 _instructions.Add(new Instruction(OpCode.Push, Value.FromInt(value)));
