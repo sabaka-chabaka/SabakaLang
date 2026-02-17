@@ -41,5 +41,6 @@ public enum OpCode
     PushThis,
     Dup,
     Pop,
-    Inherit
+    Inherit,
+    Input
 }

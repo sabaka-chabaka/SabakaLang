@@ -297,6 +297,12 @@ public class Compiler
                 return;
             }
 
+            if (call.Target == null && call.Name == "input")
+            {
+                _instructions.Add(new Instruction(OpCode.Input));
+                return;
+            }
+
             if (call.Target == null && _classes.TryGetValue(call.Name, out var cDecl))
             {
                 _instructions.Add(new Instruction(OpCode.CreateObject)

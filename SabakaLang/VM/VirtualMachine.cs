@@ -1,5 +1,6 @@
 using SabakaLang.Compiler;
 using SabakaLang.Types;
+using System.Globalization;
 
 namespace SabakaLang.VM;
 
@@ -155,6 +156,24 @@ public class VirtualMachine
                     if (_stack.Count == 0) throw new Exception("Stack empty in Print");
                     var value = _stack.Pop();
                     Console.WriteLine(value);
+                    break;
+                }
+
+                case OpCode.Input:
+                {
+                    var line = Console.ReadLine() ?? "";
+                    if (int.TryParse(line, out int intVal))
+                    {
+                        _stack.Push(Value.FromInt(intVal));
+                    }
+                    else if (double.TryParse(line, NumberStyles.Float, CultureInfo.InvariantCulture, out double floatVal))
+                    {
+                        _stack.Push(Value.FromFloat(floatVal));
+                    }
+                    else
+                    {
+                        _stack.Push(Value.FromString(line));
+                    }
                     break;
                 }
 

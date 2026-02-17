@@ -1,38 +1,10 @@
-class Base {
-    private int privateField = 1;
-    protected int protectedField = 2;
-    public int publicField = 3;
-
-    private void privateMethod() {
-        print("Base privateMethod");
-    }
-
-    protected void protectedMethod() {
-        print("Base protectedMethod");
-    }
-
-    public void publicMethod() {
-        print("Base publicMethod");
-        // Internal access should work
-        print(privateField);
-        privateMethod();
+void testInput() {
+    print("Enter something:");
+    string s = input();
+    if (s != "")
+    {
+        print("You entered: " + s);
     }
 }
 
-class Derived : Base {
-    void testProtected() {
-        print(super::protectedField);
-        super::protectedMethod();
-    }
-}
-
-void main() {
-    Base b = Base();
-    b.publicMethod();
-    print(b.publicField);
-    
-    Derived d = Derived();
-    d.testProtected();
-}
-
-main();
+testInput();
