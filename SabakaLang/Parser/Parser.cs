@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using SabakaLang.AST;
 using SabakaLang.Exceptions;
 using SabakaLang.Lexer;
@@ -12,7 +13,7 @@ public class Parser
 
     public Parser(List<Token> tokens)
     {
-        _tokens = tokens;
+        _tokens = tokens.Where(t => t.Type != TokenType.Comment).ToList();
     }
 
     private Token Current => _position >= _tokens.Count ? _tokens[^1] : _tokens[_position];

@@ -71,6 +71,8 @@ public enum TokenType
     Case,
     Default,
     
+    Comment,
+    
     Public,
     Private,
     Protected,

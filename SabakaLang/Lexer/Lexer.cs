@@ -67,8 +67,12 @@ public class Lexer
                 case '/':
                     if (PeekChar() == '/')
                     {
-                        while (Current != '\n' && Current != '\0')
+                        while (Current != '\n' && Current != '\r' && Current != '\0')
                             Advance();
+                        
+                        if (_ide)
+                            tokens.Add(new Token(TokenType.Comment, _text.Substring(start, _position - start), start, _position));
+                        
                         continue;
                     }
                     tokens.Add(new Token(TokenType.Slash, "/", start, start + 1));

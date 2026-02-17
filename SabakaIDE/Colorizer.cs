@@ -90,6 +90,8 @@ public class Colorizer : DocumentColorizingTransformer
             TokenType.Case => Brushes.DodgerBlue,
             TokenType.Default => Brushes.DodgerBlue,
             
+            TokenType.Comment => Brushes.SeaGreen,
+            
             _ => Brushes.White
         };
     }
