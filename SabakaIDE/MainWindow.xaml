@@ -1,0 +1,28 @@
+﻿<Window x:Class="SabakaIDE.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SabakaIDE"
+        xmlns:avalonedit="http://icsharpcode.net/sharpdevelop/avalonedit"
+        mc:Ignorable="d"
+        Title="SabakaIDE" Height="450" Width="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="0"/>
+        </Grid.RowDefinitions>
+
+        <avalonedit:TextEditor x:Name="Editor"
+                               ShowLineNumbers="True"
+                               FontFamily="Consolas"
+                               FontSize="14"/>
+
+        <TextBox Grid.Row="1"
+                 x:Name="OutputBox"
+                 Background="#111"
+                 Foreground="LightGreen"
+                 IsReadOnly="True"/>
+    </Grid>
+
+</Window>
