@@ -6,5 +6,7 @@ public enum SymbolKind
     Function,
     Class,
     Parameter,
-    BuiltIn
+    BuiltIn,
+    Method,
+    Field
 }

@@ -9,8 +9,9 @@ public class Symbol
     public int End { get; }
     public int ScopeStart { get; }
     public int ScopeEnd { get; }
+    public string? ParentName { get; }
 
-    public Symbol(string name, SymbolKind kind, string type, int start, int end, int scopeStart = 0, int scopeEnd = int.MaxValue)
+    public Symbol(string name, SymbolKind kind, string type, int start, int end, int scopeStart = 0, int scopeEnd = int.MaxValue, string? parentName = null)
     {
         Name = name;
         Kind = kind;
@@ -19,5 +20,6 @@ public class Symbol
         End = end;
         ScopeStart = scopeStart;
         ScopeEnd = scopeEnd;
+        ParentName = parentName;
     }
 }

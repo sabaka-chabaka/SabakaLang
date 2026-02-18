@@ -11,6 +11,7 @@ public class SemanticAnalyzer
     private readonly List<Expr> _ast;
     private readonly List<Symbol> _allSymbols = new();
     private readonly Stack<(int start, int end)> _scopeRanges = new();
+    private string? _currentParent = null;
 
     public IEnumerable<Symbol> AllSymbols => _allSymbols;
     public IEnumerable<Symbol> GlobalSymbols => _globalScope.Symbols;
@@ -29,9 +30,9 @@ public class SemanticAnalyzer
         Declare("input", SymbolKind.BuiltIn, "string", 0, 0);
     }
 
-    private bool Declare(string name, SymbolKind kind, string type, int start, int end, int scopeStart = 0, int scopeEnd = int.MaxValue)
+    private bool Declare(string name, SymbolKind kind, string type, int start, int end, int scopeStart = 0, int scopeEnd = int.MaxValue, string? parentName = null)
     {
-        var symbol = new Symbol(name, kind, type, start, end, scopeStart, scopeEnd);
+        var symbol = new Symbol(name, kind, type, start, end, scopeStart, scopeEnd, parentName);
         if (!_currentScope.Declare(symbol))
             return false;
         
@@ -95,7 +96,8 @@ public class SemanticAnalyzer
                 if (varDecl.Initializer != null)
                     AnalyzeExpr(varDecl.Initializer);
                 
-                if (!Declare(varDecl.Name, SymbolKind.Variable, varDecl.TypeToken.ToString(), varDecl.Start, varDecl.End, varDecl.End, CurrentScopeRange.end))
+                var varKind = _currentParent != null ? SymbolKind.Field : SymbolKind.Variable;
+                if (!Declare(varDecl.Name, varKind, varDecl.TypeToken.ToString(), varDecl.Start, varDecl.End, varDecl.End, CurrentScopeRange.end, _currentParent))
                 {
                     throw new SemanticException($"Variable '{varDecl.Name}' is already declared in this scope", varDecl.Start);
                 }
@@ -103,12 +105,16 @@ public class SemanticAnalyzer
 
             case FunctionDeclaration funcDecl:
                 {
-                    Declare(funcDecl.Name, SymbolKind.Function, funcDecl.ReturnType.ToString(), funcDecl.Start, funcDecl.End, CurrentScopeRange.start, CurrentScopeRange.end);
+                    var funcKind = _currentParent != null ? SymbolKind.Method : SymbolKind.Function;
+                    Declare(funcDecl.Name, funcKind, funcDecl.ReturnType.ToString(), funcDecl.Start, funcDecl.End, CurrentScopeRange.start, CurrentScopeRange.end, _currentParent);
 
                     var previousScope = _currentScope;
                     _currentScope = new Scope(previousScope);
                     _scopeRanges.Push((funcDecl.Start, funcDecl.End));
                     
+                    var previousParent = _currentParent;
+                    _currentParent = null;
+
                     foreach (var param in funcDecl.Parameters)
                     {
                         if (!Declare(param.Name, SymbolKind.Parameter, param.Type.ToString(), funcDecl.Start, funcDecl.End, funcDecl.Start, funcDecl.End))
@@ -120,6 +126,7 @@ public class SemanticAnalyzer
                     foreach (var bodyExpr in funcDecl.Body)
                         AnalyzeExpr(bodyExpr);
                     
+                    _currentParent = previousParent;
                     _scopeRanges.Pop();
                     _currentScope = previousScope;
                 }
@@ -135,11 +142,15 @@ public class SemanticAnalyzer
                     
                     Declare("this", SymbolKind.Variable, classDecl.Name, classDecl.Start, classDecl.End, classDecl.Start, classDecl.End);
 
+                    var previousParent = _currentParent;
+                    _currentParent = classDecl.Name;
+
                     foreach (var field in classDecl.Fields)
                         AnalyzeExpr(field);
                     foreach (var method in classDecl.Methods)
                         AnalyzeExpr(method);
                     
+                    _currentParent = previousParent;
                     _scopeRanges.Pop();
                     _currentScope = previousScope;
                 }
@@ -147,10 +158,18 @@ public class SemanticAnalyzer
 
             case StructDeclaration structDecl:
                 Declare(structDecl.Name, SymbolKind.Class, structDecl.Name, structDecl.Start, structDecl.End, CurrentScopeRange.start, CurrentScopeRange.end);
+                foreach (var fieldName in structDecl.Fields)
+                {
+                    Declare(fieldName, SymbolKind.Field, "unknown", structDecl.Start, structDecl.End, structDecl.Start, structDecl.End, structDecl.Name);
+                }
                 break;
 
             case EnumDeclaration enumDecl:
                 Declare(enumDecl.Name, SymbolKind.Class, enumDecl.Name, enumDecl.Start, enumDecl.End, CurrentScopeRange.start, CurrentScopeRange.end);
+                foreach (var memberName in enumDecl.Members)
+                {
+                    Declare(memberName, SymbolKind.Field, enumDecl.Name, enumDecl.Start, enumDecl.End, enumDecl.Start, enumDecl.End, enumDecl.Name);
+                }
                 break;
 
             case VariableExpr varExpr:

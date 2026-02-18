@@ -43,6 +43,49 @@ public class CompletionHandler : CompletionHandlerBase
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
     {
+        var source = _documentStore.GetDocument(request.TextDocument.Uri);
+        if (source == null) return Task.FromResult(new CompletionList());
+
+        int offset = PositionHelper.GetOffset(source, request.Position);
+
+        // Check for member completion (e.g., "a." or "E::")
+        if (offset > 0)
+        {
+            int triggerOffset = -1;
+            if (source[offset - 1] == '.') triggerOffset = offset - 1;
+            else if (offset > 1 && source[offset - 1] == ':' && source[offset - 2] == ':') triggerOffset = offset - 2;
+
+            if (triggerOffset >= 0)
+            {
+                int end = triggerOffset - 1;
+                while (end >= 0 && char.IsWhiteSpace(source[end])) end--;
+                
+                int start = end;
+                while (start >= 0 && (char.IsLetterOrDigit(source[start]) || source[start] == '_')) start--;
+                
+                if (end >= 0)
+                {
+                    string targetName = source.Substring(start + 1, end - start);
+                    var symbol = _symbolIndex.GetAvailableSymbols(request.TextDocument.Uri, end)
+                        .FirstOrDefault(s => s.Name == targetName);
+                    
+                    if (symbol != null)
+                    {
+                        string typeName = symbol.Kind == SabakaSymbolKind.Class ? symbol.Name : symbol.Type;
+                        var members = _symbolIndex.GetMembers(typeName)
+                            .Select(s => new CompletionItem
+                            {
+                                Label = s.Name,
+                                Kind = MapSymbolKind(s.Kind),
+                                Detail = s.Type
+                            });
+                        
+                        return Task.FromResult(new CompletionList(members));
+                    }
+                }
+            }
+        }
+
         var items = _keywords.Select(k => new CompletionItem
         {
             Label = k,
@@ -54,9 +97,6 @@ public class CompletionHandler : CompletionHandlerBase
             Kind = CompletionItemKind.Function,
             Detail = "Built-in Function"
         }));
-
-        var source = _documentStore.GetDocument(request.TextDocument.Uri);
-        int offset = source != null ? PositionHelper.GetOffset(source, request.Position) : 0;
 
         var symbols = _symbolIndex.GetAvailableSymbols(request.TextDocument.Uri, offset)
             .Where(s => s.Kind != SabakaSymbolKind.BuiltIn)
@@ -78,6 +118,8 @@ public class CompletionHandler : CompletionHandlerBase
             SabakaSymbolKind.Function => CompletionItemKind.Function,
             SabakaSymbolKind.Class => CompletionItemKind.Class,
             SabakaSymbolKind.Parameter => CompletionItemKind.Variable,
+            SabakaSymbolKind.Method => CompletionItemKind.Method,
+            SabakaSymbolKind.Field => CompletionItemKind.Field,
             _ => CompletionItemKind.Text
         };
     }

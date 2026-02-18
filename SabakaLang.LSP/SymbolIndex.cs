@@ -56,4 +56,14 @@ public class SymbolIndex
             return _documentSymbols.Values.SelectMany(s => s).ToList();
         }
     }
+
+    public IEnumerable<Symbol> GetMembers(string parentName)
+    {
+        lock (_documentSymbols)
+        {
+            return _documentSymbols.Values.SelectMany(s => s)
+                .Where(s => s.ParentName == parentName)
+                .ToList();
+        }
+    }
 }

@@ -1,3 +1,4 @@
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -9,10 +10,12 @@ namespace SabakaLang.LSP;
 public class SemanticTokensHandler : SemanticTokensHandlerBase
 {
     private readonly DocumentStore _documentStore;
+    private readonly SymbolIndex _symbolIndex;
 
-    public SemanticTokensHandler(DocumentStore documentStore)
+    public SemanticTokensHandler(DocumentStore documentStore, SymbolIndex symbolIndex)
     {
         _documentStore = documentStore;
+        _symbolIndex = symbolIndex;
     }
 
     protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities)
@@ -27,7 +30,7 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
             {
                 TokenTypes = new[]
                 {
-                    "keyword", "type", "number", "string", "comment", "operator", "variable", "function"
+                    "keyword", "type", "number", "string", "comment", "operator", "variable", "function", "parameter", "class"
                 }.Select(x => new SemanticTokenType(x)).ToArray(),
                 TokenModifiers = new SemanticTokenModifier[0]
             },
@@ -46,7 +49,7 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
 
         foreach (var token in tokens)
         {
-            var type = MapToken(token);
+            var type = MapToken(token, identifier.TextDocument.Uri);
             if (type != null)
             {
                 var range = PositionHelper.GetRange(source, token.TokenStart, token.TokenEnd);
@@ -60,14 +63,48 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
         return Task.FromResult(new SemanticTokensDocument(RegistrationOptions.Legend));
     }
 
-    private string? MapToken(Token token)
+    private string? MapToken(Token token, DocumentUri uri)
     {
-        if (token.Type == TokenType.Identifier && (token.Value == "print" || token.Value == "input"))
+        if (token.Type == TokenType.Identifier)
         {
-            return "function";
+            if (token.Value == "print" || token.Value == "input")
+            {
+                return "function";
+            }
+
+            // Look up in symbol index
+            var symbols = _symbolIndex.GetAvailableSymbols(uri, token.TokenStart);
+            var symbol = symbols.FirstOrDefault(s => s.Name == token.Value);
+            
+            if (symbol == null)
+            {
+                // If not in available symbols, it might be a member. 
+                // Look up in ALL symbols as a fallback for highlighting.
+                symbol = _symbolIndex.GetAllSymbols().FirstOrDefault(s => s.Name == token.Value);
+            }
+
+            if (symbol != null)
+            {
+                return MapSymbolKindToTokenType(symbol.Kind);
+            }
         }
 
         return MapTokenType(token.Type);
+    }
+
+    private string? MapSymbolKindToTokenType(SabakaLang.LSP.Analysis.SymbolKind kind)
+    {
+        return kind switch
+        {
+            SabakaLang.LSP.Analysis.SymbolKind.Variable => "variable",
+            SabakaLang.LSP.Analysis.SymbolKind.Function => "function",
+            SabakaLang.LSP.Analysis.SymbolKind.Class => "class",
+            SabakaLang.LSP.Analysis.SymbolKind.Parameter => "parameter",
+            SabakaLang.LSP.Analysis.SymbolKind.BuiltIn => "function",
+            SabakaLang.LSP.Analysis.SymbolKind.Method => "function",
+            SabakaLang.LSP.Analysis.SymbolKind.Field => "variable",
+            _ => null
+        };
     }
 
     private string? MapTokenType(TokenType type)
