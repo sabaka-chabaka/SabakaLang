@@ -10,9 +10,12 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using ICSharpCode.AvalonEdit.CodeCompletion;
 using Microsoft.Win32;
 using SabakaIDE.Services;
 using SabakaLang.Lexer;
+using SabakaLang.Parser;
+using SabakaIDE.Models;
 
 namespace SabakaIDE;
 
@@ -24,7 +27,8 @@ public partial class MainWindow : Window
     private TextBoxWriter? _outputWriter;
     private string? _currentFilePath;
     private bool _isDirty = false;
-
+    private AstIndexer _astIndexer = new();
+    private SymbolTable _symbolTable = new();
 
     public MainWindow()
     {
@@ -54,6 +58,17 @@ public partial class MainWindow : Window
 
         _colorizer.SetTokens(tokens);
         Editor.TextArea.TextView.Redraw();
+
+        try
+        {
+            var parser = new Parser(tokens);
+            var ast = parser.ParseProgram();
+            _symbolTable = _astIndexer.Index(ast);
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     private void TextArea_TextEntering(object? sender, TextCompositionEventArgs e)

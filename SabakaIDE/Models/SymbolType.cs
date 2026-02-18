@@ -5,5 +5,7 @@ public enum SymbolType
     Function,
     Variable,
     Struct,
-    Class
+    Class,
+    Interface,
+    Enum
 }
