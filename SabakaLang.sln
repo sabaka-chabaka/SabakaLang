@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabakaLang", "SabakaLang\SabakaLang.csproj", "{55711146-F0CD-4264-B3C0-20C6AF23048A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabakaLang.LSP", "SabakaLang.LSP\SabakaLang.LSP.csproj", "{B69438FD-C7A5-4C17-B117-182E2CBB3E10}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{55711146-F0CD-4264-B3C0-20C6AF23048A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{55711146-F0CD-4264-B3C0-20C6AF23048A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{55711146-F0CD-4264-B3C0-20C6AF23048A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B69438FD-C7A5-4C17-B117-182E2CBB3E10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B69438FD-C7A5-4C17-B117-182E2CBB3E10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B69438FD-C7A5-4C17-B117-182E2CBB3E10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B69438FD-C7A5-4C17-B117-182E2CBB3E10}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
