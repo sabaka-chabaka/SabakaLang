@@ -17,6 +17,7 @@ var server = await LanguageServer.From(options =>
         .WithHandler<CompletionHandler>()
         .WithHandler<SemanticTokensHandler>()
         .WithHandler<HoverHandler>()
+        .WithHandler<OnTypeFormattingHandler>()
 );
 
 await server.WaitForExit;
