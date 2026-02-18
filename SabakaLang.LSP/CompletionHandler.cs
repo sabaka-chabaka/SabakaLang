@@ -72,12 +72,20 @@ public class CompletionHandler : CompletionHandlerBase
                     if (symbol != null)
                     {
                         string typeName = symbol.Kind == SabakaSymbolKind.Class ? symbol.Name : symbol.Type;
+                        
+                        // Handle built-in type names which might be TokenTypes as strings
+                        if (typeName == "IntKeyword") typeName = "int";
+                        else if (typeName == "FloatKeyword") typeName = "float";
+                        else if (typeName == "StringKeyword") typeName = "string";
+                        else if (typeName == "BoolKeyword") typeName = "bool";
+                        else if (typeName == "VoidKeyword") typeName = "void";
+
                         var members = _symbolIndex.GetMembers(typeName)
                             .Select(s => new CompletionItem
                             {
                                 Label = s.Name,
                                 Kind = MapSymbolKind(s.Kind),
-                                Detail = s.Type
+                                Detail = GetPrettyType(s.Type)
                             });
                         
                         return Task.FromResult(new CompletionList(members));
@@ -104,7 +112,7 @@ public class CompletionHandler : CompletionHandlerBase
             {
                 Label = s.Name,
                 Kind = MapSymbolKind(s.Kind),
-                Detail = s.Type
+                Detail = GetPrettyType(s.Type)
             });
 
         return Task.FromResult(new CompletionList(items.Concat(symbols)));
@@ -121,6 +129,19 @@ public class CompletionHandler : CompletionHandlerBase
             SabakaSymbolKind.Method => CompletionItemKind.Method,
             SabakaSymbolKind.Field => CompletionItemKind.Field,
             _ => CompletionItemKind.Text
+        };
+    }
+
+    private string GetPrettyType(string type)
+    {
+        return type switch
+        {
+            "IntKeyword" => "int",
+            "FloatKeyword" => "float",
+            "StringKeyword" => "string",
+            "BoolKeyword" => "bool",
+            "VoidKeyword" => "void",
+            _ => type
         };
     }
 

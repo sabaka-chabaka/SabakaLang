@@ -62,7 +62,8 @@ public class SemanticAnalyzer
         switch (expr)
         {
             case FunctionDeclaration func:
-                if (!Declare(func.Name, SymbolKind.Function, func.ReturnType.ToString(), func.Start, func.End))
+                string funcReturnType = func.ReturnType == TokenType.Identifier ? "unknown" : func.ReturnType.ToString();
+                if (!Declare(func.Name, SymbolKind.Function, funcReturnType, func.Start, func.End))
                 {
                     throw new SemanticException($"Function '{func.Name}' is already declared", func.Start);
                 }
@@ -97,7 +98,8 @@ public class SemanticAnalyzer
                     AnalyzeExpr(varDecl.Initializer);
                 
                 var varKind = _currentParent != null ? SymbolKind.Field : SymbolKind.Variable;
-                if (!Declare(varDecl.Name, varKind, varDecl.TypeToken.ToString(), varDecl.Start, varDecl.End, varDecl.End, CurrentScopeRange.end, _currentParent))
+                string typeName = varDecl.CustomType ?? varDecl.TypeToken.ToString();
+                if (!Declare(varDecl.Name, varKind, typeName, varDecl.Start, varDecl.End, varDecl.End, CurrentScopeRange.end, _currentParent))
                 {
                     throw new SemanticException($"Variable '{varDecl.Name}' is already declared in this scope", varDecl.Start);
                 }
@@ -106,7 +108,8 @@ public class SemanticAnalyzer
             case FunctionDeclaration funcDecl:
                 {
                     var funcKind = _currentParent != null ? SymbolKind.Method : SymbolKind.Function;
-                    Declare(funcDecl.Name, funcKind, funcDecl.ReturnType.ToString(), funcDecl.Start, funcDecl.End, CurrentScopeRange.start, CurrentScopeRange.end, _currentParent);
+                    string returnType = funcDecl.ReturnType == TokenType.Identifier ? (funcDecl.Name == "Constructor" ? "" : "unknown") : funcDecl.ReturnType.ToString();
+                    Declare(funcDecl.Name, funcKind, returnType, funcDecl.Start, funcDecl.End, CurrentScopeRange.start, CurrentScopeRange.end, _currentParent);
 
                     var previousScope = _currentScope;
                     _currentScope = new Scope(previousScope);
@@ -117,7 +120,8 @@ public class SemanticAnalyzer
 
                     foreach (var param in funcDecl.Parameters)
                     {
-                        if (!Declare(param.Name, SymbolKind.Parameter, param.Type.ToString(), funcDecl.Start, funcDecl.End, funcDecl.Start, funcDecl.End))
+                        string paramType = param.CustomType ?? param.Type.ToString();
+                        if (!Declare(param.Name, SymbolKind.Parameter, paramType, funcDecl.Start, funcDecl.End, funcDecl.Start, funcDecl.End))
                         {
                              throw new SemanticException($"Parameter '{param.Name}' is already declared in this scope", funcDecl.Start);
                         }
