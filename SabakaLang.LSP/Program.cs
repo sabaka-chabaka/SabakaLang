@@ -11,6 +11,7 @@ var server = await LanguageServer.From(options =>
         .AddDefaultLoggingProvider()
         .WithServices(services => {
             services.AddSingleton<DocumentStore>();
+            services.AddSingleton<SymbolIndex>();
         })
         .WithHandler<TextDocumentHandler>()
         .WithHandler<CompletionHandler>()

@@ -15,15 +15,17 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
 {
     private readonly ILanguageServerFacade _router;
     private readonly DocumentStore _documentStore;
+    private readonly SymbolIndex _symbolIndex;
     private readonly TextDocumentSelector _documentSelector = new TextDocumentSelector(
         new TextDocumentFilter { Pattern = "**/*.sabaka" },
         new TextDocumentFilter { Language = "sabaka" }
     );
 
-    public TextDocumentHandler(ILanguageServerFacade router, DocumentStore documentStore)
+    public TextDocumentHandler(ILanguageServerFacade router, DocumentStore documentStore, SymbolIndex symbolIndex)
     {
         _router = router;
         _documentStore = documentStore;
+        _symbolIndex = symbolIndex;
     }
 
     public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri)
@@ -40,7 +42,7 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
         _router.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
         {
             Uri = uri,
-            Diagnostics = GetDiagnostics(text)
+            Diagnostics = GetDiagnostics(uri, text)
         });
 
         return Unit.Task;
@@ -55,7 +57,7 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
         _router.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
         {
             Uri = uri,
-            Diagnostics = GetDiagnostics(text)
+            Diagnostics = GetDiagnostics(uri, text)
         });
 
         return Unit.Task;
@@ -69,6 +71,7 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
     public override Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
     {
         _documentStore.RemoveDocument(request.TextDocument.Uri);
+        _symbolIndex.RemoveDocument(request.TextDocument.Uri);
         return Unit.Task;
     }
 
@@ -82,7 +85,7 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
         };
     }
 
-    private Container<Diagnostic> GetDiagnostics(string source)
+    private Container<Diagnostic> GetDiagnostics(DocumentUri uri, string source)
     {
         var diagnostics = new List<Diagnostic>();
         try
@@ -90,7 +93,12 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
             var lexer = new Lexer.Lexer(source);
             var tokens = lexer.Tokenize(false);
             var parser = new Parser.Parser(tokens);
-            parser.ParseProgram();
+            var ast = parser.ParseProgram();
+
+            var analyzer = new Analysis.SemanticAnalyzer(ast);
+            analyzer.Analyze();
+
+            _symbolIndex.UpdateSymbols(uri, analyzer.AllSymbols.ToList());
         }
         catch (SabakaLangException ex)
         {

@@ -39,12 +39,26 @@ public class HoverHandler : HoverHandlerBase
         
         if (token != null)
         {
+            string detail = $"**Token:** `{token.Type}`\n\n**Value:** `{token.Value}`";
+            
+            if (token.Type == TokenType.Identifier)
+            {
+                if (token.Value == "print")
+                {
+                    detail = "**Built-in Function:** `print`  \nPrints the given value to the standard output.";
+                }
+                else if (token.Value == "input")
+                {
+                    detail = "**Built-in Function:** `input`  \nReads a line of string from the standard input.";
+                }
+            }
+
             return Task.FromResult<Hover?>(new Hover
             {
                 Contents = new MarkedStringsOrMarkupContent(new MarkupContent
                 {
                     Kind = MarkupKind.Markdown,
-                    Value = $"**Token:** `{token.Type}`\n\n**Value:** `{token.Value}`"
+                    Value = detail
                 }),
                 Range = PositionHelper.GetRange(source, token.TokenStart, token.TokenEnd)
             });

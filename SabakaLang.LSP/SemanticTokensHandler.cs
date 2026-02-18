@@ -46,7 +46,7 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
 
         foreach (var token in tokens)
         {
-            var type = MapTokenType(token.Type);
+            var type = MapToken(token);
             if (type != null)
             {
                 var range = PositionHelper.GetRange(source, token.TokenStart, token.TokenEnd);
@@ -58,6 +58,16 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
     protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken)
     {
         return Task.FromResult(new SemanticTokensDocument(RegistrationOptions.Legend));
+    }
+
+    private string? MapToken(Token token)
+    {
+        if (token.Type == TokenType.Identifier && (token.Value == "print" || token.Value == "input"))
+        {
+            return "function";
+        }
+
+        return MapTokenType(token.Type);
     }
 
     private string? MapTokenType(TokenType type)
