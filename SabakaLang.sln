@@ -6,8 +6,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabakaLang.LSP", "SabakaLan
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabakaLang.ToExe", "SabakaLang.ToExe\SabakaLang.ToExe.csproj", "{E62DB31D-9E73-4109-B6B8-3CA86977B7BC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabakaLang.CLI", "SabakaLang.CLI\SabakaLang.CLI.csproj", "{0C91DD91-F379-4175-9FB2-A0687203DE89}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,9 +24,5 @@ Global
 		{E62DB31D-9E73-4109-B6B8-3CA86977B7BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E62DB31D-9E73-4109-B6B8-3CA86977B7BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E62DB31D-9E73-4109-B6B8-3CA86977B7BC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0C91DD91-F379-4175-9FB2-A0687203DE89}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0C91DD91-F379-4175-9FB2-A0687203DE89}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0C91DD91-F379-4175-9FB2-A0687203DE89}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0C91DD91-F379-4175-9FB2-A0687203DE89}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
