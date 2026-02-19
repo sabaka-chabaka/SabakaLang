@@ -13,7 +13,6 @@ public static class Compiler
             return;
         }
 
-        string source = File.ReadAllText(sabakaFilePath);
         string fileName = Path.GetFileNameWithoutExtension(sabakaFilePath);
         string currentDir = Directory.GetCurrentDirectory();
         string outputDir = Path.Combine(currentDir, fileName + "_build");
@@ -22,16 +21,16 @@ public static class Compiler
         try
         {
             Directory.CreateDirectory(tempDir);
-
+            
+            // Собираем все исходники
+            string allSource = CollectAllSources(sabakaFilePath);
+            
+            // Путь к сборке SabakaLang
             string sabakaLangAssemblyPath = typeof(SabakaRunner).Assembly.Location;
-            if (string.IsNullOrEmpty(sabakaLangAssemblyPath) || !File.Exists(sabakaLangAssemblyPath))
-            {
-                Console.WriteLine("Error: Could not find SabakaLang assembly.");
-                return;
-            }
-
-            // Create .csproj
-            string csproj = $@"
+            
+            // Создаем .csproj файл
+            string csprojPath = Path.Combine(tempDir, $"{fileName}.csproj");
+            string csprojContent = $@"
 <Project Sdk=""Microsoft.NET.Sdk"">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -48,33 +47,32 @@ public static class Compiler
     </Reference>
   </ItemGroup>
 </Project>";
-            File.WriteAllText(Path.Combine(tempDir, $"{fileName}.csproj"), csproj);
+            
+            File.WriteAllText(csprojPath, csprojContent);
 
-            // Create Program.cs
-            string escapedSource = source.Replace("\"", "\"\"");
-            string programCs = $@"
+            // Создаем Program.cs
+            string programPath = Path.Combine(tempDir, "Program.cs");
+            string programContent = $@"
 using SabakaLang;
 
 class Program
 {{
     static void Main()
     {{
-        string source = @""{escapedSource}"";
-        try {{
-            SabakaRunner.Run(source);
-        }} catch (Exception ex) {{
-            Console.WriteLine($""[Runtime Error] {{ex.Message}}"");
-        }}
+        string source = @""{EscapeString(allSource)}"";
+        SabakaRunner.Run(source);
     }}
 }}";
-            File.WriteAllText(Path.Combine(tempDir, "Program.cs"), programCs);
+            
+            File.WriteAllText(programPath, programContent);
 
             Console.WriteLine($"Compiling {sabakaFilePath} to EXE...");
 
+            // Запускаем dotnet publish с указанием пути к проекту
             ProcessStartInfo psi = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"publish -c Release -o \"{outputDir}\"",
+                Arguments = $"publish \"{csprojPath}\" -c Release -o \"{outputDir}\"",
                 WorkingDirectory = tempDir,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -95,28 +93,86 @@ class Program
 
             if (process.ExitCode == 0)
             {
-                Console.WriteLine($"Successfully compiled! Output directory: {outputDir}");
+                Console.WriteLine($"Success! EXE in: {outputDir}");
                 Console.WriteLine($"Executable: {Path.Combine(outputDir, fileName + ".exe")}");
             }
             else
             {
-                Console.WriteLine("Compilation failed.");
+                Console.WriteLine("Compilation failed:");
                 Console.WriteLine(output);
                 Console.WriteLine(error);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"An error occurred during compilation: {ex.Message}");
+            Console.WriteLine($"Error: {ex.Message}");
         }
         finally
         {
-            try
-            {
-                if (Directory.Exists(tempDir))
-                    Directory.Delete(tempDir, true);
-            }
-            catch { /* Ignore cleanup errors */ }
+            try { Directory.Delete(tempDir, true); } catch { }
         }
+    }
+
+    private static string CollectAllSources(string mainFile)
+    {
+        var allCode = new List<string>();
+        var processed = new HashSet<string>();
+        var queue = new Queue<string>();
+        string mainDir = Path.GetDirectoryName(Path.GetFullPath(mainFile))!;
+        
+        queue.Enqueue(Path.GetFullPath(mainFile));
+        
+        while (queue.Count > 0)
+        {
+            string file = queue.Dequeue();
+            
+            if (processed.Contains(file)) continue;
+            processed.Add(file);
+            
+            if (!File.Exists(file))
+            {
+                Console.WriteLine($"Warning: Import file not found: {file}");
+                continue;
+            }
+            
+            string content = File.ReadAllText(file);
+            var lines = content.Split('\n');
+            var filteredLines = new List<string>();
+            
+            foreach (var line in lines)
+            {
+                string trimmed = line.Trim();
+                if (trimmed.StartsWith("import "))
+                {
+                    int start = trimmed.IndexOf('"') + 1;
+                    int end = trimmed.LastIndexOf('"');
+                    if (start > 0 && end > start)
+                    {
+                        string importFile = trimmed.Substring(start, end - start);
+                        string importPath = Path.Combine(mainDir, importFile);
+                        if (!importPath.EndsWith(".sabaka")) 
+                            importPath += ".sabaka";
+                        
+                        if (File.Exists(importPath))
+                            queue.Enqueue(importPath);
+                        else
+                            Console.WriteLine($"Warning: Import not found: {importFile}");
+                    }
+                }
+                else
+                {
+                    filteredLines.Add(line);
+                }
+            }
+            
+            allCode.Add(string.Join("\n", filteredLines));
+        }
+        
+        return string.Join("\n\n", allCode);
+    }
+
+    private static string EscapeString(string s)
+    {
+        return s.Replace("\"", "\"\"");
     }
 }

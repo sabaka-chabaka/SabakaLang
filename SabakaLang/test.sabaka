@@ -1,3 +1,4 @@
 import "test2.sabaka"
 
 hello();
+input();
