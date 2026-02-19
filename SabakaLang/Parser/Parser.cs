@@ -251,6 +251,8 @@ public class Parser
             stmt = ParseFor();
         else if (Current.Type == TokenType.StructKeyword)
             return ParseStruct();
+        else if (Current.Type == TokenType.Import)
+            stmt = ParseImport();
         else if (Current.Type == TokenType.Class)
         {
             stmt = ParseClass();
@@ -988,4 +990,16 @@ public class Parser
         return WithPos(new InterfaceDeclaration(name, parents, methods), startToken, _tokens[_position - 1]);
     }
 
+    private Expr ParseImport()
+    {
+        var startToken = Consume();
+
+        var pathToken = Expect(TokenType.StringLiteral);
+        var filePath = pathToken.Value;
+
+        if (Current.Type == TokenType.Semicolon)
+            Consume();
+
+        return WithPos(new ImportStatement(filePath), startToken, _tokens[_position - 1]);
+    }
 }

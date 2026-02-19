@@ -54,7 +54,7 @@ class Program
             }
 
             var source = File.ReadAllText(path);
-            SabakaRunner.Run(source);
+            SabakaRunner.Run(source, path);
         }
         catch (SabakaLangException ex)
         {

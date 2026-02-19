@@ -15,6 +15,8 @@ public class Compiler
     private Dictionary<string, InterfaceDeclaration> _interfaces = new();
     private string? _currentClass = null;
     private Stack<Dictionary<string, string>> _typeScopes = new();
+    private HashSet<string> _importedFiles = new();
+    private string? _currentFilePath;
 
     private void PushScope() => _typeScopes.Push(new Dictionary<string, string>());
     private void PopScope() => _typeScopes.Pop();
@@ -28,8 +30,13 @@ public class Compiler
         return null;
     }
 
-    public List<Instruction> Compile(List<Expr> expressions)
+    public List<Instruction> Compile(List<Expr> expressions, string? filePath = null)
     {
+        _currentFilePath = filePath;
+        _importedFiles.Clear();
+        if (_currentFilePath != null)
+            _importedFiles.Add(_currentFilePath);
+        
         _typeScopes.Clear();
         PushScope(); // Global scope
 
@@ -54,6 +61,10 @@ public class Compiler
             _instructions.Add(
                 new Instruction(OpCode.Push, Value.FromFloat(f.Value))
             );
+        }
+        else if (expr is ImportStatement import)
+        {
+            HandleImport(import);
         }
         else if (expr is ClassDeclaration classDecl)
         {
@@ -991,5 +1002,74 @@ public class Compiler
         if (cd.Methods.Any(m => m.Name == methodName && m.Parameters.Count == paramCount)) return className;
         if (cd.BaseClassName != null) return GetDefiningClassForMethod(cd.BaseClassName, methodName, paramCount);
         return className;
+    }
+
+    private void HandleImport(ImportStatement import)
+    {
+        // Получаем абсолютный путь относительно текущего файла
+        string basePath = Path.GetDirectoryName(_currentFilePath) ?? Directory.GetCurrentDirectory();
+        string fullPath = Path.Combine(basePath, import.FilePath);
+        
+        // Нормализуем путь
+        fullPath = Path.GetFullPath(fullPath);
+        
+        // Проверяем циклические импорты
+        if (_importedFiles.Contains(fullPath))
+        {
+            // Можно просто проигнорировать повторный импорт
+            return;
+        }
+        
+        // Проверяем существование файла
+        if (!File.Exists(fullPath))
+        {
+            throw new CompilerException($"Import file not found: {import.FilePath}", import.Start);
+        }
+        
+        // Читаем и компилируем импортированный файл
+        string source = File.ReadAllText(fullPath);
+        
+        // Сохраняем текущее состояние
+        var oldFilePath = _currentFilePath;
+        var oldInstructions = _instructions;
+        var oldFunctions = _functions;
+        // ... сохранить другие состояния, если нужно ...
+        
+        // Временно создаем новый компилятор для импортированного файла
+        var importCompiler = new Compiler();
+        importCompiler._currentFilePath = fullPath;
+        importCompiler._importedFiles = new HashSet<string>(_importedFiles);
+        importCompiler._importedFiles.Add(fullPath);
+        
+        var lexer = new Lexer.Lexer(source);
+        var tokens = lexer.Tokenize(false);
+        var parser = new Parser.Parser(tokens);
+        var program = parser.ParseProgram();
+        
+        var importedInstructions = importCompiler.Compile(program);
+        
+        // Добавляем инструкции из импортированного файла
+        _instructions.AddRange(importedInstructions);
+        
+        // Объединяем словари функций, классов и т.д.
+        foreach (var kv in importCompiler._functions)
+        {
+            if (!_functions.ContainsKey(kv.Key))
+                _functions[kv.Key] = kv.Value;
+        }
+        
+        foreach (var kv in importCompiler._classes)
+        {
+            if (!_classes.ContainsKey(kv.Key))
+                _classes[kv.Key] = kv.Value;
+        }
+        
+        // ... объединить остальные словари ...
+        
+        // Добавляем путь в список импортированных файлов
+        _importedFiles.Add(fullPath);
+        
+        // Восстанавливаем текущий путь
+        _currentFilePath = oldFilePath;
     }
 }

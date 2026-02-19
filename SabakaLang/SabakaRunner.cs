@@ -4,7 +4,7 @@ namespace SabakaLang;
 
 public class SabakaRunner
 {
-    public static void Run(string source, TextReader? input = null, TextWriter? output = null)
+    public static void Run(string source, string? filePath = null, TextReader? input = null, TextWriter? output = null)
     {
         var lexer = new Lexer.Lexer(source);
         var tokens = lexer.Tokenize(false);
@@ -13,7 +13,7 @@ public class SabakaRunner
         var program = parser.ParseProgram();
 
         var compiler = new Compiler.Compiler();
-        var bytecode = compiler.Compile(program);
+        var bytecode = compiler.Compile(program, filePath);
 
         var vm = new VirtualMachine(input, output);
         vm.Execute(bytecode);

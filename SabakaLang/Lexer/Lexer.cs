@@ -293,6 +293,7 @@ public class Lexer
             "public" => new Token(TokenType.Public, text, start, _position),
             "private" => new Token(TokenType.Private, text, start, _position),
             "protected" => new Token(TokenType.Protected, text, start, _position),
+            "import" => new Token(TokenType.Import, text, start, _position),
 
             _ => new Token(TokenType.Identifier, text, start, _position)
         };

@@ -77,5 +77,7 @@ public enum TokenType
     Private,
     Protected,
     
+    Import,
+    
     EOF
 }
