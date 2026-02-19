@@ -3,6 +3,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using SabakaLang.LSP.Analysis;
 using SabakaSymbolKind = SabakaLang.LSP.Analysis.SymbolKind;
+using System.IO; 
 
 namespace SabakaLang.LSP;
 
@@ -22,7 +23,7 @@ public class CompletionHandler : CompletionHandlerBase
         "int", "float", "string", "bool", "true", "false",
         "struct", "class", "interface", "new", "override", "super",
         "switch", "case", "default", "enum",
-        "public", "private", "protected"
+        "public", "private", "protected", "import"
     };
 
     private readonly string[] _builtInFunctions = {
@@ -85,7 +86,8 @@ public class CompletionHandler : CompletionHandlerBase
                             {
                                 Label = s.Name,
                                 Kind = MapSymbolKind(s.Kind),
-                                Detail = GetPrettyType(s.Type)
+                                Detail = GetPrettyType(s.Type),
+                                Documentation = s.SourceFile != null ? $"From: {Path.GetFileName(s.SourceFile)}" : null  // ДОБАВЛЕНО
                             });
                         
                         return Task.FromResult(new CompletionList(members));
@@ -112,7 +114,10 @@ public class CompletionHandler : CompletionHandlerBase
             {
                 Label = s.Name,
                 Kind = MapSymbolKind(s.Kind),
-                Detail = GetPrettyType(s.Type)
+                Detail = GetPrettyType(s.Type),
+                Documentation = s.SourceFile != null && s.SourceFile != request.TextDocument.Uri.GetFileSystemPath() 
+                    ? $"Imported from: {Path.GetFileName(s.SourceFile)}"
+                    : null
             });
 
         return Task.FromResult(new CompletionList(items.Concat(symbols)));

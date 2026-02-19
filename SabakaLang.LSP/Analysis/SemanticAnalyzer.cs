@@ -1,3 +1,4 @@
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using SabakaLang.AST;
 using SabakaLang.Exceptions;
 using SabakaLang.Lexer;
@@ -15,6 +16,7 @@ public class SemanticAnalyzer
 
     public IEnumerable<Symbol> AllSymbols => _allSymbols;
     public IEnumerable<Symbol> GlobalSymbols => _globalScope.Symbols;
+    private readonly Dictionary<string, List<Symbol>> _importedSymbols = new();  // ДОБАВИТЬ ЭТУ СТРОКУ
 
     public SemanticAnalyzer(List<Expr> ast)
     {
@@ -28,6 +30,21 @@ public class SemanticAnalyzer
     {
         Declare("print", SymbolKind.BuiltIn, "void", 0, 0);
         Declare("input", SymbolKind.BuiltIn, "string", 0, 0);
+    }
+    
+    public void AddImportedSymbols(DocumentUri uri, List<Symbol> symbols)
+    {
+        var key = uri.ToString();
+        _importedSymbols[key] = symbols;
+    
+        // Добавляем импортированные символы в глобальную область видимости
+        foreach (var symbol in symbols)
+        {
+            if (symbol.ScopeStart == 0 && symbol.ScopeEnd == int.MaxValue) // Только глобальные символы
+            {
+                _globalScope.Declare(symbol);
+            }
+        }
     }
 
     private bool Declare(string name, SymbolKind kind, string type, int start, int end, int scopeStart = 0, int scopeEnd = int.MaxValue, string? parentName = null)
@@ -44,15 +61,21 @@ public class SemanticAnalyzer
 
     public void Analyze()
     {
-        // First pass: Register global declarations
+        // First pass: Register global declarations and collect imports
         foreach (var expr in _ast)
         {
+            if (expr is ImportStatement import) 
+            {
+                continue;
+            }
             RegisterGlobal(expr);
         }
 
         // Second pass: Analyze bodies and expressions
         foreach (var expr in _ast)
         {
+            if (expr is ImportStatement) 
+                continue;
             AnalyzeExpr(expr);
         }
     }
@@ -177,7 +200,7 @@ public class SemanticAnalyzer
                 break;
 
             case VariableExpr varExpr:
-                if (_currentScope.Resolve(varExpr.Name) == null)
+                if (_currentScope.Resolve(varExpr.Name) == null && !IsImportedSymbol(varExpr.Name))
                 {
                     throw new SemanticException($"Undefined variable '{varExpr.Name}'", varExpr.Start);
                 }
@@ -185,7 +208,7 @@ public class SemanticAnalyzer
 
             case AssignmentExpr assignExpr:
                 AnalyzeExpr(assignExpr.Value);
-                if (_currentScope.Resolve(assignExpr.Name) == null)
+                if (_currentScope.Resolve(assignExpr.Name) == null && !IsImportedSymbol(assignExpr.Name)) 
                 {
                     throw new SemanticException($"Undefined variable '{assignExpr.Name}'", assignExpr.Start);
                 }
@@ -203,7 +226,7 @@ public class SemanticAnalyzer
             case CallExpr callExpr:
                 if (callExpr.Target != null)
                     AnalyzeExpr(callExpr.Target);
-                else if (_currentScope.Resolve(callExpr.Name) == null)
+                else if (_currentScope.Resolve(callExpr.Name) == null && !IsImportedSymbol(callExpr.Name)) 
                 {
                     throw new SemanticException($"Undefined function '{callExpr.Name}'", callExpr.Start);
                 }
@@ -321,5 +344,15 @@ public class SemanticAnalyzer
                 AnalyzeExpr(arrayStore.Value);
                 break;
         }
+    }
+    
+    private bool IsImportedSymbol(string name)
+    {
+        foreach (var symbols in _importedSymbols.Values)
+        {
+            if (symbols.Any(s => s.Name == name))
+                return true;
+        }
+        return false;
     }
 }

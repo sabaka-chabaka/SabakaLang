@@ -2,16 +2,19 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using SabakaLang.Lexer;
+using System.IO;
 
 namespace SabakaLang.LSP;
 
 public class HoverHandler : HoverHandlerBase
 {
     private readonly DocumentStore _documentStore;
+    private readonly SymbolIndex _symbolIndex; 
 
-    public HoverHandler(DocumentStore documentStore)
+    public HoverHandler(DocumentStore documentStore, SymbolIndex symbolIndex)
     {
         _documentStore = documentStore;
+        _symbolIndex = symbolIndex;
     }
 
     protected override HoverRegistrationOptions CreateRegistrationOptions(HoverCapability capability, ClientCapabilities clientCapabilities)
@@ -43,7 +46,19 @@ public class HoverHandler : HoverHandlerBase
             
             if (token.Type == TokenType.Identifier)
             {
-                if (token.Value == "print")
+                var symbol = _symbolIndex.GetAvailableSymbols(request.TextDocument.Uri, offset)
+                    .FirstOrDefault(s => s.Name == token.Value);
+    
+                if (symbol != null)
+                {
+                    detail = $"**{symbol.Kind}:** `{symbol.Name}`\n\n";
+                    if (!string.IsNullOrEmpty(symbol.Type) && symbol.Type != "unknown")
+                        detail += $"**Type:** `{symbol.Type}`\n\n";
+        
+                    if (symbol.SourceFile != null && symbol.SourceFile != request.TextDocument.Uri.GetFileSystemPath())
+                        detail += $"**Imported from:** `{Path.GetFileName(symbol.SourceFile)}`"; 
+                }
+                else if (token.Value == "print")
                 {
                     detail = "**Built-in Function:** `print`  \nPrints the given value to the standard output.";
                 }

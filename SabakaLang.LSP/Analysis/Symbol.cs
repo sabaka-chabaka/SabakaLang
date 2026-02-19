@@ -10,8 +10,9 @@ public class Symbol
     public int ScopeStart { get; }
     public int ScopeEnd { get; }
     public string? ParentName { get; }
+    public string? SourceFile { get; }
 
-    public Symbol(string name, SymbolKind kind, string type, int start, int end, int scopeStart = 0, int scopeEnd = int.MaxValue, string? parentName = null)
+    public Symbol(string name, SymbolKind kind, string type, int start, int end, int scopeStart = 0, int scopeEnd = int.MaxValue, string? parentName = null, string? sourceFile = null)
     {
         Name = name;
         Kind = kind;
@@ -21,5 +22,6 @@ public class Symbol
         ScopeStart = scopeStart;
         ScopeEnd = scopeEnd;
         ParentName = parentName;
+        SourceFile = sourceFile; 
     }
 }

@@ -8,6 +8,10 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using SabakaLang.Lexer;
 using SabakaLang.Parser;
 using SabakaLang.Exceptions;
+using SabakaLang.LSP.Analysis;
+using System.IO;
+using SabakaLang.AST;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace SabakaLang.LSP;
 
@@ -16,6 +20,7 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
     private readonly ILanguageServerFacade _router;
     private readonly DocumentStore _documentStore;
     private readonly SymbolIndex _symbolIndex;
+
     private readonly TextDocumentSelector _documentSelector = new TextDocumentSelector(
         new TextDocumentFilter { Pattern = "**/*.sabaka" },
         new TextDocumentFilter { Language = "sabaka" }
@@ -33,34 +38,24 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
         return new TextDocumentAttributes(uri, "sabaka");
     }
 
-    public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
+    public override async Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
     {
         var uri = request.TextDocument.Uri;
         var text = request.ContentChanges.First().Text;
         _documentStore.UpdateDocument(uri, text);
 
-        _router.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
-        {
-            Uri = uri,
-            Diagnostics = GetDiagnostics(uri, text)
-        });
-
-        return Unit.Task;
+        await AnalyzeDocument(uri, text);
+        return Unit.Value;
     }
 
-    public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
+    public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
         var uri = request.TextDocument.Uri;
         var text = request.TextDocument.Text;
         _documentStore.UpdateDocument(uri, text);
 
-        _router.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
-        {
-            Uri = uri,
-            Diagnostics = GetDiagnostics(uri, text)
-        });
-
-        return Unit.Task;
+        await AnalyzeDocument(uri, text);
+        return Unit.Value;
     }
 
     public override Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken)
@@ -75,7 +70,8 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
         return Unit.Task;
     }
 
-    protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(TextSynchronizationCapability capability,
+    protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(
+        TextSynchronizationCapability capability,
         ClientCapabilities clientCapabilities)
     {
         return new TextDocumentSyncRegistrationOptions
@@ -85,9 +81,10 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
         };
     }
 
-    private Container<Diagnostic> GetDiagnostics(DocumentUri uri, string source)
+    private async Task AnalyzeDocument(DocumentUri uri, string source)
     {
         var diagnostics = new List<Diagnostic>();
+
         try
         {
             var lexer = new Lexer.Lexer(source);
@@ -95,10 +92,65 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
             var parser = new Parser.Parser(tokens);
             var ast = parser.ParseProgram();
 
-            var analyzer = new Analysis.SemanticAnalyzer(ast);
+            var imports = ast.OfType<ImportStatement>().ToList();
+
+            var importedSymbols = new List<Symbol>();
+            string baseDir = Path.GetDirectoryName(uri.GetFileSystemPath()) ?? Directory.GetCurrentDirectory();
+
+            foreach (var import in imports)
+            {
+                string importPath = Path.Combine(baseDir, import.FilePath);
+                if (!importPath.EndsWith(".sabaka"))
+                    importPath += ".sabaka";
+
+                if (File.Exists(importPath))
+                {
+                    var importSource = await File.ReadAllTextAsync(importPath);
+                    var importLexer = new Lexer.Lexer(importSource);
+                    var importTokens = importLexer.Tokenize(false);
+                    var importParser = new Parser.Parser(importTokens);
+                    var importAst = importParser.ParseProgram();
+
+                    var importAnalyzer = new SemanticAnalyzer(importAst);
+                    try
+                    {
+                        importAnalyzer.Analyze();
+                        importedSymbols.AddRange(importAnalyzer.AllSymbols);
+                    }
+                    catch (SabakaLangException ex)
+                    {
+                        diagnostics.Add(new Diagnostic
+                        {
+                            Severity = DiagnosticSeverity.Warning,
+                            Range = PositionHelper.GetRange(source, import.Start, import.End),
+                            Message = $"Error in imported file '{import.FilePath}': {ex.Message}",
+                            Source = "SabakaLang"
+                        });
+                    }
+                }
+                else
+                {
+                    diagnostics.Add(new Diagnostic
+                    {
+                        Severity = DiagnosticSeverity.Error,
+                        Range = PositionHelper.GetRange(source, import.Start, import.End),
+                        Message = $"Import file not found: {import.FilePath}",
+                        Source = "SabakaLang"
+                    });
+                }
+            }
+
+            var analyzer = new SemanticAnalyzer(ast);
+
+            if (importedSymbols.Any())
+            {
+                analyzer.AddImportedSymbols(uri, importedSymbols);
+            }
+
             analyzer.Analyze();
 
-            _symbolIndex.UpdateSymbols(uri, analyzer.AllSymbols.ToList());
+            var allSymbols = analyzer.AllSymbols.Concat(importedSymbols).ToList();
+            _symbolIndex.UpdateSymbols(uri, allSymbols);
         }
         catch (SabakaLangException ex)
         {
@@ -112,16 +164,19 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
         }
         catch (Exception ex)
         {
-             // General errors might not have a position
-             diagnostics.Add(new Diagnostic
-             {
-                 Severity = DiagnosticSeverity.Error,
-                 Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(new Position(0, 0), new Position(0, 0)),
-                 Message = ex.Message,
-                 Source = "SabakaLang"
-             });
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Error,
+                Range = new Range(new Position(0, 0), new Position(0, 0)),
+                Message = ex.Message,
+                Source = "SabakaLang"
+            });
         }
 
-        return diagnostics;
+        _router.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
+        {
+            Uri = uri,
+            Diagnostics = diagnostics
+        });
     }
 }
