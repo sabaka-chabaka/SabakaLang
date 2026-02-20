@@ -254,36 +254,56 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
     }
 
     private List<Symbol> LoadDllSymbols(string dllPath, DocumentUri currentUri)
+{
+    var symbols = new List<Symbol>();
+    Assembly asm = Assembly.LoadFrom(dllPath);
+
+    foreach (var type in asm.GetTypes())
     {
-        var symbols = new List<Symbol>();
-        Assembly asm = Assembly.LoadFrom(dllPath);
+        // Ищем [SabakaExport] на классе по имени (избегаем проблему двух копий атрибута)
+        var classAttr = type.GetCustomAttributes()
+            .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
+        if (classAttr == null) continue;
 
-        foreach (var type in asm.GetTypes())
+        string className = (string)classAttr.GetType().GetProperty("Name")!.GetValue(classAttr)!;
+
+        // Регистрируем сам класс
+        symbols.Add(new Symbol(
+            name: className,
+            kind: SymbolKind.Class,
+            type: className,
+            start: 0, end: 0,
+            scopeStart: 0, scopeEnd: int.MaxValue,
+            parentName: null,
+            sourceFile: dllPath
+        ));
+
+        // Регистрируем методы класса
+        foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
         {
-            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
-            {
-                var attr = method.GetCustomAttribute<SabakaExportAttribute>();
-                if (attr == null) continue;
+            var methodAttr = method.GetCustomAttributes()
+                .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
+            if (methodAttr == null) continue;
 
-                string exportName = attr.Name;
-                // Определим приблизительный тип возврата (можно уточнить)
-                string returnType = method.ReturnType.Name;
+            string methodName = (string)methodAttr.GetType().GetProperty("Name")!.GetValue(methodAttr)!;
+            string returnType = method.ReturnType == typeof(void) ? "void" : method.ReturnType.Name;
 
-                var symbol = new Symbol(
-                    name: exportName,
-                    kind: SymbolKind.Function,
-                    type: returnType,
-                    start: 0,
-                    end: 0,
-                    scopeStart: 0,
-                    scopeEnd: int.MaxValue,
-                    parentName: null,
-                    sourceFile: dllPath
-                );
-                symbols.Add(symbol);
-            }
+            // Параметры для отображения в hover/completion
+            var paramsStr = string.Join(", ", method.GetParameters()
+                .Select(p => $"{p.ParameterType.Name} {p.Name}"));
+
+            symbols.Add(new Symbol(
+                name: methodName,
+                kind: SymbolKind.Method,
+                type: $"{returnType}({paramsStr})",
+                start: 0, end: 0,
+                scopeStart: 0, scopeEnd: int.MaxValue,
+                parentName: className,  // <-- привязываем к классу
+                sourceFile: dllPath
+            ));
         }
-
-        return symbols;
     }
+
+    return symbols;
+}
 }
