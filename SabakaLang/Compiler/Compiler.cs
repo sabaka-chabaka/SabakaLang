@@ -19,6 +19,7 @@ public class Compiler
     private HashSet<string> _importedFiles = new();
     private string? _currentFilePath;
     private readonly Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> _externalFunctions = new();
+    private readonly Dictionary<string, Value> _externalVariables = new(); // For storing imported variables
 
     private readonly
         Dictionary<string, (object Instance, Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> Methods
@@ -685,10 +686,18 @@ public class Compiler
                 }
             }
 
-            _instructions.Add(new Instruction(OpCode.Load)
+            // Check if this is an external variable from an imported DLL
+            if (_externalVariables.TryGetValue(variable.Name.ToLower(), out var externalValue))
             {
-                Name = variable.Name
-            });
+                _instructions.Add(new Instruction(OpCode.Push, externalValue));
+            }
+            else
+            {
+                _instructions.Add(new Instruction(OpCode.Load)
+                {
+                    Name = variable.Name
+                });
+            }
         }
         else if (expr is IfStatement ifStmt)
         {
@@ -1124,7 +1133,7 @@ public class Compiler
             if (!File.Exists(dllPath))
                 throw new CompilerException($"Import DLL not found in executable directory: {dllFileName}. Directory: {dllPath}", import.Start);
 
-            LoadDll(dllPath);
+            LoadDll(dllPath, import.ImportNames);
             _importedFiles.Add(dllPath);
             return;
         }
@@ -1176,12 +1185,18 @@ public class Compiler
                 _classes[kv.Key] = kv.Value;
         }
 
+        foreach (var kv in importCompiler._externalVariables)
+        {
+            if (!_externalVariables.ContainsKey(kv.Key))
+                _externalVariables[kv.Key] = kv.Value;
+        }
+
         _importedFiles.Add(fullPath);
 
         _currentFilePath = oldFilePath;
     }
 
-    private void LoadDll(string fullPath)
+    private void LoadDll(string fullPath, List<string> importNames = null)
     {
         Assembly asm;
         try
@@ -1193,6 +1208,10 @@ public class Compiler
             throw new CompilerException($"Failed to load DLL '{fullPath}': {ex.Message}", 0);
         }
         
+        // If importNames is specified, convert to lowercase for comparison
+        var importNamesLower = importNames?.Count > 0 
+            ? new HashSet<string>(importNames.Select(x => x.ToLower()), StringComparer.OrdinalIgnoreCase)
+            : null;
 
         foreach (var type in asm.GetTypes())
         {
@@ -1238,6 +1257,10 @@ public class Compiler
 
                 string methodExportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
                 string key = $"{className}.{methodExportName.ToLower()}";
+                
+                // If specific imports are requested, check if this method is in the list
+                if (importNamesLower != null && !importNamesLower.Contains(methodExportName))
+                    continue;
     
                 var parameters = method.GetParameters();
                 int paramCount = parameters.Length;
@@ -1262,6 +1285,59 @@ public class Compiler
                 };
 
                 _externalFunctions[key] = (paramCount, wrapper);
+            }
+
+            // Регистрируем все публичные свойства и поля с SabakaExportAttribute
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
+            {
+                var attr = property.GetCustomAttributes()
+                    .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
+                if (attr == null) continue;
+
+                string varExportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
+                
+                // If specific imports are requested, check if this variable is in the list
+                if (importNamesLower != null && !importNamesLower.Contains(varExportName))
+                    continue;
+                
+                string key = varExportName.ToLower();
+
+                try
+                {
+                    object? value = property.GetValue(instance);
+                    Value convertedValue = ConvertNativeToValue(value, property.PropertyType);
+                    _externalVariables[key] = convertedValue;
+                }
+                catch (Exception ex)
+                {
+                    throw new CompilerException($"Failed to read property '{varExportName}' from '{type.Name}': {ex.Message}", 0);
+                }
+            }
+
+            foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
+            {
+                var attr = field.GetCustomAttributes()
+                    .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
+                if (attr == null) continue;
+
+                string varExportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
+                
+                // If specific imports are requested, check if this variable is in the list
+                if (importNamesLower != null && !importNamesLower.Contains(varExportName))
+                    continue;
+                
+                string key = varExportName.ToLower();
+
+                try
+                {
+                    object? value = field.GetValue(instance);
+                    Value convertedValue = ConvertNativeToValue(value, field.FieldType);
+                    _externalVariables[key] = convertedValue;
+                }
+                catch (Exception ex)
+                {
+                    throw new CompilerException($"Failed to read field '{varExportName}' from '{type.Name}': {ex.Message}", 0);
+                }
             }
 
             // Регистрируем сам класс как известный (чтобы new directory() не падал)

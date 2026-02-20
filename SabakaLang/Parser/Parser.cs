@@ -997,9 +997,26 @@ public class Parser
         var pathToken = Expect(TokenType.StringLiteral);
         var filePath = pathToken.Value;
 
+        var importNames = new List<string>();
+
+        // Check for "from" keyword to import specific items
+        if (Current.Type == TokenType.Identifier && Current.Value == "from")
+        {
+            Consume(); // consume "from"
+            
+            // Parse comma-separated list of identifiers
+            importNames.Add(Expect(TokenType.Identifier).Value);
+            
+            while (Current.Type == TokenType.Comma)
+            {
+                Consume(); // consume comma
+                importNames.Add(Expect(TokenType.Identifier).Value);
+            }
+        }
+
         if (Current.Type == TokenType.Semicolon)
             Consume();
 
-        return WithPos(new ImportStatement(filePath), startToken, _tokens[_position - 1]);
+        return WithPos(new ImportStatement(filePath, importNames), startToken, _tokens[_position - 1]);
     }
 }
