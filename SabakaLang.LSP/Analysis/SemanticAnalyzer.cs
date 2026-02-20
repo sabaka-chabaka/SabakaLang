@@ -47,12 +47,12 @@ public class SemanticAnalyzer
         }
     }
 
-    private bool Declare(string name, SymbolKind kind, string type, int start, int end, int scopeStart = 0, int scopeEnd = int.MaxValue, string? parentName = null)
+    private bool Declare(string name, SymbolKind kind, string type, int start, int end, 
+        int scopeStart = 0, int scopeEnd = int.MaxValue, string? parentName = null, string? parameters = null)
     {
-        var symbol = new Symbol(name, kind, type, start, end, scopeStart, scopeEnd, parentName);
+        var symbol = new Symbol(name, kind, type, start, end, scopeStart, scopeEnd, parentName, sourceFile: null, parameters: parameters);
         if (!_currentScope.Declare(symbol))
             return false;
-        
         _allSymbols.Add(symbol);
         return true;
     }
@@ -132,7 +132,9 @@ public class SemanticAnalyzer
                 {
                     var funcKind = _currentParent != null ? SymbolKind.Method : SymbolKind.Function;
                     string returnType = funcDecl.ReturnType == TokenType.Identifier ? (funcDecl.Name == "Constructor" ? "" : "unknown") : funcDecl.ReturnType.ToString();
-                    Declare(funcDecl.Name, funcKind, returnType, funcDecl.Start, funcDecl.End, CurrentScopeRange.start, CurrentScopeRange.end, _currentParent);
+                    var paramsStr = string.Join(", ", funcDecl.Parameters
+                        .Select(p => $"{p.CustomType ?? p.Type.ToString()} {p.Name}"));
+                    Declare(funcDecl.Name, funcKind, returnType, funcDecl.Start, funcDecl.End, CurrentScopeRange.start, CurrentScopeRange.end, _currentParent, parameters: paramsStr);
 
                     var previousScope = _currentScope;
                     _currentScope = new Scope(previousScope);

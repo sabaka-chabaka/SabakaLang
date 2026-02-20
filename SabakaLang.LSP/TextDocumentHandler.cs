@@ -268,7 +268,7 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
 
             string className = (string)classAttr.GetType()
                 .GetProperty("Name")!.GetValue(classAttr)!;
-
+            
             symbols.Add(new Symbol(
                 name: className,
                 kind: SymbolKind.Class,
@@ -301,7 +301,8 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
                     start: 0, end: 0,
                     scopeStart: 0, scopeEnd: int.MaxValue,
                     parentName: className,
-                    sourceFile: dllPath
+                    sourceFile: dllPath,
+                    parameters: paramsStr
                 ));
             }
         }

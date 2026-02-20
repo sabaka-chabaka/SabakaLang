@@ -51,12 +51,31 @@ public class HoverHandler : HoverHandlerBase
     
                 if (symbol != null)
                 {
+                    string prettyType = symbol.Type switch
+                    {
+                        "IntKeyword" => "int",
+                        "FloatKeyword" => "float", 
+                        "StringKeyword" => "string",
+                        "BoolKeyword" => "bool",
+                        "VoidKeyword" => "void",
+                        _ => symbol.Type
+                    };
+
                     detail = $"**{symbol.Kind}:** `{symbol.Name}`\n\n";
-                    if (!string.IsNullOrEmpty(symbol.Type) && symbol.Type != "unknown")
-                        detail += $"**Type:** `{symbol.Type}`\n\n";
+    
+                    // Показываем сигнатуру с параметрами
+                    if (symbol.Kind == SabakaLang.LSP.Analysis.SymbolKind.Function || 
+                        symbol.Kind == SabakaLang.LSP.Analysis.SymbolKind.Method)
+                    {
+                        string paramsDisplay = symbol.Parameters ?? "";
+                        detail += $"**Signature:** `{symbol.Name}({paramsDisplay})` → `{prettyType}`\n\n";
+                    }
+    
+                    if (!string.IsNullOrEmpty(prettyType) && prettyType != "unknown")
+                        detail += $"**Type:** `{prettyType}`\n\n";
         
                     if (symbol.SourceFile != null && symbol.SourceFile != request.TextDocument.Uri.GetFileSystemPath())
-                        detail += $"**Imported from:** `{Path.GetFileName(symbol.SourceFile)}`"; 
+                        detail += $"**Imported from:** `{Path.GetFileName(symbol.SourceFile)}`";
                 }
                 else if (token.Value == "print")
                 {
