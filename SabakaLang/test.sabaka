@@ -1,3 +1,5 @@
-import "SabakaTest.dll"
+import "Sabaka.Core.IO.dll";
 
-print(add(1, 1));
+directory sabaka = new directory();
+
+sabaka.makedir("D:/someTestDir");

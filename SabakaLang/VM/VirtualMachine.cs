@@ -269,6 +269,14 @@ public class VirtualMachine
                     {
                         startClassName = baseClassName;
                     }
+                    
+                    string extKey = $"{startClassName.ToLower()}.{instruction.Name!.ToLower()}";
+                    if (_externals.TryGetValue(extKey, out var extMethod))
+                    {
+                        var extResult = extMethod(args.ToArray());
+                        _stack.Push(extResult);
+                        break;
+                    }
 
                     var function = ResolveMethod(startClassName, instruction.Name!);
 

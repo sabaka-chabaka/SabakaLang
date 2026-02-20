@@ -19,10 +19,24 @@ public class Compiler
     private HashSet<string> _importedFiles = new();
     private string? _currentFilePath;
     private readonly Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> _externalFunctions = new();
+
+    private readonly
+        Dictionary<string, (object Instance, Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> Methods
+            )> _externalClasses = new();
+
     public IReadOnlyDictionary<string, Func<Value[], Value>> ExternalDelegates =>
-        _externalFunctions.ToDictionary(kv => kv.Key, kv => kv.Value.Delegate);
+        _externalFunctions
+            .ToDictionary(kv => kv.Key, kv => kv.Value.Delegate)
+            .Concat(
+                _externalClasses.SelectMany(cls =>
+                    cls.Value.Methods.Select(m =>
+                        new KeyValuePair<string, Func<Value[], Value>>(
+                            $"{cls.Key}.{m.Key}", m.Value.Delegate)))
+            )
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+
     private static readonly string _executableDirectory;
-    
+
     static Compiler()
     {
         string? location = Assembly.GetExecutingAssembly().Location;
@@ -35,12 +49,14 @@ public class Compiler
     private void PushScope() => _typeScopes.Push(new Dictionary<string, string>());
     private void PopScope() => _typeScopes.Pop();
     private void DeclareVar(string name, string type) => _typeScopes.Peek()[name] = type;
+
     private string? GetVarType(string name)
     {
         foreach (var scope in _typeScopes)
         {
             if (scope.TryGetValue(name, out var type)) return type;
         }
+
         return null;
     }
 
@@ -50,7 +66,7 @@ public class Compiler
         _importedFiles.Clear();
         if (_currentFilePath != null)
             _importedFiles.Add(_currentFilePath);
-        
+
         _typeScopes.Clear();
         PushScope(); // Global scope
 
@@ -117,14 +133,15 @@ public class Compiler
                 {
                     if (!HasMethodInChain(classDecl.Name, ifaceMethod.Name, ifaceMethod.Parameters.Count))
                     {
-                        throw new CompilerException($"Class {classDecl.Name} does not implement interface method {ifaceMethod.Name}", 0);
+                        throw new CompilerException(
+                            $"Class {classDecl.Name} does not implement interface method {ifaceMethod.Name}", 0);
                     }
                 }
             }
 
             var oldClass = _currentClass;
             _currentClass = classDecl.Name;
-            
+
             var fields = GetAllFields(classDecl.Name);
 
             foreach (var method in classDecl.Methods)
@@ -170,6 +187,13 @@ public class Compiler
         }
         else if (expr is NewExpr newExpr)
         {
+            if (_externalClasses.ContainsKey(newExpr.ClassName.ToLower()))
+            {
+                _instructions.Add(new Instruction(OpCode.Push,
+                    Value.FromString($"__extern__{newExpr.ClassName.ToLower()}")));
+                return;
+            }
+
             var fields = GetAllFields(newExpr.ClassName);
             var cd = _classes.GetValueOrDefault(newExpr.ClassName);
 
@@ -223,7 +247,7 @@ public class Compiler
             PopScope();
 
             _instructions.Add(new Instruction(OpCode.Return));
-            
+
             functionInstr.Operand = _instructions.Count;
             _functions[func.Name] = bodyStart;
         }
@@ -327,11 +351,13 @@ public class Compiler
                 _instructions.Add(new Instruction(OpCode.Input));
                 return;
             }
-            
+
             if (call.Target == null && _externalFunctions.TryGetValue(call.Name, out var extInfo))
             {
                 if (call.Arguments.Count != extInfo.ParamCount)
-                    throw new CompilerException($"External function '{call.Name}' expects {extInfo.ParamCount} arguments, got {call.Arguments.Count}", 0);
+                    throw new CompilerException(
+                        $"External function '{call.Name}' expects {extInfo.ParamCount} arguments, got {call.Arguments.Count}",
+                        0);
 
                 foreach (var arg in call.Arguments)
                     Emit(arg);
@@ -368,6 +394,7 @@ public class Compiler
                 {
                     throw new CompilerException($"Class {call.Name} does not have a constructor", 0);
                 }
+
                 return;
             }
 
@@ -397,7 +424,10 @@ public class Compiler
                 string? objType = null;
                 if (call.Target is VariableExpr ve) objType = GetVarType(ve.Name);
                 else if (call.Target is NewExpr ne) objType = ne.ClassName;
-                else if (call.Target is SuperExpr) objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd)) ? cd.BaseClassName : null;
+                else if (call.Target is SuperExpr)
+                    objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd))
+                        ? cd.BaseClassName
+                        : null;
 
                 if (objType != null)
                 {
@@ -406,6 +436,26 @@ public class Compiler
                     {
                         string definingClass = GetDefiningClassForMethod(objType, call.Name, call.Arguments.Count);
                         CheckAccess(definingClass, method.AccessModifier, "method", method.Name);
+                    }
+                }
+
+                if (call.Target is VariableExpr veCheck)
+                {
+                    var varType = GetVarType(veCheck.Name)?.ToLower();
+                    if (varType != null && _externalClasses.TryGetValue(varType, out var extClass))
+                    {
+                        string extKey = $"{varType}.{call.Name.ToLower()}";
+                        if (extClass.Methods.ContainsKey(call.Name.ToLower()))
+                        {
+                            foreach (var arg in call.Arguments)
+                                Emit(arg);
+
+                            _instructions.Add(new Instruction(OpCode.CallExternal, call.Arguments.Count)
+                            {
+                                Name = extKey
+                            });
+                            return;
+                        }
                     }
                 }
 
@@ -485,7 +535,10 @@ public class Compiler
                 string? objType = null;
                 if (memberAccess.Object is VariableExpr ve) objType = GetVarType(ve.Name);
                 else if (memberAccess.Object is NewExpr ne) objType = ne.ClassName;
-                else if (memberAccess.Object is SuperExpr) objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd)) ? cd.BaseClassName : null;
+                else if (memberAccess.Object is SuperExpr)
+                    objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd))
+                        ? cd.BaseClassName
+                        : null;
 
                 if (objType != null)
                 {
@@ -566,6 +619,18 @@ public class Compiler
                         _instructions.Add(new Instruction(OpCode.Pop));
                     }
                 }
+                else if (decl.CustomType != null && _externalClasses.ContainsKey(decl.CustomType.ToLower()))
+                {
+                    if (decl.Initializer != null)
+                        Emit(decl.Initializer);
+                    else
+                        _instructions.Add(new Instruction(OpCode.Push,
+                            Value.FromString($"__extern__{decl.CustomType.ToLower()}")));
+
+                    _instructions.Add(new Instruction(OpCode.Declare) { Name = decl.Name });
+                    DeclareVar(decl.Name, decl.CustomType.ToLower());
+                    return;
+                }
                 else
                 {
                     _instructions.Add(new Instruction(OpCode.Push, Value.FromInt(0)));
@@ -583,7 +648,10 @@ public class Compiler
             string? objType = null;
             if (assignmentExpr.Object is VariableExpr ve) objType = GetVarType(ve.Name);
             else if (assignmentExpr.Object is NewExpr ne) objType = ne.ClassName;
-            else if (assignmentExpr.Object is SuperExpr) objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd)) ? cd.BaseClassName : null;
+            else if (assignmentExpr.Object is SuperExpr)
+                objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd))
+                    ? cd.BaseClassName
+                    : null;
 
             if (objType != null)
             {
@@ -747,7 +815,7 @@ public class Compiler
             _instructions.Add(new Instruction(OpCode.ExitScope));
             PopScope();
 
-            
+
             _instructions.Add(new Instruction(OpCode.Jump, loopStart));
 
             jumpIfFalse.Operand = _instructions.Count;
@@ -850,9 +918,9 @@ public class Compiler
             // If fe.Collection is an array, we'd need to know its element type.
             // Since we don't have full type inference yet, let's just use "object" as placeholder or skip.
             // But wait, if it's an array of class objects, we'd want to know.
-            
+
             // For now let's just declare it without type info if we can't find it.
-            DeclareVar(fe.VarName, "object"); 
+            DeclareVar(fe.VarName, "object");
 
             foreach (var stmt in fe.Body)
                 Emit(stmt);
@@ -877,7 +945,6 @@ public class Compiler
         {
             _structs[sd.Name] = sd.Fields;
         }
-
     }
 
     private List<FunctionDeclaration> GetAllInterfaceMethods(string interfaceName)
@@ -892,6 +959,7 @@ public class Compiler
         {
             methods.AddRange(GetAllInterfaceMethods(parent));
         }
+
         return methods;
     }
 
@@ -981,7 +1049,8 @@ public class Compiler
     {
         if (!_classes.TryGetValue(className, out var cd)) return null;
 
-        var method = cd.Methods.FirstOrDefault(m => m.Name == methodName && (paramCount == null || m.Parameters.Count == paramCount));
+        var method = cd.Methods.FirstOrDefault(m =>
+            m.Name == methodName && (paramCount == null || m.Parameters.Count == paramCount));
         if (method != null) return method;
 
         if (cd.BaseClassName != null)
@@ -995,17 +1064,22 @@ public class Compiler
         if (access == AccessModifier.Public) return;
 
         if (_currentClass == null)
-            throw new CompilerException($"Cannot access {access.ToString().ToLower()} {kind} '{name}' from top-level", 0);
+            throw new CompilerException($"Cannot access {access.ToString().ToLower()} {kind} '{name}' from top-level",
+                0);
 
         if (access == AccessModifier.Private)
         {
             if (_currentClass != targetClassName)
-                throw new CompilerException($"Cannot access private {kind} '{name}' of class '{targetClassName}' from class '{_currentClass}'", 0);
+                throw new CompilerException(
+                    $"Cannot access private {kind} '{name}' of class '{targetClassName}' from class '{_currentClass}'",
+                    0);
         }
         else if (access == AccessModifier.Protected)
         {
             if (!IsDerivedFrom(_currentClass, targetClassName))
-                throw new CompilerException($"Cannot access protected {kind} '{name}' of class '{targetClassName}' from class '{_currentClass}'", 0);
+                throw new CompilerException(
+                    $"Cannot access protected {kind} '{name}' of class '{targetClassName}' from class '{_currentClass}'",
+                    0);
         }
     }
 
@@ -1035,85 +1109,79 @@ public class Compiler
 
     private void HandleImport(ImportStatement import)
     {
-        string basePath = Path.GetDirectoryName(_currentFilePath) ?? Directory.GetCurrentDirectory();
-        string fullPath = Path.Combine(basePath, import.FilePath);
+        string extension = Path.GetExtension(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), Path.GetFileName(import.FilePath))).ToLowerInvariant();
         
-        fullPath = Path.GetFullPath(fullPath);
-        
-        if (_importedFiles.Contains(fullPath))
-        {
-            return;
-        }
-        
-        if (!File.Exists(fullPath))
-        {
-            throw new CompilerException($"Import file not found: {import.FilePath}", import.Start);
-        }
-        
-        string extension = Path.GetExtension(fullPath).ToLowerInvariant();
         if (extension == ".dll")
         {
-            string dllPath;
-            if (Path.IsPathRooted(import.FilePath))
-            {
-                dllPath = import.FilePath;
-            }
-            else
-            {
-                dllPath = Path.Combine(_executableDirectory, import.FilePath);
-            }
-
+            string dllFileName = Path.GetFileName(import.FilePath);
+            string dllPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), dllFileName);
+        
             dllPath = Path.GetFullPath(dllPath);
 
             if (_importedFiles.Contains(dllPath))
                 return;
 
             if (!File.Exists(dllPath))
-                throw new CompilerException($"Import DLL not found: {import.FilePath}", import.Start);
+                throw new CompilerException($"Import DLL not found in executable directory: {dllFileName}. Directory: {dllPath}", import.Start);
 
             LoadDll(dllPath);
             _importedFiles.Add(dllPath);
             return;
         }
         
+        string basePath = Path.GetDirectoryName(_currentFilePath) ?? Directory.GetCurrentDirectory();
+        string fullPath = Path.Combine(basePath, import.FilePath);
+
+        fullPath = Path.GetFullPath(fullPath);
+
+        if (_importedFiles.Contains(fullPath))
+        {
+            return;
+        }
+
+        if (!File.Exists(fullPath))
+        {
+            throw new CompilerException($"Import file not found: {import.FilePath}", import.Start);
+        }
+
         string source = File.ReadAllText(fullPath);
-        
+
         var oldFilePath = _currentFilePath;
         var oldInstructions = _instructions;
         var oldFunctions = _functions;
-        
+
         var importCompiler = new Compiler();
         importCompiler._currentFilePath = fullPath;
         importCompiler._importedFiles = new HashSet<string>(_importedFiles);
         importCompiler._importedFiles.Add(fullPath);
-        
+
         var lexer = new Lexer.Lexer(source);
         var tokens = lexer.Tokenize(false);
         var parser = new Parser.Parser(tokens);
         var program = parser.ParseProgram();
-        
+
         var importedInstructions = importCompiler.Compile(program);
-        
+
         _instructions.AddRange(importedInstructions);
-        
+
         foreach (var kv in importCompiler._functions)
         {
             if (!_functions.ContainsKey(kv.Key))
                 _functions[kv.Key] = kv.Value;
         }
-        
+
         foreach (var kv in importCompiler._classes)
         {
             if (!_classes.ContainsKey(kv.Key))
                 _classes[kv.Key] = kv.Value;
         }
-        
+
         _importedFiles.Add(fullPath);
-        
+
         _currentFilePath = oldFilePath;
     }
-    
-     private void LoadDll(string fullPath)
+
+    private void LoadDll(string fullPath)
     {
         Assembly asm;
         try
@@ -1124,94 +1192,129 @@ public class Compiler
         {
             throw new CompilerException($"Failed to load DLL '{fullPath}': {ex.Message}", 0);
         }
+        
 
         foreach (var type in asm.GetTypes())
         {
-            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+            var classAttr = type.GetCustomAttribute<SabakaExportAttribute>();
+            if (classAttr == null) continue;
+
+            string className = classAttr.Name.ToLower();
+
+            // Найти конструктор с [SabakaExport] и создать экземпляр
+            var exportedCtor = type.GetConstructors()
+                .FirstOrDefault(c => c.GetParameters().Length == 0);
+
+            object createInstance;
+            try 
+            { 
+                createInstance = Activator.CreateInstance(type)!;
+            }
+            catch (Exception ex)
             {
-                var attr = method.GetCustomAttribute<SabakaExportAttribute>();
+                continue;
+            }
+
+            if (exportedCtor == null) continue;
+
+            object instance;
+            try { instance = exportedCtor.Invoke(Array.Empty<object>()); }
+            catch (Exception ex)
+            {
+                throw new CompilerException($"Failed to instantiate '{type.Name}': {ex.Message}", 0);
+            }
+
+            foreach (var ctor in type.GetConstructors())
+            {
+                var attrs = ctor.GetCustomAttributes().ToList();
+            }
+            
+            // Регистрируем все методы как "classname.methodname"
+            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
+            {
+                var attr = method.GetCustomAttributes()
+                    .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
                 if (attr == null) continue;
 
-                string exportName = attr.Name;
-                if (_externalFunctions.ContainsKey(exportName))
-                    throw new CompilerException($"Duplicate external function name '{exportName}' in DLL '{fullPath}'", 0);
-
+                string methodExportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
+                string key = $"{className}.{methodExportName.ToLower()}";
+    
                 var parameters = method.GetParameters();
                 int paramCount = parameters.Length;
                 var returnType = method.ReturnType;
+                var capturedInstance = instance;
+                var capturedMethod = method;
 
                 Func<Value[], Value> wrapper = (args) =>
                 {
-                    if (args.Length != paramCount)
-                        throw new Exception($"External function '{exportName}' expects {paramCount} arguments, got {args.Length}");
-
                     object?[] converted = new object?[paramCount];
                     for (int i = 0; i < paramCount; i++)
-                    {
-                        var paramType = parameters[i].ParameterType;
-                        var val = args[i];
-                        converted[i] = ConvertValueToNative(val, paramType);
-                    }
-
-                    object? result;
-                    if (method.IsStatic)
-                    {
-                        result = method.Invoke(null, converted);
-                    }
-                    else
-                    {
-                        throw new NotSupportedException("Instance methods are not supported yet in external imports.");
-                    }
-
+                        converted[i] = ConvertValueToNative(args[i], parameters[i].ParameterType);
+                    var result = capturedMethod.Invoke(capturedInstance, converted);
                     return ConvertNativeToValue(result, returnType);
                 };
 
-                _externalFunctions[exportName] = (paramCount, wrapper);
+                _externalFunctions[key] = (paramCount, wrapper);
+            }
+
+            // Регистрируем сам класс как известный (чтобы new directory() не падал)
+            // Добавляем фейковый класс в _classes через специальный маркер
+            if (!_classes.ContainsKey(classAttr.Name))
+            {
+                _classes[classAttr.Name] = new ClassDeclaration(
+                    classAttr.Name, null, new List<string>(),
+                    new List<VariableDeclaration>(), new List<FunctionDeclaration>());
             }
         }
     }
-     
-      private static object? ConvertValueToNative(Value val, Type targetType)
+
+    private static object? ConvertValueToNative(Value val, Type targetType)
     {
         if (targetType == typeof(int) || targetType == typeof(int?))
         {
             if (val.Type != SabakaType.Int) throw new Exception($"Expected int, got {val.Type}");
             return val.Int;
         }
+
         if (targetType == typeof(double) || targetType == typeof(double?))
         {
             if (val.Type == SabakaType.Int) return (double)val.Int;
             if (val.Type == SabakaType.Float) return val.Float;
             throw new Exception($"Expected number, got {val.Type}");
         }
+
         if (targetType == typeof(float) || targetType == typeof(float?))
         {
             if (val.Type == SabakaType.Int) return (float)val.Int;
             if (val.Type == SabakaType.Float) return (float)val.Float;
             throw new Exception($"Expected number, got {val.Type}");
         }
+
         if (targetType == typeof(bool) || targetType == typeof(bool?))
         {
             if (val.Type != SabakaType.Bool) throw new Exception($"Expected bool, got {val.Type}");
             return val.Bool;
         }
+
         if (targetType == typeof(string))
         {
             if (val.Type != SabakaType.String) throw new Exception($"Expected string, got {val.Type}");
             return val.String;
         }
+
         throw new NotSupportedException($"Conversion to type {targetType} not supported");
     }
 
     private static Value ConvertNativeToValue(object? result, Type returnType)
     {
         if (returnType == typeof(void))
-            return Value.FromInt(0); 
+            return Value.FromInt(0);
 
         if (result == null)
             return Value.FromInt(0);
 
-        if (returnType == typeof(int) || returnType == typeof(long) || returnType == typeof(short) || returnType == typeof(byte))
+        if (returnType == typeof(int) || returnType == typeof(long) || returnType == typeof(short) ||
+            returnType == typeof(byte))
             return Value.FromInt(Convert.ToInt32(result));
         if (returnType == typeof(double) || returnType == typeof(float))
             return Value.FromFloat(Convert.ToDouble(result));
