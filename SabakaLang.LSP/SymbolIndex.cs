@@ -33,14 +33,17 @@ public class SymbolIndex
             {
                 if (entry.Key == uri)
                 {
-                    // For the current file, include all symbols that are in scope at the given offset
-                    result.AddRange(entry.Value.Where(s => offset >= s.ScopeStart && offset <= s.ScopeEnd));
+                    result.AddRange(entry.Value.Where(s => 
+                        offset >= s.ScopeStart && offset <= s.ScopeEnd));
                 }
                 else
                 {
-                    // For other files, include only global symbols
-                    result.AddRange(entry.Value.Where(s => s.ScopeStart == 0 && s.ScopeEnd == int.MaxValue));
+                    result.AddRange(entry.Value.Where(s => 
+                        s.ScopeStart == 0 && s.ScopeEnd == int.MaxValue));
                 }
+    
+                // Члены классов всегда добавляем для подсветки
+                result.AddRange(entry.Value.Where(s => s.ParentName != null));
             }
             
             // Return unique symbols by name, prioritizing the most specific ones (implied by order of addition if we were more careful, 

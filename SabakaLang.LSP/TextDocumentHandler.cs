@@ -27,7 +27,7 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
         new TextDocumentFilter { Pattern = "**/*.sabaka" },
         new TextDocumentFilter { Language = "sabaka" }
     );
-    
+
     private static readonly string _executableDirectory;
 
     static TextDocumentHandler()
@@ -134,6 +134,7 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
                         // Ищем DLL относительно исполняемого файла сервера
                         dllFullPath = Path.Combine(_executableDirectory, import.FilePath);
                     }
+
                     dllFullPath = Path.GetFullPath(dllFullPath);
 
                     if (!File.Exists(dllFullPath))
@@ -186,8 +187,9 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
                         {
                             importAnalyzer.Analyze();
                             // Добавляем SourceFile для символов из импортированного файла
-                            var fileSymbols = importAnalyzer.AllSymbols.Select(s => 
-                                new Symbol(s.Name, s.Kind, s.Type, s.Start, s.End, s.ScopeStart, s.ScopeEnd, s.ParentName, importPath)).ToList();
+                            var fileSymbols = importAnalyzer.AllSymbols.Select(s =>
+                                new Symbol(s.Name, s.Kind, s.Type, s.Start, s.End, s.ScopeStart, s.ScopeEnd,
+                                    s.ParentName, importPath)).ToList();
                             importedSymbols.AddRange(fileSymbols);
 
                             // Обновляем SymbolIndex для импортированного файла
@@ -254,56 +256,56 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
     }
 
     private List<Symbol> LoadDllSymbols(string dllPath, DocumentUri currentUri)
-{
-    var symbols = new List<Symbol>();
-    Assembly asm = Assembly.LoadFrom(dllPath);
-
-    foreach (var type in asm.GetTypes())
     {
-        // Ищем [SabakaExport] на классе по имени (избегаем проблему двух копий атрибута)
-        var classAttr = type.GetCustomAttributes()
-            .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
-        if (classAttr == null) continue;
+        var symbols = new List<Symbol>();
+        Assembly asm = Assembly.LoadFrom(dllPath);
 
-        string className = (string)classAttr.GetType().GetProperty("Name")!.GetValue(classAttr)!;
-
-        // Регистрируем сам класс
-        symbols.Add(new Symbol(
-            name: className,
-            kind: SymbolKind.Class,
-            type: className,
-            start: 0, end: 0,
-            scopeStart: 0, scopeEnd: int.MaxValue,
-            parentName: null,
-            sourceFile: dllPath
-        ));
-
-        // Регистрируем методы класса
-        foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var type in asm.GetTypes())
         {
-            var methodAttr = method.GetCustomAttributes()
+            var classAttr = type.GetCustomAttributes()
                 .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
-            if (methodAttr == null) continue;
+            if (classAttr == null) continue;
 
-            string methodName = (string)methodAttr.GetType().GetProperty("Name")!.GetValue(methodAttr)!;
-            string returnType = method.ReturnType == typeof(void) ? "void" : method.ReturnType.Name;
-
-            // Параметры для отображения в hover/completion
-            var paramsStr = string.Join(", ", method.GetParameters()
-                .Select(p => $"{p.ParameterType.Name} {p.Name}"));
+            string className = (string)classAttr.GetType()
+                .GetProperty("Name")!.GetValue(classAttr)!;
 
             symbols.Add(new Symbol(
-                name: methodName,
-                kind: SymbolKind.Method,
-                type: $"{returnType}({paramsStr})",
+                name: className,
+                kind: SymbolKind.Class,
+                type: className,
                 start: 0, end: 0,
                 scopeStart: 0, scopeEnd: int.MaxValue,
-                parentName: className,  // <-- привязываем к классу
+                parentName: null,
                 sourceFile: dllPath
             ));
-        }
-    }
 
-    return symbols;
-}
+            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            {
+                var allAttrs = method.GetCustomAttributes().ToList();
+    
+                var methodAttr = allAttrs.FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
+                if (methodAttr == null) continue;
+
+                string methodName = (string)methodAttr.GetType()
+                    .GetProperty("Name")!.GetValue(methodAttr)!;
+                string returnType = method.ReturnType == typeof(void)
+                    ? "void"
+                    : method.ReturnType.Name;
+                var paramsStr = string.Join(", ", method.GetParameters()
+                    .Select(p => $"{p.ParameterType.Name} {p.Name}"));
+
+                symbols.Add(new Symbol(
+                    name: methodName,
+                    kind: SymbolKind.Method,
+                    type: $"{returnType}({paramsStr})",
+                    start: 0, end: 0,
+                    scopeStart: 0, scopeEnd: int.MaxValue,
+                    parentName: className,
+                    sourceFile: dllPath
+                ));
+            }
+        }
+
+        return symbols;
+    }
 }

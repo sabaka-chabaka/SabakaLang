@@ -68,25 +68,25 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
         if (token.Type == TokenType.Identifier)
         {
             if (token.Value == "print" || token.Value == "input")
-            {
                 return "function";
+
+            if (token.Value == "makedir") // временный дебаг
+            {
+                var all = _symbolIndex.GetAllSymbols().ToList();
+                File.AppendAllText("D:\\sabaka_debug.txt", 
+                    $"makedir search: total symbols={all.Count}, " +
+                    $"found={all.Any(s => s.Name == "makedir")}\n" +
+                    $"all names: {string.Join(", ", all.Select(s => s.Name))}\n");
             }
 
-            // Look up in symbol index
             var symbols = _symbolIndex.GetAvailableSymbols(uri, token.TokenStart);
             var symbol = symbols.FirstOrDefault(s => s.Name == token.Value);
-            
+        
             if (symbol == null)
-            {
-                // If not in available symbols, it might be a member. 
-                // Look up in ALL symbols as a fallback for highlighting.
                 symbol = _symbolIndex.GetAllSymbols().FirstOrDefault(s => s.Name == token.Value);
-            }
 
             if (symbol != null)
-            {
                 return MapSymbolKindToTokenType(symbol.Kind);
-            }
         }
 
         return MapTokenType(token.Type);
