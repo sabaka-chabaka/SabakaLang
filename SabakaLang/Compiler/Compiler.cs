@@ -21,9 +21,9 @@ public class Compiler
     private readonly Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> _externalFunctions = new();
     public IReadOnlyDictionary<string, Func<Value[], Value>> ExternalDelegates =>
         _externalFunctions.ToDictionary(kv => kv.Key, kv => kv.Value.Delegate);
-    private readonly string _executableDirectory;
+    private static readonly string _executableDirectory;
     
-    public Compiler()
+    static Compiler()
     {
         string? location = Assembly.GetExecutingAssembly().Location;
         if (!string.IsNullOrEmpty(location))

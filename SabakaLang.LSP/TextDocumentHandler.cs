@@ -10,8 +10,10 @@ using SabakaLang.Parser;
 using SabakaLang.Exceptions;
 using SabakaLang.LSP.Analysis;
 using System.IO;
+using System.Reflection;
 using SabakaLang.AST;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using SymbolKind = SabakaLang.LSP.Analysis.SymbolKind;
 
 namespace SabakaLang.LSP;
 
@@ -25,6 +27,17 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
         new TextDocumentFilter { Pattern = "**/*.sabaka" },
         new TextDocumentFilter { Language = "sabaka" }
     );
+    
+    private static readonly string _executableDirectory;
+
+    static TextDocumentHandler()
+    {
+        string? location = Assembly.GetEntryAssembly()?.Location;
+        if (!string.IsNullOrEmpty(location))
+            _executableDirectory = Path.GetDirectoryName(location) ?? AppDomain.CurrentDomain.BaseDirectory;
+        else
+            _executableDirectory = AppDomain.CurrentDomain.BaseDirectory;
+    }
 
     public TextDocumentHandler(ILanguageServerFacade router, DocumentStore documentStore, SymbolIndex symbolIndex)
     {
@@ -84,6 +97,7 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
     private async Task AnalyzeDocument(DocumentUri uri, string source)
     {
         var diagnostics = new List<Diagnostic>();
+        var importedSymbols = new List<Symbol>();
 
         try
         {
@@ -93,60 +107,119 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
             var ast = parser.ParseProgram();
 
             var imports = ast.OfType<ImportStatement>().ToList();
-
-            var importedSymbols = new List<Symbol>();
             string baseDir = Path.GetDirectoryName(uri.GetFileSystemPath()) ?? Directory.GetCurrentDirectory();
 
             foreach (var import in imports)
             {
-                string importPath = Path.Combine(baseDir, import.FilePath);
-                if (!importPath.EndsWith(".sabaka"))
-                    importPath += ".sabaka";
-
-                if (File.Exists(importPath))
+                string importPath;
+                if (Path.IsPathRooted(import.FilePath))
                 {
-                    var importSource = await File.ReadAllTextAsync(importPath);
-                    var importLexer = new Lexer.Lexer(importSource);
-                    var importTokens = importLexer.Tokenize(false);
-                    var importParser = new Parser.Parser(importTokens);
-                    var importAst = importParser.ParseProgram();
+                    importPath = import.FilePath;
+                }
+                else
+                {
+                    importPath = Path.Combine(baseDir, import.FilePath);
+                }
 
-                    var importAnalyzer = new SemanticAnalyzer(importAst);
-                    try
+                // Обработка .dll
+                if (importPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                {
+                    string dllFullPath;
+                    if (Path.IsPathRooted(import.FilePath))
                     {
-                        importAnalyzer.Analyze();
-                        importedSymbols.AddRange(importAnalyzer.AllSymbols);
+                        dllFullPath = import.FilePath;
                     }
-                    catch (SabakaLangException ex)
+                    else
+                    {
+                        // Ищем DLL относительно исполняемого файла сервера
+                        dllFullPath = Path.Combine(_executableDirectory, import.FilePath);
+                    }
+                    dllFullPath = Path.GetFullPath(dllFullPath);
+
+                    if (!File.Exists(dllFullPath))
                     {
                         diagnostics.Add(new Diagnostic
                         {
-                            Severity = DiagnosticSeverity.Warning,
+                            Severity = DiagnosticSeverity.Error,
                             Range = PositionHelper.GetRange(source, import.Start, import.End),
-                            Message = $"Error in imported file '{import.FilePath}': {ex.Message}",
+                            Message = $"DLL not found: {import.FilePath}",
+                            Source = "SabakaLang"
+                        });
+                        continue;
+                    }
+
+                    try
+                    {
+                        var dllSymbols = LoadDllSymbols(dllFullPath, uri);
+                        importedSymbols.AddRange(dllSymbols);
+
+                        // Обновляем SymbolIndex для виртуального URI (dll://...)
+                        var virtualUri = DocumentUri.From($"dll://{dllFullPath}");
+                        _symbolIndex.UpdateSymbols(virtualUri, dllSymbols);
+                    }
+                    catch (Exception ex)
+                    {
+                        diagnostics.Add(new Diagnostic
+                        {
+                            Severity = DiagnosticSeverity.Error,
+                            Range = PositionHelper.GetRange(source, import.Start, import.End),
+                            Message = $"Failed to load DLL '{import.FilePath}': {ex.Message}",
                             Source = "SabakaLang"
                         });
                     }
                 }
-                else
+                else // .sabaka
                 {
-                    diagnostics.Add(new Diagnostic
+                    if (!importPath.EndsWith(".sabaka"))
+                        importPath += ".sabaka";
+
+                    if (File.Exists(importPath))
                     {
-                        Severity = DiagnosticSeverity.Error,
-                        Range = PositionHelper.GetRange(source, import.Start, import.End),
-                        Message = $"Import file not found: {import.FilePath}",
-                        Source = "SabakaLang"
-                    });
+                        var importSource = await File.ReadAllTextAsync(importPath);
+                        var importLexer = new Lexer.Lexer(importSource);
+                        var importTokens = importLexer.Tokenize(false);
+                        var importParser = new Parser.Parser(importTokens);
+                        var importAst = importParser.ParseProgram();
+
+                        var importAnalyzer = new SemanticAnalyzer(importAst);
+                        try
+                        {
+                            importAnalyzer.Analyze();
+                            // Добавляем SourceFile для символов из импортированного файла
+                            var fileSymbols = importAnalyzer.AllSymbols.Select(s => 
+                                new Symbol(s.Name, s.Kind, s.Type, s.Start, s.End, s.ScopeStart, s.ScopeEnd, s.ParentName, importPath)).ToList();
+                            importedSymbols.AddRange(fileSymbols);
+
+                            // Обновляем SymbolIndex для импортированного файла
+                            var importUri = DocumentUri.FromFileSystemPath(importPath);
+                            _symbolIndex.UpdateSymbols(importUri, fileSymbols);
+                        }
+                        catch (SabakaLangException ex)
+                        {
+                            diagnostics.Add(new Diagnostic
+                            {
+                                Severity = DiagnosticSeverity.Warning,
+                                Range = PositionHelper.GetRange(source, import.Start, import.End),
+                                Message = $"Error in imported file '{import.FilePath}': {ex.Message}",
+                                Source = "SabakaLang"
+                            });
+                        }
+                    }
+                    else
+                    {
+                        diagnostics.Add(new Diagnostic
+                        {
+                            Severity = DiagnosticSeverity.Error,
+                            Range = PositionHelper.GetRange(source, import.Start, import.End),
+                            Message = $"Import file not found: {import.FilePath}",
+                            Source = "SabakaLang"
+                        });
+                    }
                 }
             }
 
             var analyzer = new SemanticAnalyzer(ast);
-
-            if (importedSymbols.Any())
-            {
-                analyzer.AddImportedSymbols(uri, importedSymbols);
-            }
-
+            analyzer.AddImportedSymbols(uri, importedSymbols);
             analyzer.Analyze();
 
             var allSymbols = analyzer.AllSymbols.Concat(importedSymbols).ToList();
@@ -178,5 +251,39 @@ public class TextDocumentHandler : TextDocumentSyncHandlerBase
             Uri = uri,
             Diagnostics = diagnostics
         });
+    }
+
+    private List<Symbol> LoadDllSymbols(string dllPath, DocumentUri currentUri)
+    {
+        var symbols = new List<Symbol>();
+        Assembly asm = Assembly.LoadFrom(dllPath);
+
+        foreach (var type in asm.GetTypes())
+        {
+            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+            {
+                var attr = method.GetCustomAttribute<SabakaExportAttribute>();
+                if (attr == null) continue;
+
+                string exportName = attr.Name;
+                // Определим приблизительный тип возврата (можно уточнить)
+                string returnType = method.ReturnType.Name;
+
+                var symbol = new Symbol(
+                    name: exportName,
+                    kind: SymbolKind.Function,
+                    type: returnType,
+                    start: 0,
+                    end: 0,
+                    scopeStart: 0,
+                    scopeEnd: int.MaxValue,
+                    parentName: null,
+                    sourceFile: dllPath
+                );
+                symbols.Add(symbol);
+            }
+        }
+
+        return symbols;
     }
 }
