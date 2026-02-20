@@ -1247,11 +1247,18 @@ public class Compiler
 
                 Func<Value[], Value> wrapper = (args) =>
                 {
-                    object?[] converted = new object?[paramCount];
-                    for (int i = 0; i < paramCount; i++)
-                        converted[i] = ConvertValueToNative(args[i], parameters[i].ParameterType);
-                    var result = capturedMethod.Invoke(capturedInstance, converted);
-                    return ConvertNativeToValue(result, returnType);
+                    try
+                    {
+                        object?[] converted = new object?[paramCount];
+                        for (int i = 0; i < paramCount; i++)
+                            converted[i] = ConvertValueToNative(args[i], parameters[i].ParameterType);
+                        var result = capturedMethod.Invoke(capturedInstance, converted);
+                        return ConvertNativeToValue(result, returnType);
+                    }
+                    catch (TargetInvocationException ex)
+                    {
+                        throw ex.InnerException ?? ex;
+                    }
                 };
 
                 _externalFunctions[key] = (paramCount, wrapper);
