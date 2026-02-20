@@ -42,5 +42,6 @@ public enum OpCode
     Dup,
     Pop,
     Inherit,
-    Input
+    Input,
+    CallExternal
 }

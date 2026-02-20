@@ -2,6 +2,7 @@ using SabakaLang.AST;
 using SabakaLang.Exceptions;
 using SabakaLang.Lexer;
 using SabakaLang.Types;
+using System.Reflection;
 
 namespace SabakaLang.Compiler;
 
@@ -17,6 +18,19 @@ public class Compiler
     private Stack<Dictionary<string, string>> _typeScopes = new();
     private HashSet<string> _importedFiles = new();
     private string? _currentFilePath;
+    private readonly Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> _externalFunctions = new();
+    public IReadOnlyDictionary<string, Func<Value[], Value>> ExternalDelegates =>
+        _externalFunctions.ToDictionary(kv => kv.Key, kv => kv.Value.Delegate);
+    private readonly string _executableDirectory;
+    
+    public Compiler()
+    {
+        string? location = Assembly.GetExecutingAssembly().Location;
+        if (!string.IsNullOrEmpty(location))
+            _executableDirectory = Path.GetDirectoryName(location) ?? AppDomain.CurrentDomain.BaseDirectory;
+        else
+            _executableDirectory = AppDomain.CurrentDomain.BaseDirectory;
+    }
 
     private void PushScope() => _typeScopes.Push(new Dictionary<string, string>());
     private void PopScope() => _typeScopes.Pop();
@@ -311,6 +325,21 @@ public class Compiler
             if (call.Target == null && call.Name == "input")
             {
                 _instructions.Add(new Instruction(OpCode.Input));
+                return;
+            }
+            
+            if (call.Target == null && _externalFunctions.TryGetValue(call.Name, out var extInfo))
+            {
+                if (call.Arguments.Count != extInfo.ParamCount)
+                    throw new CompilerException($"External function '{call.Name}' expects {extInfo.ParamCount} arguments, got {call.Arguments.Count}", 0);
+
+                foreach (var arg in call.Arguments)
+                    Emit(arg);
+
+                _instructions.Add(new Instruction(OpCode.CallExternal, call.Arguments.Count)
+                {
+                    Name = call.Name
+                });
                 return;
             }
 
@@ -1006,36 +1035,53 @@ public class Compiler
 
     private void HandleImport(ImportStatement import)
     {
-        // Получаем абсолютный путь относительно текущего файла
         string basePath = Path.GetDirectoryName(_currentFilePath) ?? Directory.GetCurrentDirectory();
         string fullPath = Path.Combine(basePath, import.FilePath);
         
-        // Нормализуем путь
         fullPath = Path.GetFullPath(fullPath);
         
-        // Проверяем циклические импорты
         if (_importedFiles.Contains(fullPath))
         {
-            // Можно просто проигнорировать повторный импорт
             return;
         }
         
-        // Проверяем существование файла
         if (!File.Exists(fullPath))
         {
             throw new CompilerException($"Import file not found: {import.FilePath}", import.Start);
         }
         
-        // Читаем и компилируем импортированный файл
+        string extension = Path.GetExtension(fullPath).ToLowerInvariant();
+        if (extension == ".dll")
+        {
+            string dllPath;
+            if (Path.IsPathRooted(import.FilePath))
+            {
+                dllPath = import.FilePath;
+            }
+            else
+            {
+                dllPath = Path.Combine(_executableDirectory, import.FilePath);
+            }
+
+            dllPath = Path.GetFullPath(dllPath);
+
+            if (_importedFiles.Contains(dllPath))
+                return;
+
+            if (!File.Exists(dllPath))
+                throw new CompilerException($"Import DLL not found: {import.FilePath}", import.Start);
+
+            LoadDll(dllPath);
+            _importedFiles.Add(dllPath);
+            return;
+        }
+        
         string source = File.ReadAllText(fullPath);
         
-        // Сохраняем текущее состояние
         var oldFilePath = _currentFilePath;
         var oldInstructions = _instructions;
         var oldFunctions = _functions;
-        // ... сохранить другие состояния, если нужно ...
         
-        // Временно создаем новый компилятор для импортированного файла
         var importCompiler = new Compiler();
         importCompiler._currentFilePath = fullPath;
         importCompiler._importedFiles = new HashSet<string>(_importedFiles);
@@ -1048,10 +1094,8 @@ public class Compiler
         
         var importedInstructions = importCompiler.Compile(program);
         
-        // Добавляем инструкции из импортированного файла
         _instructions.AddRange(importedInstructions);
         
-        // Объединяем словари функций, классов и т.д.
         foreach (var kv in importCompiler._functions)
         {
             if (!_functions.ContainsKey(kv.Key))
@@ -1064,12 +1108,118 @@ public class Compiler
                 _classes[kv.Key] = kv.Value;
         }
         
-        // ... объединить остальные словари ...
-        
-        // Добавляем путь в список импортированных файлов
         _importedFiles.Add(fullPath);
         
-        // Восстанавливаем текущий путь
         _currentFilePath = oldFilePath;
+    }
+    
+     private void LoadDll(string fullPath)
+    {
+        Assembly asm;
+        try
+        {
+            asm = Assembly.LoadFrom(fullPath);
+        }
+        catch (Exception ex)
+        {
+            throw new CompilerException($"Failed to load DLL '{fullPath}': {ex.Message}", 0);
+        }
+
+        foreach (var type in asm.GetTypes())
+        {
+            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+            {
+                var attr = method.GetCustomAttribute<SabakaExportAttribute>();
+                if (attr == null) continue;
+
+                string exportName = attr.Name;
+                if (_externalFunctions.ContainsKey(exportName))
+                    throw new CompilerException($"Duplicate external function name '{exportName}' in DLL '{fullPath}'", 0);
+
+                var parameters = method.GetParameters();
+                int paramCount = parameters.Length;
+                var returnType = method.ReturnType;
+
+                Func<Value[], Value> wrapper = (args) =>
+                {
+                    if (args.Length != paramCount)
+                        throw new Exception($"External function '{exportName}' expects {paramCount} arguments, got {args.Length}");
+
+                    object?[] converted = new object?[paramCount];
+                    for (int i = 0; i < paramCount; i++)
+                    {
+                        var paramType = parameters[i].ParameterType;
+                        var val = args[i];
+                        converted[i] = ConvertValueToNative(val, paramType);
+                    }
+
+                    object? result;
+                    if (method.IsStatic)
+                    {
+                        result = method.Invoke(null, converted);
+                    }
+                    else
+                    {
+                        throw new NotSupportedException("Instance methods are not supported yet in external imports.");
+                    }
+
+                    return ConvertNativeToValue(result, returnType);
+                };
+
+                _externalFunctions[exportName] = (paramCount, wrapper);
+            }
+        }
+    }
+     
+      private static object? ConvertValueToNative(Value val, Type targetType)
+    {
+        if (targetType == typeof(int) || targetType == typeof(int?))
+        {
+            if (val.Type != SabakaType.Int) throw new Exception($"Expected int, got {val.Type}");
+            return val.Int;
+        }
+        if (targetType == typeof(double) || targetType == typeof(double?))
+        {
+            if (val.Type == SabakaType.Int) return (double)val.Int;
+            if (val.Type == SabakaType.Float) return val.Float;
+            throw new Exception($"Expected number, got {val.Type}");
+        }
+        if (targetType == typeof(float) || targetType == typeof(float?))
+        {
+            if (val.Type == SabakaType.Int) return (float)val.Int;
+            if (val.Type == SabakaType.Float) return (float)val.Float;
+            throw new Exception($"Expected number, got {val.Type}");
+        }
+        if (targetType == typeof(bool) || targetType == typeof(bool?))
+        {
+            if (val.Type != SabakaType.Bool) throw new Exception($"Expected bool, got {val.Type}");
+            return val.Bool;
+        }
+        if (targetType == typeof(string))
+        {
+            if (val.Type != SabakaType.String) throw new Exception($"Expected string, got {val.Type}");
+            return val.String;
+        }
+        throw new NotSupportedException($"Conversion to type {targetType} not supported");
+    }
+
+    private static Value ConvertNativeToValue(object? result, Type returnType)
+    {
+        if (returnType == typeof(void))
+            return Value.FromInt(0); 
+
+        if (result == null)
+            return Value.FromInt(0);
+
+        if (returnType == typeof(int) || returnType == typeof(long) || returnType == typeof(short) || returnType == typeof(byte))
+            return Value.FromInt(Convert.ToInt32(result));
+        if (returnType == typeof(double) || returnType == typeof(float))
+            return Value.FromFloat(Convert.ToDouble(result));
+        if (returnType == typeof(bool))
+            return Value.FromBool((bool)result);
+        if (returnType == typeof(string))
+            return Value.FromString((string)result);
+
+        throw new NotSupportedException($"Conversion from type {returnType} not supported");
     }
 }

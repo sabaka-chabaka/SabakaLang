@@ -1,4 +1,3 @@
-import "test2.sabaka"
+import "SabakaTest.dll"
 
-hello();
-input();
+print(add(1, 1));

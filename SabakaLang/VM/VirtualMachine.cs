@@ -17,6 +17,16 @@ public class VirtualMachine
     private readonly Dictionary<string, string> _inheritance = new();
     private readonly TextReader _input;
     private readonly TextWriter _output;
+    
+    private readonly IReadOnlyDictionary<string, Func<Value[], Value>> _externals;
+
+    public VirtualMachine(TextReader? input = null, TextWriter? output = null,
+        IReadOnlyDictionary<string, Func<Value[], Value>>? externals = null)
+    {
+        _input = input ?? Console.In;
+        _output = output ?? Console.Out;
+        _externals = externals ?? new Dictionary<string, Func<Value[], Value>>();
+    }
 
     public VirtualMachine(TextReader? input = null, TextWriter? output = null)
     {
@@ -103,7 +113,25 @@ public class VirtualMachine
                     _stack.Push((Value)instruction.Operand!);
                     break;
 
-                
+                case OpCode.CallExternal:
+                {
+                    int argCount = (int)instruction.Operand!;
+                    var args = new List<Value>();
+                    for (int i = 0; i < argCount; i++)
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in CallExternal");
+                        args.Add(_stack.Pop());
+                    }
+                    args.Reverse();
+
+                    string name = instruction.Name!;
+                    if (!_externals.TryGetValue(name, out var nativeFunc))
+                        throw new Exception($"External function '{name}' not registered");
+
+                    var result = nativeFunc(args.ToArray());
+                    _stack.Push(result);
+                    break;
+                }
                 
                 case OpCode.Add:
                     if (_stack.Count < 2) throw new Exception("Stack empty in Add");
