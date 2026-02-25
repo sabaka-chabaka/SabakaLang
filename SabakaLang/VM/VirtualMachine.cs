@@ -193,6 +193,14 @@ public class VirtualMachine
                     break;
                 }
 
+                case OpCode.Sleep:
+                {
+                    if (_stack.Count == 0) throw new Exception("Stack empty in Print");
+                    var value = _stack.Pop();
+                    Thread.Sleep((int)(value.Float * 1000f));
+                    break;
+                }
+
                 case OpCode.Input:
                 {
                     var line = _input.ReadLine() ?? "";

@@ -67,7 +67,7 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
     {
         if (token.Type == TokenType.Identifier)
         {
-            if (token.Value == "print" || token.Value == "input")
+            if (token.Value == "print" || token.Value == "input" || token.Value == "sleep")
                 return "function";
 
             if (token.Value == "makedir") // временный дебаг

@@ -29,6 +29,7 @@ public class SemanticAnalyzer
     private void InitializeGlobalScope()
     {
         Declare("print", SymbolKind.BuiltIn, "void", 0, 0);
+        Declare("sleep", SymbolKind.BuiltIn, "void", 0, 0);
         Declare("input", SymbolKind.BuiltIn, "string", 0, 0);
     }
     

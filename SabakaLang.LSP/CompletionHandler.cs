@@ -27,7 +27,7 @@ public class CompletionHandler : CompletionHandlerBase
     };
 
     private readonly string[] _builtInFunctions = {
-        "print", "input"
+        "print", "input", "sleep"
     };
 
     protected override CompletionRegistrationOptions CreateRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)

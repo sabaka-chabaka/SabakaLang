@@ -347,6 +347,15 @@ public class Compiler
                 return;
             }
 
+            if (call.Target == null && call.Name == "sleep")
+            {
+                foreach (var arg in call.Arguments)
+                    Emit(arg);
+
+                _instructions.Add(new Instruction(OpCode.Sleep));
+                return;
+            }
+
             if (call.Target == null && call.Name == "input")
             {
                 _instructions.Add(new Instruction(OpCode.Input));

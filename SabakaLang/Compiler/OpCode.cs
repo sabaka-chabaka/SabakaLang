@@ -43,5 +43,6 @@ public enum OpCode
     Pop,
     Inherit,
     Input,
-    CallExternal
+    CallExternal,
+    Sleep
 }
