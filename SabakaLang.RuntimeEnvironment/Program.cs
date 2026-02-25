@@ -1,4 +1,5 @@
-﻿using SabakaLang.VM;
+﻿using SabakaLang.Compiler;
+using SabakaLang.VM;
 
 namespace SabakaLang.RuntimeEnvironment;
 
@@ -11,7 +12,7 @@ public class Program
 
     private static void Run(string source, string? filePath = null, TextReader? input = null, TextWriter? output = null)
     {
-        var lexer = new Lexer.Lexer(source);
+        /* var lexer = new Lexer.Lexer(source);
         var tokens = lexer.Tokenize(false);
 
         var parser = new Parser.Parser(tokens);
@@ -23,6 +24,27 @@ public class Program
         var externals = compiler.ExternalDelegates;
         
         var vm = new VirtualMachine(input, output, externals);
-        vm.Execute(bytecode);
+        vm.Execute(bytecode); */
+        
+        var lexer = new Lexer.Lexer(source);
+        var tokens = lexer.Tokenize(false);
+
+        var parser = new Parser.Parser(tokens);
+        var program = parser.ParseProgram();
+
+        var compiler = new Compiler.Compiler();
+        var bytecode = compiler.Compile(program, filePath);
+
+        foreach (Instruction instruction in bytecode)
+        {
+            Console.WriteLine($"{instruction.OpCode} {instruction.Operand} ");
+        }
+
+        /*var loader = new SarLoader();
+        var sar = loader.Load(source);
+        var entryBytes = sar.GetEntryBytes();
+        var module = new SabakacReader().Read(entryBytes);
+        var vm = new VirtualMachine(input, output);
+        vm.Execute(module);*/
     }
 }
