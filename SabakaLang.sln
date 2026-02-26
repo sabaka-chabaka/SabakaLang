@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabakaLang.ToExe", "SabakaL
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabakaLang.RuntimeEnvironment", "SabakaLang.RuntimeEnvironment\SabakaLang.RuntimeEnvironment.csproj", "{F982DFD0-2718-48F8-97F3-279DCF1B884F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabakaLang.SarPacker", "SabakaLang.SarPacker\SabakaLang.SarPacker.csproj", "{BCFC923F-B700-499D-9760-EC7983E80311}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{F982DFD0-2718-48F8-97F3-279DCF1B884F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F982DFD0-2718-48F8-97F3-279DCF1B884F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F982DFD0-2718-48F8-97F3-279DCF1B884F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BCFC923F-B700-499D-9760-EC7983E80311}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BCFC923F-B700-499D-9760-EC7983E80311}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BCFC923F-B700-499D-9760-EC7983E80311}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BCFC923F-B700-499D-9760-EC7983E80311}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
