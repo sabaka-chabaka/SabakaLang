@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Reflection;
 using System.Text;
 using SabakaLang.Compiler;
 using SabakaLang.Types;
@@ -38,40 +40,54 @@ public static class BinaryWriterWorker
         }
     }
 
-    private static void WriteObject(BinaryWriter bw, object? obj)
+    public static void WriteObject(BinaryWriter writer, object? obj)
     {
         if (obj == null)
         {
-            bw.Write((byte)0); // Null
+            writer.Write((byte)0);
         }
         else if (obj is int i)
         {
-            bw.Write((byte)1);
-            bw.Write(i);
+            writer.Write((byte)1);
+            writer.Write(i);
         }
-        else if (obj is double f)
+        else if (obj is double d)
         {
-            bw.Write((byte)2);
-            bw.Write(f);
+            writer.Write((byte)2);
+            writer.Write(d);
         }
         else if (obj is bool b)
         {
-            bw.Write((byte)3);
-            bw.Write(b);
+            writer.Write((byte)3);
+            writer.Write(b);
         }
         else if (obj is string s)
         {
-            bw.Write((byte)4);
-            WriteString(new BinaryWriter(bw.BaseStream, Encoding.UTF8, true), s);
+            writer.Write((byte)4);
+            writer.Write(s);
         }
-        else if (obj is Value v)
+        else if (obj.GetType().IsEnum)
         {
-            bw.Write((byte)5); // Value
-            WriteValue(bw, v);
+            writer.Write((byte)5);
+            writer.Write(obj.ToString());
+            writer.Write(obj.GetType().AssemblyQualifiedName!);
         }
-        else
+        else if (obj is IList list)
         {
-            throw new Exception("Unsupported type in SAR");
+            writer.Write((byte)6);
+            writer.Write(list.Count);
+            foreach (var item in list)
+                WriteObject(writer, item); // каждый элемент сам хранит тип
+        }
+        else // класс / struct
+        {
+            writer.Write((byte)7);
+            writer.Write(obj.GetType().AssemblyQualifiedName!);
+
+            var fields = obj.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            writer.Write(fields.Length);
+            foreach (var field in fields)
+                WriteObject(writer, field.GetValue(obj));
         }
     }
 
@@ -145,19 +161,57 @@ public static class BinaryReaderWorker
         return Encoding.UTF8.GetString(bytes);
     }
 
-    private static object? ReadObject(BinaryReader br)
+    public static object? ReadObject(BinaryReader reader)
     {
-        byte type = br.ReadByte();
-        return type switch
+        byte typeMarker = reader.ReadByte();
+        switch (typeMarker)
         {
-            0 => null,
-            1 => br.ReadInt32(),
-            2 => br.ReadDouble(),
-            3 => br.ReadBoolean(),
-            4 => ReadString(br),
-            5 => ReadValue(br),
-            _ => throw new Exception("Unknown type in SAR")
-        };
+            case 0: return null;
+            case 1: return reader.ReadInt32();
+            case 2: return reader.ReadDouble();
+            case 3: return reader.ReadBoolean();
+            case 4: return reader.ReadString();
+            case 5:
+            {
+                string enumStr = reader.ReadString();
+                string typeName = reader.ReadString();
+                Type enumType = Type.GetType(typeName)!;
+                return Enum.Parse(enumType, enumStr);
+            }
+            case 6:
+            {
+                int count = reader.ReadInt32();
+                var list = new List<object?>();
+                for (int i = 0; i < count; i++)
+                    list.Add(ReadObject(reader));
+                return list;
+            }
+            case 7:
+            {
+                string typeName = reader.ReadString();
+                Type type = Type.GetType(typeName)!;
+                object obj = Activator.CreateInstance(type)!;
+
+                int fieldCount = reader.ReadInt32();
+                var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                for (int i = 0; i < fieldCount; i++)
+                {
+                    var val = ReadObject(reader);
+                    fields[i].SetValue(obj, val);
+                }
+
+                return obj;
+            }
+            default:
+                throw new Exception("Unknown type marker");
+        }
+    }
+
+    public static T Unpack<T>(string path)
+    {
+        using var fs = File.OpenRead(path);
+        using var reader = new BinaryReader(fs);
+        return (T)ReadObject(reader)!;
     }
 
     private static Value ReadValue(BinaryReader br)

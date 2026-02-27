@@ -47,14 +47,14 @@ public class VirtualMachine
                 var info = new FunctionInfo
                 {
                     Address = i + 1,
-                    Parameters = (List<string>)instructions[i].Extra!
+                    Parameters = UnwrapStringList(instructions[i].Extra)
                 };
 
                 _functions[instructions[i].Name!] = info;
             }
             else if (instructions[i].OpCode == OpCode.Inherit)
             {
-                _inheritance[instructions[i].Name!] = (string)instructions[i].Operand!;
+                _inheritance[instructions[i].Name!] = UnwrapString(instructions[i].Operand);
             }
         }
 
@@ -67,7 +67,7 @@ public class VirtualMachine
             {
                 case OpCode.CreateObject:
                 {
-                    var fieldNames = (List<string>?)instruction.Extra;
+                    var fieldNames = UnwrapStringList(instruction.Extra);
                     var fields = new Dictionary<string, Value>();
                     if (fieldNames != null)
                     {
@@ -110,12 +110,12 @@ public class VirtualMachine
                 }
 
                 case OpCode.Push:
-                    _stack.Push((Value)instruction.Operand!);
+                    _stack.Push(UnwrapValue(instruction.Operand));
                     break;
 
                 case OpCode.CallExternal:
                 {
-                    int argCount = (int)instruction.Operand!;
+                    int argCount = UnwrapInt(instruction.Operand);
                     var args = new List<Value>();
                     for (int i = 0; i < argCount; i++)
                     {
@@ -255,7 +255,7 @@ public class VirtualMachine
 
                 case OpCode.CallMethod:
                 {
-                    int argCount = (int)instruction.Operand!;
+                    int argCount = UnwrapInt(instruction.Operand);
                     var args = new List<Value>();
 
                     for (int i = 0; i < argCount; i++)
@@ -313,7 +313,7 @@ public class VirtualMachine
 
                 case OpCode.Call:
                 {
-                    int argCount = (int)instruction.Operand!;
+                    int argCount = UnwrapInt(instruction.Operand);
                     var args = new List<Value>();
 
                     for (int i = 0; i < argCount; i++)
@@ -346,7 +346,7 @@ public class VirtualMachine
 
                 case OpCode.CreateArray:
                 {
-                    int count = (int)instruction.Operand!;
+                    int count = UnwrapInt(instruction.Operand);
                     var list = new List<Value>();
 
                     for (int i = 0; i < count; i++)
@@ -438,7 +438,7 @@ public class VirtualMachine
 
 
                 case OpCode.Jump:
-                    ip = (int)instruction.Operand!;
+                    ip = UnwrapInt(instruction.Operand);
                     continue;
 
                 case OpCode.JumpIfFalse:
@@ -451,7 +451,7 @@ public class VirtualMachine
 
                     if (!condition.Bool)
                     {
-                        ip = (int)instruction.Operand!;
+                        ip = UnwrapInt(instruction.Operand);
                         continue;
                     }
 
@@ -591,7 +591,7 @@ public class VirtualMachine
 
                     if (condition.Bool)
                     {
-                        ip = (int)instruction.Operand!;
+                        ip = UnwrapInt(instruction.Operand);
                         continue;
                     }
 
@@ -600,7 +600,7 @@ public class VirtualMachine
 
                 case OpCode.Function:
                 {
-                    ip = (int)instruction.Operand!;
+                    ip = UnwrapInt(instruction.Operand);
                     continue;
                 }
 
@@ -617,7 +617,7 @@ public class VirtualMachine
 
                 case OpCode.CreateStruct:
                 {
-                    var fields = (List<string>)instruction.Extra!;
+                    var fields = UnwrapStringList(instruction.Extra);
                     var structData = new Dictionary<string, Value>();
                     foreach (var field in fields)
                     {
@@ -639,6 +639,51 @@ public class VirtualMachine
     // ================================
     // 🔥 Helpers
     // ================================
+
+    private int UnwrapInt(object? operand)
+    {
+        if (operand is int i) return i;
+        if (operand is Value v && v.Type == SabakaType.Int) return v.Int;
+        return 0;
+    }
+
+    private string UnwrapString(object? operand)
+    {
+        if (operand is string s) return s;
+        if (operand is Value v && v.Type == SabakaType.String) return v.String;
+        return operand?.ToString() ?? "";
+    }
+
+    private Value UnwrapValue(object? operand)
+    {
+        if (operand is Value v) return v;
+        if (operand is int i) return Value.FromInt(i);
+        if (operand is double d) return Value.FromFloat(d);
+        if (operand is bool b) return Value.FromBool(b);
+        if (operand is string s) return Value.FromString(s);
+        return default;
+    }
+
+    private List<string> UnwrapStringList(object? extra)
+    {
+        if (extra is List<string> list) return list;
+        if (extra is Value v && v.Type == SabakaType.Array && v.Array != null)
+        {
+            return v.Array.Select(x => x.String).ToList();
+        }
+        if (extra is System.Collections.IEnumerable enumerable)
+        {
+            var result = new List<string>();
+            foreach (var item in enumerable)
+            {
+                if (item is string s) result.Add(s);
+                else if (item is Value val && val.Type == SabakaType.String) result.Add(val.String);
+                else result.Add(item?.ToString() ?? "");
+            }
+            return result;
+        }
+        return new List<string>();
+    }
 
     private bool IsStringAtTop()
     {
