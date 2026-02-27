@@ -1,5 +1,9 @@
 ﻿using SabakaLang.ToExe;
 
+Console.ForegroundColor = ConsoleColor.Yellow;
+Console.Error.WriteLine("[WARN] THIS UTILITY IS DEPRECATED. USE SABAKALANG SAR PACKER UTILITY INSTEAD.");
+Console.ResetColor();
+
 if (args.Length == 0)
 {
     Console.WriteLine("Usage: SabakaLang.ToExe <file.sabaka>");
