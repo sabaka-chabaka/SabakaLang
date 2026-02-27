@@ -1,9 +1,18 @@
+using System.Text.Json.Serialization;
+
 namespace SabakaLang.RuntimeEnvironment.Models;
 
 public sealed class SarManifest
 {
-    public string Name { get; init; } = "";
-    public string Version { get; init; } = "";
-    public string Entry { get; init; } = "";
-    public string SreTarget { get; init; } = "";
+    [JsonPropertyName("name")]
+    public string Name { get; init; }
+    
+    [JsonPropertyName("version")]
+    public string Version { get; init; }
+    
+    [JsonPropertyName("entry")]
+    public string Entry { get; init; }
+    
+    [JsonPropertyName("sre_target")]
+    public string SreTarget { get; init; }
 }

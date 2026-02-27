@@ -4,7 +4,7 @@ namespace SabakaLang.Compiler;
 
 public class Instruction
 {
-    public OpCode OpCode { get; }
+    public OpCode OpCode { get; set; }
     public object? Operand { get; set; }
     public string? Name { get; set; }
     public object? Extra { get; set; }
@@ -15,5 +15,9 @@ public class Instruction
         OpCode = opCode;
         Operand = operand;
         Name = name;
+    }
+
+    public Instruction()
+    {
     }
 }
