@@ -18,6 +18,9 @@ public class Compiler
     private Stack<Dictionary<string, string>> _typeScopes = new();
     private HashSet<string> _importedFiles = new();
     private string? _currentFilePath;
+    private readonly object _lock = new();
+    private List<(FunctionDeclaration func, string? className)> _functionsToCompile = new();
+    private bool _isPreScan = false;
     private readonly Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> _externalFunctions = new();
     private readonly Dictionary<string, Value> _externalVariables = new(); // For storing imported variables
 
@@ -71,16 +74,127 @@ public class Compiler
         _typeScopes.Clear();
         PushScope(); // Global scope
 
+        _functionsToCompile.Clear();
+        
+        // Phase 1: Pre-scan for declarations (sequential)
+        _isPreScan = true;
         foreach (var expr in expressions)
         {
             Emit(expr);
+        }
+        _isPreScan = false;
+
+        // Phase 2: Compile global code (sequential)
+        foreach (var expr in expressions)
+        {
+            if (expr is not FunctionDeclaration && expr is not ClassDeclaration && expr is not InterfaceDeclaration && expr is not EnumDeclaration && expr is not StructDeclaration)
+            {
+                Emit(expr);
+            }
+        }
+
+        // Phase 3: Parallel compilation of function/method bodies
+        var results = new System.Collections.Concurrent.ConcurrentBag<(string Name, List<Instruction> Bytecode, int StartAddr)>();
+        
+        System.Threading.Tasks.Parallel.ForEach(_functionsToCompile, item =>
+        {
+            var localCompiler = CreateLocalCompiler();
+            var bytecode = localCompiler.CompileIsolated(item.func, item.className);
+            lock(_lock)
+            {
+                results.Add((item.className != null ? $"{item.className}.{item.func.Name}" : item.func.Name, bytecode, -1));
+            }
+        });
+
+        foreach (var res in results)
+        {
+            var bodyStart = _instructions.Count;
+            var instr = new Instruction(OpCode.Function)
+            {
+                Name = res.Name,
+                Extra = _functionsToCompile.First(f => (f.className != null ? $"{f.className}.{f.func.Name}" : f.func.Name) == res.Name).func.Parameters.Select(p => p.Name).ToList()
+            };
+            _instructions.Add(instr);
+            var actualStart = _instructions.Count;
+            _instructions.AddRange(res.Bytecode);
+            _instructions.Add(new Instruction(OpCode.Return));
+            instr.Operand = _instructions.Count;
+            _functions[res.Name] = actualStart;
         }
 
         return _instructions;
     }
 
+    private Compiler CreateLocalCompiler()
+    {
+        var c = new Compiler();
+        c._classes = _classes;
+        c._interfaces = _interfaces;
+        c._functions = _functions;
+        c._structs = _structs;
+        c._enums = _enums;
+        c._externalFunctions.Clear();
+        foreach (var kv in _externalFunctions) c._externalFunctions[kv.Key] = kv.Value;
+        c._externalClasses.Clear();
+        foreach (var kv in _externalClasses) c._externalClasses[kv.Key] = kv.Value;
+        c._externalVariables.Clear();
+        foreach (var kv in _externalVariables) c._externalVariables[kv.Key] = kv.Value;
+        return c;
+    }
+
+    private List<Instruction> CompileIsolated(FunctionDeclaration func, string? className)
+    {
+        _currentClass = className;
+        PushScope();
+        if (className != null)
+        {
+            foreach (var field in GetAllFieldsFull(className))
+                DeclareVar(field.Name, field.CustomType ?? field.TypeToken.ToString());
+        }
+        foreach (var p in func.Parameters)
+            DeclareVar(p.Name, p.CustomType ?? p.Type.ToString());
+
+        foreach (var stmt in func.Body)
+            Emit(stmt);
+
+        PopScope();
+        return _instructions;
+    }
+
     private void Emit(Expr expr)
     {
+        if (_isPreScan)
+        {
+            if (expr is ImportStatement import) HandleImport(import);
+            else if (expr is ClassDeclaration cd)
+            {
+                _classes[cd.Name] = cd;
+                string? actualBaseClass = null;
+                if (cd.BaseClassName != null)
+                {
+                    if (_interfaces.ContainsKey(cd.BaseClassName)) { } // handled elsewhere
+                    else actualBaseClass = cd.BaseClassName;
+                }
+                if (actualBaseClass != null)
+                    _instructions.Add(new Instruction(OpCode.Inherit) { Name = cd.Name, Operand = actualBaseClass });
+                
+                foreach (var method in cd.Methods) _functionsToCompile.Add((method, cd.Name));
+            }
+            else if (expr is FunctionDeclaration fd) _functionsToCompile.Add((fd, null));
+            else if (expr is InterfaceDeclaration id) _interfaces[id.Name] = id;
+            else if (expr is EnumDeclaration ed) 
+            {
+                var vals = new Dictionary<string, int>();
+                for (int i = 0; i < ed.Members.Count; i++) vals[ed.Members[i]] = i;
+                _enums[ed.Name] = vals;
+            }
+            else if (expr is StructDeclaration sd)
+            {
+                _structs[sd.Name] = sd.Fields;
+            }
+            return;
+        }
+
         if (expr is IntExpr intExpr)
         {
             _instructions.Add(
@@ -99,6 +213,8 @@ public class Compiler
         }
         else if (expr is ClassDeclaration classDecl)
         {
+            if (!_isPreScan) return;
+            
             _classes[classDecl.Name] = classDecl;
 
             string? actualBaseClass = null;
@@ -125,62 +241,10 @@ public class Compiler
                 });
             }
 
-            // Interface implementation check
-            foreach (var interfaceName in allInterfaces)
-            {
-                var ifaceMethods = GetAllInterfaceMethods(interfaceName);
-
-                foreach (var ifaceMethod in ifaceMethods)
-                {
-                    if (!HasMethodInChain(classDecl.Name, ifaceMethod.Name, ifaceMethod.Parameters.Count))
-                    {
-                        throw new CompilerException(
-                            $"Class {classDecl.Name} does not implement interface method {ifaceMethod.Name}", 0);
-                    }
-                }
-            }
-
-            var oldClass = _currentClass;
-            _currentClass = classDecl.Name;
-
-            var fields = GetAllFields(classDecl.Name);
-
             foreach (var method in classDecl.Methods)
             {
-                var methodFqn = $"{classDecl.Name}.{method.Name}";
-                var methodInstr = new Instruction(OpCode.Function)
-                {
-                    Name = methodFqn,
-                    Extra = method.Parameters.Select(p => p.Name).ToList()
-                };
-
-                _instructions.Add(methodInstr);
-                var bodyStart = _instructions.Count;
-
-                PushScope();
-                // Declare fields in scope so we know their types
-                foreach (var field in GetAllFieldsFull(classDecl.Name))
-                {
-                    DeclareVar(field.Name, field.CustomType ?? field.TypeToken.ToString());
-                }
-
-                foreach (var p in method.Parameters)
-                {
-                    DeclareVar(p.Name, p.CustomType ?? p.Type.ToString());
-                }
-
-                foreach (var stmt in method.Body)
-                    Emit(stmt);
-
-                PopScope();
-
-                _instructions.Add(new Instruction(OpCode.Return));
-
-                methodInstr.Operand = _instructions.Count;
-                _functions[methodFqn] = bodyStart;
+                _functionsToCompile.Add((method, classDecl.Name));
             }
-
-            _currentClass = oldClass;
         }
         else if (expr is InterfaceDeclaration interfaceDecl)
         {
@@ -231,26 +295,8 @@ public class Compiler
         }
         else if (expr is FunctionDeclaration func)
         {
-            var functionInstr = new Instruction(OpCode.Function);
-            functionInstr.Name = func.Name;
-            functionInstr.Extra = func.Parameters.Select(p => p.Name).ToList();
-
-            _instructions.Add(functionInstr);
-            var bodyStart = _instructions.Count;
-
-            PushScope();
-            foreach (var p in func.Parameters)
-                DeclareVar(p.Name, p.CustomType ?? p.Type.ToString());
-
-            foreach (var stmt in func.Body)
-                Emit(stmt);
-
-            PopScope();
-
-            _instructions.Add(new Instruction(OpCode.Return));
-
-            functionInstr.Operand = _instructions.Count;
-            _functions[func.Name] = bodyStart;
+            if (!_isPreScan) return;
+            _functionsToCompile.Add((func, null));
         }
 
 
@@ -579,6 +625,15 @@ public class Compiler
             if (ret.Value != null)
                 Emit(ret.Value);
             _instructions.Add(new Instruction(OpCode.Return));
+        }
+        else if (expr is SpawnExpr spawn)
+        {
+            _instructions.Add(new Instruction(OpCode.SpawnThread, spawn.FunctionName));
+        }
+        else if (expr is JoinExpr join)
+        {
+            Emit(join.ThreadHandle);
+            _instructions.Add(new Instruction(OpCode.JoinThread));
         }
 
         else if (expr is EnumDeclaration enumDecl)

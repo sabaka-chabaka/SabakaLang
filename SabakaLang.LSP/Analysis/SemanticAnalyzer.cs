@@ -346,6 +346,15 @@ public class SemanticAnalyzer
                 AnalyzeExpr(arrayStore.Index);
                 AnalyzeExpr(arrayStore.Value);
                 break;
+
+            case SpawnExpr spawn:
+                if (_currentScope.Resolve(spawn.FunctionName) == null && !IsImportedSymbol(spawn.FunctionName))
+                    throw new SemanticException($"Undefined function '{spawn.FunctionName}' for spawn", spawn.Start);
+                break;
+
+            case JoinExpr join:
+                AnalyzeExpr(join.ThreadHandle);
+                break;
         }
     }
     

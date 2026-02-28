@@ -274,6 +274,7 @@ public class Lexer
             "int" => new Token(TokenType.IntKeyword, text, start, _position),
             "float" => new Token(TokenType.FloatKeyword, text, start, _position),
             "string" => new Token(TokenType.StringKeyword, text, start, _position),
+            "thread" => new Token(TokenType.ThreadKeyword, text, start, _position),
             "void" => new Token(TokenType.VoidKeyword, text, start, _position),
             "func" => new Token(TokenType.Function, text, start, _position),
             "return" => new Token(TokenType.Return, text, start, _position),
@@ -294,6 +295,8 @@ public class Lexer
             "private" => new Token(TokenType.Private, text, start, _position),
             "protected" => new Token(TokenType.Protected, text, start, _position),
             "import" => new Token(TokenType.Import, text, start, _position),
+            "spawn" => new Token(TokenType.Spawn, text, start, _position),
+            "join" => new Token(TokenType.Join, text, start, _position),
 
             _ => new Token(TokenType.Identifier, text, start, _position)
         };

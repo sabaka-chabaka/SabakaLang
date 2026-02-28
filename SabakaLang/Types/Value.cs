@@ -14,6 +14,7 @@ public struct Value
     public Dictionary<string, Value>? Struct;
     public Dictionary<string, Value>? ObjectFields;
     public string? ClassName;
+    public System.Threading.Thread? Thread;
 
     public static Value FromInt(int v)
         => new Value { Type = SabakaType.Int, Int = v };
@@ -28,6 +29,9 @@ public struct Value
         => new Value { Type = SabakaType.String, String = value };
 
     public static Value FromArray(List<Value> values) => new Value{ Type = SabakaType.Array, Array = values};
+    
+    public static Value FromThread(System.Threading.Thread thread) => new Value { Type = SabakaType.Thread, Thread = thread };
+
     public static Value FromStruct(Dictionary<string, Value> fields)
     {
         return new Value
@@ -49,6 +53,7 @@ public override string ToString()
             SabakaType.String => String,
             SabakaType.Array => $"[{string.Join(", ", Array!.Select(v => v.ToString()))}]",
             SabakaType.Struct => "struct { " + string.Join(", ", Struct!.Select(kv => $"{kv.Key}: {kv.Value}")) + " }",
+            SabakaType.Thread => $"thread {Thread?.ManagedThreadId ?? 0}",
             _ => "null"
         };
     }

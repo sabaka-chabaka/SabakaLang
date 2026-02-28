@@ -118,9 +118,11 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
             TokenType.StructKeyword or TokenType.Class or TokenType.New or 
             TokenType.Override or TokenType.Super or TokenType.Interface or 
             TokenType.Switch or TokenType.Case or TokenType.Default or 
-            TokenType.Public or TokenType.Private or TokenType.Protected or TokenType.Import => "keyword",
+            TokenType.Public or TokenType.Private or TokenType.Protected or 
+            TokenType.Import or TokenType.Spawn or TokenType.Join => "keyword",
 
-            TokenType.IntKeyword or TokenType.FloatKeyword or TokenType.StringKeyword => "type",
+            TokenType.IntKeyword or TokenType.FloatKeyword or 
+            TokenType.StringKeyword or TokenType.ThreadKeyword => "type",
 
             TokenType.IntLiteral or TokenType.Number or TokenType.FloatLiteral => "number",
 

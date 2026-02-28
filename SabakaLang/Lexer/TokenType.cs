@@ -41,6 +41,7 @@ public enum TokenType
     FloatKeyword,
     StringLiteral,
     StringKeyword,
+    ThreadKeyword,
 
     Function,      // можно func если хочешь
     Return,
@@ -78,6 +79,9 @@ public enum TokenType
     Protected,
     
     Import,
+    
+    Spawn,
+    Join,
     
     EOF
 }

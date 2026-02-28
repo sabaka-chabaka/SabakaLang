@@ -556,6 +556,18 @@ public class Parser
 
         expr = WithPos(new NewExpr(name, arguments), startToken, _tokens[_position - 1]);
     }
+    else if (Current.Type == TokenType.Spawn)
+    {
+        Consume();
+        var funcName = Expect(TokenType.Identifier).Value;
+        expr = WithPos(new SpawnExpr(funcName), startToken, _tokens[_position - 1]);
+    }
+    else if (Current.Type == TokenType.Join)
+    {
+        Consume();
+        var threadExpr = ParsePrimary();
+        expr = WithPos(new JoinExpr(threadExpr), startToken, _tokens[_position - 1]);
+    }
     else if (Current.Type == TokenType.IntLiteral)
     {
         expr = WithPos(new IntExpr(int.Parse(Current.Value, CultureInfo.InvariantCulture)), Current);
@@ -580,6 +592,22 @@ public class Parser
     {
         expr = WithPos(new BoolExpr(false), Current);
         Consume();
+    }
+    else if (Current.Type == TokenType.Spawn)
+    {
+        Consume();
+        Expect(TokenType.LParen);
+        var funcName = Expect(TokenType.Identifier).Value;
+        Expect(TokenType.RParen);
+        expr = WithPos(new SpawnExpr(funcName), startToken, _tokens[_position - 1]);
+    }
+    else if (Current.Type == TokenType.Join)
+    {
+        Consume();
+        Expect(TokenType.LParen);
+        var threadHandle = ParseAssignment();
+        Expect(TokenType.RParen);
+        expr = WithPos(new JoinExpr(threadHandle), startToken, _tokens[_position - 1]);
     }
     else if (Current.Type == TokenType.Identifier)
     {
