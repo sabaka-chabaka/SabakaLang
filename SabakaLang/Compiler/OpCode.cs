@@ -44,7 +44,5 @@ public enum OpCode
     Inherit,
     Input,
     CallExternal,
-    Sleep,
-    SpawnThread,
-    JoinThread
+    Sleep
 }

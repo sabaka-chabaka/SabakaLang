@@ -6,13 +6,7 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        string filePath = args.Length > 0 ? args[0] : "test_threads.sabaka";
-        if (!File.Exists(filePath)) {
-            Console.WriteLine($"File not found: {filePath}");
-            return;
-        }
-        string source = File.ReadAllText(filePath);
-        SabakaLang.SabakaRunner.Run(source, filePath);
+        Run(args[0]);
     }
 
     private static void Run(string source, TextReader? input = null, TextWriter? output = null)

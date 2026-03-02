@@ -1,16 +1,5 @@
-void say_hello() {
-    while (true)
-    {
-        print("hello");
-    }
-}
+int[] arr = [1, 2, 3, 4, 5];
 
-void main() {
-    print("Main thread: starting...");
-    var t = spawn say_hello;
-    print("Main thread: spawned thread");
-    join t;
-    print("Main thread: thread joined. Bye!");
+foreach(int a in arr){
+    print(a);
 }
-
-main();

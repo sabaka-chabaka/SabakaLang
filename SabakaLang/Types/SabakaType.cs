@@ -8,6 +8,5 @@ public enum SabakaType
     String,
     Array,
     Struct,
-    Object,
-    Thread
+    Object
 }

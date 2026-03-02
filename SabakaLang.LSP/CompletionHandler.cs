@@ -20,10 +20,10 @@ public class CompletionHandler : CompletionHandlerBase
 
     private readonly string[] _keywords = {
         "if", "else", "while", "for", "foreach", "in", "func", "return", "void",
-        "int", "float", "string", "thread", "bool", "true", "false",
+        "int", "float", "string", "bool", "true", "false",
         "struct", "class", "interface", "new", "override", "super",
         "switch", "case", "default", "enum",
-        "public", "private", "protected", "import", "spawn", "join"
+        "public", "private", "protected", "import"
     };
 
     private readonly string[] _builtInFunctions = {
@@ -80,7 +80,6 @@ public class CompletionHandler : CompletionHandlerBase
                         else if (typeName == "StringKeyword") typeName = "string";
                         else if (typeName == "BoolKeyword") typeName = "bool";
                         else if (typeName == "VoidKeyword") typeName = "void";
-                        else if (typeName == "ThreadKeyword") typeName = "thread";
 
                         var members = _symbolIndex.GetMembers(typeName)
                             .Select(s => new CompletionItem
@@ -147,7 +146,6 @@ public class CompletionHandler : CompletionHandlerBase
             "StringKeyword" => "string",
             "BoolKeyword" => "bool",
             "VoidKeyword" => "void",
-            "ThreadKeyword" => "thread",
             _ => type
         };
     }
