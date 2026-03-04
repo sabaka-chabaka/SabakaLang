@@ -1162,6 +1162,8 @@ public class Compiler
             throw new CompilerException($"Import file not found: {import.FilePath}", import.Start);
         }
 
+        Console.WriteLine($"Loading file: {fullPath}");
+        
         string source = File.ReadAllText(fullPath);
 
         var oldFilePath = _currentFilePath;
@@ -1203,6 +1205,8 @@ public class Compiler
         _importedFiles.Add(fullPath);
 
         _currentFilePath = oldFilePath;
+        
+        Console.WriteLine($"Loaded file: {fullPath}");
     }
 
     private void LoadDll(string fullPath, List<string> importNames = null)
