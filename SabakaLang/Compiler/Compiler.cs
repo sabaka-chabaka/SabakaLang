@@ -63,6 +63,8 @@ public class Compiler
 
     public List<Instruction> Compile(List<Expr> expressions, string? filePath = null)
     {
+        Console.WriteLine("Compiling...");
+        
         _currentFilePath = filePath;
         _importedFiles.Clear();
         if (_currentFilePath != null)
@@ -76,6 +78,7 @@ public class Compiler
             Emit(expr);
         }
 
+        Console.WriteLine($"Compiled {_instructions.Count} instructions");
         return _instructions;
     }
 
