@@ -613,7 +613,10 @@ public class VirtualMachine
                 {
                     var arr = _stack.Pop();
 
-                    _stack.Push(Value.FromInt(arr.Array!.Count));
+                    if (arr.Type == SabakaType.String)
+                        _stack.Push(Value.FromInt(arr.String?.Length ?? 0));
+                    else
+                        _stack.Push(Value.FromInt(arr.Array!.Count));
                     break;
                 }
 
