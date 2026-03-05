@@ -390,6 +390,10 @@ public class Compiler
                 case TokenType.LessEqual:
                     _instructions.Add(new Instruction(OpCode.LessEqual));
                     break;
+                
+                case TokenType.Percent:
+                    _instructions.Add(new Instruction(OpCode.Percent));
+                    break;
             }
         }
         else if (expr is CallExpr call)
@@ -1332,14 +1336,32 @@ public class Compiler
         var parser = new Parser.Parser(tokens);
         var program = parser.ParseProgram();
 
-        var importedInstructions = importCompiler.Compile(program);
+        var importedInstructions = importCompiler.Compile(program, fullPath);
+
+        // All addresses in importCompiler are relative to its own instruction list (starting at 0).
+        // After AddRange they need to be offset by the current instruction count.
+        int addressOffset = _instructions.Count;
 
         _instructions.AddRange(importedInstructions);
+
+        // Fix up Jump targets inside the imported instructions
+        for (int i = addressOffset; i < _instructions.Count; i++)
+        {
+            var instr = _instructions[i];
+            if (instr.OpCode == OpCode.Jump ||
+                instr.OpCode == OpCode.JumpIfFalse ||
+                instr.OpCode == OpCode.JumpIfTrue ||
+                instr.OpCode == OpCode.Function)
+            {
+                if (instr.Operand is int addr)
+                    instr.Operand = addr + addressOffset;
+            }
+        }
 
         foreach (var kv in importCompiler._functions)
         {
             if (!_functions.ContainsKey(kv.Key))
-                _functions[kv.Key] = kv.Value;
+                _functions[kv.Key] = kv.Value; // compile-time only, VM re-scans
         }
 
         foreach (var kv in importCompiler._classes)
@@ -1360,7 +1382,9 @@ public class Compiler
                 _externalVariables[kv.Key] = kv.Value;
         }
 
-        _importedFiles.Add(fullPath);
+        // Merge imported files so transitive imports aren't loaded twice
+        foreach (var f in importCompiler._importedFiles)
+            _importedFiles.Add(f);
 
         _currentFilePath = oldFilePath;
         

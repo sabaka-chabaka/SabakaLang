@@ -130,7 +130,7 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
 
             TokenType.Comment => "comment",
 
-            TokenType.Plus or TokenType.Minus or TokenType.Star or TokenType.Slash or 
+            TokenType.Plus or TokenType.Minus or TokenType.Star or TokenType.Slash or TokenType.Percent or 
             TokenType.Equal or TokenType.EqualEqual or TokenType.NotEqual or 
             TokenType.Greater or TokenType.Less or TokenType.GreaterEqual or 
             TokenType.LessEqual or TokenType.Dot or TokenType.AndAnd or 

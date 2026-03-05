@@ -163,6 +163,13 @@ public class VirtualMachine
                     if (_stack.Count < 2) throw new Exception("Stack empty in Div");
                     BinaryNumeric((a, b) => a / b);
                     break;
+                
+                case OpCode.Percent:
+                {
+                    if (_stack.Count < 2) throw new Exception("Stack empty in Percent");
+                    BinaryNumeric((a, b) => a % b);
+                    break;
+                }
 
                 case OpCode.Store:
                 {
@@ -364,11 +371,19 @@ public class VirtualMachine
                     var index = _stack.Pop();
                     var array = _stack.Pop();
 
-                    if (array.Type != SabakaType.Array)
-                        throw new Exception("Not an array");
-
                     if (index.Type != SabakaType.Int)
                         throw new Exception("Index must be int");
+
+                    if (array.Type == SabakaType.String)
+                    {
+                        if (index.Int < 0 || index.Int >= array.String.Length)
+                            throw new Exception($"String index {index.Int} out of range");
+                        _stack.Push(Value.FromString(array.String[index.Int].ToString()));
+                        break;
+                    }
+
+                    if (array.Type != SabakaType.Array)
+                        throw new Exception("Not an array");
 
                     _stack.Push(array.Array![index.Int]);
                     break;

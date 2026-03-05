@@ -1,20 +1,64 @@
-class Eb{
-    string name;
+int abs(int x){
+    if(x < 0){
+        return -x;
+    }
+    return x;
 }
 
-class Box<T>{
-    
-    T value;
+int pow(int base, int exp){
+    int result = 1;
 
-    void Box (T val){
-        value = val;
+    for(int i = 0; i < exp; i = i + 1){
+        result = result * base;
     }
 
+    return result;
 }
 
-Eb e = new Eb();
-e.name = "ebil";
+float sqrt(float x){
+    if(x <= 0){
+        return 0;
+    }
 
-Bob b = new Box<Eb>(e);
+    float guess = x / 2;
 
-print(b.value.name);
+    for(int i = 0; i < 20; i = i + 1){
+        guess = (guess + x / guess) / 2;
+    }
+
+    return guess;
+}
+
+int random(int max){
+    int seed = 555;
+    seed = seed * 1103515245 + 12345;
+    return seed / max;
+}
+
+int min(int a, int b){
+    if(a < b) return a;
+    return b;
+}
+
+int max(int a, int b){
+    if(a > b) return a;
+    return b;
+}
+
+class Random {
+    int seed = 123456;
+
+    void setSeed(int s){
+        seed = s;
+    }
+
+    int next(){
+        seed = (1103515245 * seed + 12345) % 2147483647;
+        return seed;
+    }
+
+    int nextInt(int max){
+        int r = next();
+        return r % max;
+    }
+}

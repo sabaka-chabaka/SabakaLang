@@ -208,6 +208,10 @@ public class Lexer
                     tokens.Add(new Token(TokenType.RBracket, "]", start, start + 1));
                     break;
 
+                case '%':
+                    tokens.Add(new Token(TokenType.Percent, "%", start, start + 1));
+                    break;
+                
                 
                 default:
                     if (!isIde)

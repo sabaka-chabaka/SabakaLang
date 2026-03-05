@@ -7,7 +7,8 @@ public enum TokenType
     Plus,
     Minus,
     Star,
-    Slash,
+    Slash, 
+    Percent,
     
     LParen,
     RParen,
