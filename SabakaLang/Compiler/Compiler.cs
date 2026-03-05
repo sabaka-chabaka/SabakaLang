@@ -14,6 +14,8 @@ public class Compiler
     private Dictionary<string, List<string>> _structs = new();
     private Dictionary<string, Dictionary<string, int>> _enums = new();
     private Dictionary<string, ClassDeclaration> _classes = new();
+    // Stores original generic class templates keyed by base name, e.g. "List"
+    private Dictionary<string, ClassDeclaration> _genericTemplates = new();
     private Dictionary<string, InterfaceDeclaration> _interfaces = new();
     private string? _currentClass = null;
     private Stack<Dictionary<string, string>> _typeScopes = new();
@@ -103,6 +105,14 @@ public class Compiler
         }
         else if (expr is ClassDeclaration classDecl)
         {
+            // If this is a generic class definition, store as template and don't compile yet.
+            // It will be instantiated (monomorphized) when a NewExpr with type args is encountered.
+            if (classDecl.IsGeneric)
+            {
+                _genericTemplates[classDecl.Name] = classDecl;
+                return;
+            }
+
             _classes[classDecl.Name] = classDecl;
 
             string? actualBaseClass = null;
@@ -188,10 +198,32 @@ public class Compiler
         }
         else if (expr is InterfaceDeclaration interfaceDecl)
         {
+            // Generic interfaces are stored but not validated until instantiation
             _interfaces[interfaceDecl.Name] = interfaceDecl;
         }
         else if (expr is NewExpr newExpr)
         {
+            // If this is a generic instantiation (e.g. new List<int>()),
+            // monomorphize the template class before proceeding.
+            if (newExpr.TypeArgs.Count > 0)
+            {
+                string mangledName = newExpr.MangledName;
+                if (!_classes.ContainsKey(mangledName))
+                {
+                    if (!_genericTemplates.TryGetValue(newExpr.ClassName, out var template))
+                        throw new CompilerException($"Generic class '{newExpr.ClassName}' not found", 0);
+
+                    var instantiated = MonomorphizeClass(template, newExpr.TypeArgs);
+                    // Compile the instantiated class
+                    Emit(instantiated);
+                }
+
+                // Now emit as a regular NewExpr with the mangled name
+                var concreteNew = new NewExpr(mangledName, newExpr.Arguments);
+                Emit(concreteNew);
+                return;
+            }
+
             if (_externalClasses.ContainsKey(newExpr.ClassName.ToLower()))
             {
                 _instructions.Add(new Instruction(OpCode.Push,
@@ -644,6 +676,12 @@ public class Compiler
 
         else if (expr is VariableDeclaration decl)
         {
+            // If customType is a mangled generic name (e.g. "Box$int"), ensure the class is instantiated
+            if (decl.CustomType != null && decl.CustomType.Contains('$') && !_classes.ContainsKey(decl.CustomType))
+            {
+                EnsureGenericClassInstantiated(decl.CustomType);
+            }
+
             if (decl.Initializer != null)
             {
                 Emit(decl.Initializer);
@@ -1157,6 +1195,72 @@ public class Compiler
         return IsDerivedFrom(cd.BaseClassName, parent);
     }
 
+    /// <summary>
+    /// Given a mangled name like "Box$int" or "Pair$string$int", ensures the generic
+    /// class has been monomorphized and compiled. Parses the mangled name to extract
+    /// the base class name and type arguments.
+    /// </summary>
+    private void EnsureGenericClassInstantiated(string mangledName)
+    {
+        if (_classes.ContainsKey(mangledName)) return;
+
+        int dollar = mangledName.IndexOf('$');
+        if (dollar < 0) return;
+
+        string baseName = mangledName.Substring(0, dollar);
+        var typeArgs = mangledName.Substring(dollar + 1).Split('$').ToList();
+
+        if (!_genericTemplates.TryGetValue(baseName, out var template))
+            throw new CompilerException($"Generic class '{baseName}' not found", 0);
+
+        var instantiated = MonomorphizeClass(template, typeArgs);
+        Emit(instantiated);
+    }
+
+    /// <summary>
+    /// Performs monomorphization: clones a generic class template substituting
+    /// type parameters with concrete type arguments. Returns a non-generic
+    /// ClassDeclaration with a mangled name (e.g. "List$int").
+    /// </summary>
+    private ClassDeclaration MonomorphizeClass(ClassDeclaration template, List<string> typeArgs)
+    {
+        if (template.TypeParams.Count != typeArgs.Count)
+            throw new CompilerException(
+                $"Generic class '{template.Name}' expects {template.TypeParams.Count} type parameter(s), got {typeArgs.Count}", 0);
+
+        // Build substitution map: T -> int, U -> string, etc.
+        var subst = new Dictionary<string, string>();
+        for (int i = 0; i < template.TypeParams.Count; i++)
+            subst[template.TypeParams[i]] = typeArgs[i];
+
+        string mangledName = $"{template.Name}${string.Join("$", typeArgs)}";
+
+        // Clone fields with substituted types
+        var newFields = template.Fields.Select(f =>
+        {
+            string? newCustom = f.CustomType != null && subst.TryGetValue(f.CustomType, out var sc) ? sc : f.CustomType;
+            TokenType newType = f.TypeToken;
+            if (f.CustomType != null && subst.ContainsKey(f.CustomType))
+                newType = TokenType.Identifier; // keep as Identifier, customType holds concrete name
+            return new VariableDeclaration(newType, newCustom, f.Name, f.Initializer, f.AccessModifier);
+        }).ToList();
+
+        // Clone methods with substituted parameter/return types
+        var newMethods = template.Methods.Select(m =>
+        {
+            var newParams = m.Parameters.Select(p =>
+            {
+                string? newCustom = p.CustomType != null && subst.TryGetValue(p.CustomType, out var sc) ? sc : p.CustomType;
+                return new Parameter(p.Type, p.Name, newCustom);
+            }).ToList();
+            // Substitute method name if it equals the class name (constructor)
+            string methodName = m.Name == template.Name ? mangledName : m.Name;
+            return new FunctionDeclaration(m.ReturnType, methodName, newParams, m.Body, m.IsOverride, m.AccessModifier);
+        }).ToList();
+
+        return new ClassDeclaration(mangledName, null, template.BaseClassName, template.Interfaces, newFields, newMethods);
+    }
+
     private string GetDefiningClassForField(string className, string fieldName)
     {
         if (!_classes.TryGetValue(className, out var cd)) return className;
@@ -1406,7 +1510,7 @@ public class Compiler
             if (!_classes.ContainsKey(classAttr.Name))
             {
                 _classes[classAttr.Name] = new ClassDeclaration(
-                    classAttr.Name, null, new List<string>(),
+                    classAttr.Name, null, null, new List<string>(),
                     new List<VariableDeclaration>(), new List<FunctionDeclaration>());
             }
         }

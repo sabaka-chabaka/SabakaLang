@@ -62,6 +62,14 @@ public class Parser
         if (type == TokenType.Identifier)
             customType = token.Value;
 
+        // Consume generic type args: Box<int>  →  customType = "Box$int"
+        if (type == TokenType.Identifier && Current.Type == TokenType.Less)
+        {
+            var typeArgs = TryParseTypeArgs();
+            if (typeArgs.Count > 0)
+                customType = $"{customType}${string.Join("$", typeArgs)}";
+        }
+
         while (Current.Type == TokenType.LBracket)
         {
             Consume();
@@ -114,6 +122,23 @@ public class Parser
             return false;
 
         offset++;
+
+        // Skip generic type args on return type: Box<int> foo(...)
+        if (Peek(offset).Type == TokenType.Less)
+        {
+            offset++; // skip <
+            int depth = 1;
+            while (depth > 0 && _position + offset < _tokens.Count)
+            {
+                var t = Peek(offset).Type;
+                if (t == TokenType.Less) depth++;
+                else if (t == TokenType.Greater) depth--;
+                else if (t == TokenType.Semicolon || t == TokenType.EOF) break;
+                offset++;
+            }
+            if (depth != 0) return false;
+        }
+
         while (Peek(offset).Type == TokenType.LBracket)
         {
             if (Peek(offset + 1).Type != TokenType.RBracket)
@@ -121,7 +146,27 @@ public class Parser
             offset += 2;
         }
 
-        return Peek(offset).Type == TokenType.Identifier && Peek(offset + 1).Type == TokenType.LParen;
+        if (Peek(offset).Type != TokenType.Identifier)
+            return false;
+        offset++;
+
+        // Skip optional generic type params on method name: void swap<T>(...)
+        if (Peek(offset).Type == TokenType.Less)
+        {
+            offset++;
+            int depth = 1;
+            while (depth > 0 && _position + offset < _tokens.Count)
+            {
+                var t = Peek(offset).Type;
+                if (t == TokenType.Less) depth++;
+                else if (t == TokenType.Greater) depth--;
+                else if (t == TokenType.Semicolon || t == TokenType.EOF) break;
+                offset++;
+            }
+            if (depth != 0) return false;
+        }
+
+        return Peek(offset).Type == TokenType.LParen;
     }
 
     private bool IsVariableDeclaration()
@@ -136,6 +181,31 @@ public class Parser
         if (Peek(offset).Type == TokenType.Identifier)
         {
             offset++;
+
+            // Skip generic type args: Box<int>
+            if (Peek(offset).Type == TokenType.Less)
+            {
+                int saved = offset;
+                offset++; // skip <
+                // Scan for matching >
+                int depth = 1;
+                while (depth > 0 && _position + offset < _tokens.Count)
+                {
+                    var t = Peek(offset).Type;
+                    if (t == TokenType.Less) depth++;
+                    else if (t == TokenType.Greater) depth--;
+                    else if (t == TokenType.Semicolon || t == TokenType.EOF) break;
+                    offset++;
+                }
+                if (depth != 0)
+                {
+                    // Not a valid generic, not a variable declaration
+                    return false;
+                }
+                // offset now points just after '>', check next is Identifier
+                return Peek(offset).Type == TokenType.Identifier;
+            }
+
             while (Peek(offset).Type == TokenType.LBracket)
             {
                 if (Peek(offset + 1).Type != TokenType.RBracket)
@@ -181,22 +251,8 @@ public class Parser
             access = GetAccessModifier(Consume().Type);
         }
 
-        var typeToken = Consume();
-
-        while (Current.Type == TokenType.LBracket)
-        {
-            Consume();
-            Expect(TokenType.RBracket);
-        }
-
-        string? customType = null;
-        TokenType type = typeToken.Type;
-
-        // если это не builtin тип — значит struct
-        if (typeToken.Type == TokenType.Identifier)
-        {
-            customType = typeToken.Value;
-        }
+        // Use ConsumeTypeFull so that generic types like Box<int> are handled correctly
+        var (type, customType) = ConsumeTypeFull();
 
         var nameToken = Expect(TokenType.Identifier);
 
@@ -541,6 +597,9 @@ public class Parser
         Consume();
         var name = Expect(TokenType.Identifier).Value;
 
+        // Optional type args: new List<int>()
+        var typeArgs = TryParseTypeArgs();
+
         Expect(TokenType.LParen);
         var arguments = new List<Expr>();
         if (Current.Type != TokenType.RParen)
@@ -554,7 +613,7 @@ public class Parser
         }
         Expect(TokenType.RParen);
 
-        expr = WithPos(new NewExpr(name, arguments), startToken, _tokens[_position - 1]);
+        expr = WithPos(new NewExpr(name, arguments, typeArgs), startToken, _tokens[_position - 1]);
     }
     else if (Current.Type == TokenType.IntLiteral)
     {
@@ -751,13 +810,16 @@ public class Parser
         var returnType = ConsumeType();
         var name = Expect(TokenType.Identifier).Value;
 
+        // Optional generic type params: void swap<T>(...)
+        var typeParams = TryParseTypeParams();
+
         Expect(TokenType.LParen);
         var parameters = ParseParameters();
         Expect(TokenType.RParen);
 
         var body = ParseBlock();
 
-        return WithPos(new FunctionDeclaration(returnType, name, parameters, body, isOverride, access), startToken, _tokens[_position - 1]);
+        return WithPos(new FunctionDeclaration(returnType, name, parameters, body, isOverride, access, typeParams), startToken, _tokens[_position - 1]);
     }
 
     private List<Parameter> ParseParameters()
@@ -900,11 +962,89 @@ public class Parser
         return WithPos(new EnumDeclaration(name, members), startToken, _tokens[_position - 1]);
     }
     
+    /// <summary>
+    /// Parses a generic type parameter list: &lt;T&gt; or &lt;T, U&gt;
+    /// Returns the list of parameter names, or empty list if none.
+    /// </summary>
+    private List<string> TryParseTypeParams()
+    {
+        var result = new List<string>();
+        if (Current.Type != TokenType.Less) return result;
+
+        // Peek ahead: must look like < Ident (, Ident)* >
+        int saved = _position;
+        Consume(); // <
+
+        while (true)
+        {
+            if (Current.Type != TokenType.Identifier)
+            {
+                _position = saved;
+                return new List<string>();
+            }
+            result.Add(Consume().Value);
+            if (Current.Type == TokenType.Comma) { Consume(); continue; }
+            break;
+        }
+
+        if (Current.Type != TokenType.Greater)
+        {
+            _position = saved;
+            return new List<string>();
+        }
+        Consume(); // >
+        return result;
+    }
+
+    /// <summary>
+    /// Parses type argument list at call/new site: &lt;int&gt; or &lt;MyClass, string&gt;
+    /// Returns list of type name strings, or empty if this isn't a type arg list.
+    /// </summary>
+    private List<string> TryParseTypeArgs()
+    {
+        var result = new List<string>();
+        if (Current.Type != TokenType.Less) return result;
+
+        int saved = _position;
+        Consume(); // <
+
+        while (true)
+        {
+            if (!IsTypeKeyword(Current.Type) && Current.Type != TokenType.Identifier)
+            {
+                _position = saved;
+                return new List<string>();
+            }
+            string typeName = Current.Value;
+            Consume();
+            // Allow array suffix []
+            while (Current.Type == TokenType.LBracket && Peek().Type == TokenType.RBracket)
+            {
+                typeName += "[]";
+                Consume(); Consume();
+            }
+            result.Add(typeName);
+            if (Current.Type == TokenType.Comma) { Consume(); continue; }
+            break;
+        }
+
+        if (Current.Type != TokenType.Greater)
+        {
+            _position = saved;
+            return new List<string>();
+        }
+        Consume(); // >
+        return result;
+    }
+
     private Expr ParseClass()
     {
         var startToken = Consume(); // class
 
         var name = Expect(TokenType.Identifier).Value;
+
+        // Optional generic type params: class Foo<T>  or  class Pair<T, U>
+        var typeParams = TryParseTypeParams();
 
         string? baseClassName = null;
         var interfaces = new List<string>();
@@ -913,8 +1053,6 @@ public class Parser
         {
             Consume();
             var first = Expect(TokenType.Identifier).Value;
-            // For now, let's assume the first one is a base class. 
-            // In a better compiler we would check if 'first' is a class or an interface.
             baseClassName = first;
 
             while (Current.Type == TokenType.Comma)
@@ -945,7 +1083,7 @@ public class Parser
 
         Expect(TokenType.RBrace);
 
-        return WithPos(new ClassDeclaration(name, baseClassName, interfaces, fields, methods), startToken, _tokens[_position - 1]);
+        return WithPos(new ClassDeclaration(name, typeParams, baseClassName, interfaces, fields, methods), startToken, _tokens[_position - 1]);
     }
 
     private Expr ParseInterface()
@@ -953,6 +1091,9 @@ public class Parser
         var startToken = Consume(); // interface
 
         var name = Expect(TokenType.Identifier).Value;
+
+        // Optional generic type params: interface IList<T>
+        var typeParams = TryParseTypeParams();
 
         var parents = new List<string>();
         if (Current.Type == TokenType.Colon)
@@ -973,7 +1114,6 @@ public class Parser
         while (Current.Type != TokenType.RBrace)
         {
             var methodStartToken = Current;
-            // Interface methods don't have a body
             var returnType = ConsumeType();
             var methodName = Expect(TokenType.Identifier).Value;
 
@@ -987,7 +1127,7 @@ public class Parser
 
         Expect(TokenType.RBrace);
 
-        return WithPos(new InterfaceDeclaration(name, parents, methods), startToken, _tokens[_position - 1]);
+        return WithPos(new InterfaceDeclaration(name, typeParams, parents, methods), startToken, _tokens[_position - 1]);
     }
 
     private Expr ParseImport()
