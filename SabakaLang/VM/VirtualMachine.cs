@@ -386,6 +386,11 @@ public class VirtualMachine
                     if (index.Type != SabakaType.Int)
                         throw new Exception("Index must be int");
 
+                    while (array.Array.Count <= index.Int)
+                    {
+                        array.Array.Add(value);
+                    }
+                    
                     array.Array![index.Int] = value;
                     break;
                 }
@@ -607,9 +612,6 @@ public class VirtualMachine
                 case OpCode.ArrayLength:
                 {
                     var arr = _stack.Pop();
-
-                    if (arr.Type != SabakaType.Array)
-                        throw new Exception("ArrayLength requires array");
 
                     _stack.Push(Value.FromInt(arr.Array!.Count));
                     break;

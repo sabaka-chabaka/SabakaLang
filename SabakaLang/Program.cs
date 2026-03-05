@@ -1,4 +1,4 @@
-﻿using SabakaLang.Exceptions;
+﻿﻿using SabakaLang.Exceptions;
 
 namespace SabakaLang;
 
@@ -38,7 +38,7 @@ class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Internal Error] {ex.Message}");
+                Console.WriteLine($"[Internal Error] {ex}");
             }
         }
     }
@@ -62,7 +62,7 @@ class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Internal Error] {ex.Message}");
+            Console.WriteLine($"[Internal Error] {ex}");
         }
     }
 }

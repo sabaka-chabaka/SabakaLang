@@ -2,6 +2,7 @@ using SabakaLang.AST;
 using SabakaLang.Exceptions;
 using SabakaLang.Lexer;
 using SabakaLang.Types;
+using System;
 using System.Reflection;
 
 namespace SabakaLang.Compiler;
@@ -207,6 +208,26 @@ public class Compiler
                 Extra = fields
             });
 
+            // If the class has field initializers, emit code to set them on the newly created object.
+            if (cd != null)
+            {
+                foreach (var fieldDecl in GetAllFieldsFull(newExpr.ClassName))
+                {
+                    if (fieldDecl.Initializer != null)
+                    {
+                        // duplicate object reference
+                        _instructions.Add(new Instruction(OpCode.Dup));
+                        // emit initializer (pushes the value)
+                        Emit(fieldDecl.Initializer);
+                        // store into field
+                        _instructions.Add(new Instruction(OpCode.StoreField)
+                        {
+                            Name = fieldDecl.Name
+                        });
+                    }
+                }
+            }
+
             bool hasConstructor = cd != null && cd.Methods.Any(m => m.Name == newExpr.ClassName);
             if (!hasConstructor && cd?.BaseClassName != null)
             {
@@ -390,6 +411,20 @@ public class Compiler
                     Extra = GetAllFields(call.Name)
                 });
 
+                // Initialize field initializers if present
+                foreach (var fieldDecl in GetAllFieldsFull(call.Name))
+                {
+                    if (fieldDecl.Initializer != null)
+                    {
+                        _instructions.Add(new Instruction(OpCode.Dup));
+                        Emit(fieldDecl.Initializer);
+                        _instructions.Add(new Instruction(OpCode.StoreField)
+                        {
+                            Name = fieldDecl.Name
+                        });
+                    }
+                }
+
                 bool hasConstructor = cDecl.Methods.Any(m => m.Name == call.Name);
                 if (hasConstructor)
                 {
@@ -545,29 +580,39 @@ public class Compiler
             }
             else
             {
-                string? objType = null;
-                if (memberAccess.Object is VariableExpr ve) objType = GetVarType(ve.Name);
-                else if (memberAccess.Object is NewExpr ne) objType = ne.ClassName;
-                else if (memberAccess.Object is SuperExpr)
-                    objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd))
-                        ? cd.BaseClassName
-                        : null;
-
-                if (objType != null)
+                // Special-case: allow array.length member access.
+                // Emit the object expression and then ArrayLength opcode. Runtime will validate the type.
+                if (string.Equals(memberAccess.Member, "length", StringComparison.OrdinalIgnoreCase))
                 {
-                    var field = GetFieldInChain(objType, memberAccess.Member);
-                    if (field != null)
-                    {
-                        string definingClass = GetDefiningClassForField(objType, memberAccess.Member);
-                        CheckAccess(definingClass, field.AccessModifier, "field", field.Name);
-                    }
+                    Emit(memberAccess.Object);
+                    _instructions.Add(new Instruction(OpCode.ArrayLength));
                 }
-
-                Emit(memberAccess.Object);
-                _instructions.Add(new Instruction(OpCode.LoadField)
+                else
                 {
-                    Name = memberAccess.Member
-                });
+                    string? objType = null;
+                    if (memberAccess.Object is VariableExpr ve) objType = GetVarType(ve.Name);
+                    else if (memberAccess.Object is NewExpr ne) objType = ne.ClassName;
+                    else if (memberAccess.Object is SuperExpr)
+                        objType = (_currentClass != null && _classes.TryGetValue(_currentClass, out var cd))
+                            ? cd.BaseClassName
+                            : null;
+
+                    if (objType != null)
+                    {
+                        var field = GetFieldInChain(objType, memberAccess.Member);
+                        if (field != null)
+                        {
+                            string definingClass = GetDefiningClassForField(objType, memberAccess.Member);
+                            CheckAccess(definingClass, field.AccessModifier, "field", field.Name);
+                        }
+                    }
+
+                    Emit(memberAccess.Object);
+                    _instructions.Add(new Instruction(OpCode.LoadField)
+                    {
+                        Name = memberAccess.Member
+                    });
+                }
             }
         }
 
