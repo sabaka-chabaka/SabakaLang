@@ -1348,6 +1348,12 @@ public class Compiler
                 _classes[kv.Key] = kv.Value;
         }
 
+        foreach (var kv in importCompiler._genericTemplates)
+        {
+            if (!_genericTemplates.ContainsKey(kv.Key))
+                _genericTemplates[kv.Key] = kv.Value;
+        }
+
         foreach (var kv in importCompiler._externalVariables)
         {
             if (!_externalVariables.ContainsKey(kv.Key))
