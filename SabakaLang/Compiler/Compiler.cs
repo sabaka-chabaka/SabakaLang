@@ -1442,6 +1442,8 @@ public class Compiler
         var oldInstructions = _instructions;
         var oldFunctions = _functions;
 
+        _importedFiles.Add(fullPath); // guard BEFORE recursion
+
         var importCompiler = new Compiler();
         importCompiler._currentFilePath = fullPath;
         importCompiler._importedFiles = new HashSet<string>(_importedFiles);

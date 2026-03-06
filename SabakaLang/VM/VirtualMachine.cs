@@ -217,7 +217,10 @@ public class VirtualMachine
                 {
                     var path = _stack.Pop().String;
                     if (!File.Exists(path))
-                        throw new Exception($"File not found: {path}");
+                    {
+                        _stack.Push(Value.FromString(""));
+                        break;
+                    }
                     _stack.Push(Value.FromString(File.ReadAllText(path)));
                     break;
                 }
