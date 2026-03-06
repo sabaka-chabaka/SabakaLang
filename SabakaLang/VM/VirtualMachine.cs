@@ -484,11 +484,19 @@ public class VirtualMachine
                     var index = _stack.Pop();
                     var array = _stack.Pop();
 
-                    if (array.Type != SabakaType.Array)
-                        throw new Exception("Not an array");
-
                     if (index.Type != SabakaType.Int)
                         throw new Exception("Index must be int");
+
+                    if (array.Type == SabakaType.String)
+                    {
+                        if (index.Int < 0 || index.Int >= array.String.Length)
+                            throw new Exception($"String index {index.Int} out of range");
+                        _stack.Push(Value.FromString(array.String[index.Int].ToString()));
+                        break;
+                    }
+
+                    if (array.Type != SabakaType.Array)
+                        throw new Exception("Not an array");
 
                     _stack.Push(array.Array![index.Int]);
                     break;
@@ -733,7 +741,10 @@ public class VirtualMachine
                 {
                     var arr = _stack.Pop();
 
-                    _stack.Push(Value.FromInt(arr.Array!.Count));
+                    if (arr.Type == SabakaType.String)
+                        _stack.Push(Value.FromInt(arr.String?.Length ?? 0));
+                    else
+                        _stack.Push(Value.FromInt(arr.Array!.Count));
                     break;
                 }
 
