@@ -65,6 +65,8 @@ public class VirtualMachine
         while (ip < instructions.Count)
         {
             var instruction = instructions[ip];
+            try
+            {
 
             switch (instruction.OpCode)
             {
@@ -487,7 +489,13 @@ public class VirtualMachine
                     if (array.Type != SabakaType.Array)
                         throw new Exception("Not an array");
 
-                    _stack.Push(array.Array![index.Int]);
+                    if (array.Array == null)
+                        throw new Exception("ArrayLoad: array is null");
+
+                    if (index.Int < 0 || index.Int >= array.Array.Count)
+                        throw new Exception($"ArrayLoad out of bounds: index={index.Int} size={array.Array.Count}");
+
+                    _stack.Push(array.Array[index.Int]);
                     break;
                 }
 
@@ -592,7 +600,7 @@ public class VirtualMachine
                     }
                     else if (a.Type != b.Type)
                     {
-                        throw new Exception("Type mismatch in ==");
+                        throw new Exception($"Type mismatch in ==: left={a.Type} right={b.Type} | left_val={a} right_val={b}");
                     }
                     else
                     {
@@ -755,6 +763,11 @@ public class VirtualMachine
             }
 
             ip++;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"[ip={ip} opcode={instruction.OpCode} name={instruction.Name}] {ex.Message}", ex);
+            }
         }
     }
 
