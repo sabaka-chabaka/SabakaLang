@@ -27,7 +27,7 @@ public class CompletionHandler : CompletionHandlerBase
     };
 
     private readonly string[] _builtInFunctions = {
-        "print", "input", "sleep", "readFile", "writeFile", "appendFile", "fileExists", "deleteFile", "readLines", "time", "timeMs"
+        "print", "input", "sleep", "readFile", "writeFile", "appendFile", "fileExists", "deleteFile", "readLines", "time", "timeMs", "httpGet", "httpPost", "httpPostJson"
     };
 
     protected override CompletionRegistrationOptions CreateRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)

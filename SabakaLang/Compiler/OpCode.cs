@@ -53,5 +53,8 @@ public enum OpCode
     DeleteFile,
     ReadLines,
     Time,
-    TimeMs
+    TimeMs,
+    HttpGet,
+    HttpPost,
+    HttpPostJson
 }

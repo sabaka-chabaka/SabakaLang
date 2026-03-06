@@ -1,6 +1,8 @@
 using SabakaLang.Compiler;
 using SabakaLang.Types;
 using System.Globalization;
+using System.Net.Http;
+using System.Text;
 
 namespace SabakaLang.VM;
 
@@ -17,6 +19,7 @@ public class VirtualMachine
     private readonly Dictionary<string, string> _inheritance = new();
     private readonly TextReader _input;
     private readonly TextWriter _output;
+    private static readonly HttpClient _httpClient = new();
     
     private readonly IReadOnlyDictionary<string, Func<Value[], Value>> _externals;
 
@@ -282,6 +285,57 @@ public class VirtualMachine
                 {
                     var ms = (int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % int.MaxValue);
                     _stack.Push(Value.FromInt(ms));
+                    break;
+                }
+
+                case OpCode.HttpGet:
+                {
+                    var url = _stack.Pop().String;
+                    try
+                    {
+                        var response = _httpClient.GetStringAsync(url).GetAwaiter().GetResult();
+                        _stack.Push(Value.FromString(response));
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"httpGet failed: {ex.Message}");
+                    }
+                    break;
+                }
+
+                case OpCode.HttpPost:
+                {
+                    var body = _stack.Pop().String;
+                    var url = _stack.Pop().String;
+                    try
+                    {
+                        var content = new StringContent(body, Encoding.UTF8, "text/plain");
+                        var response = _httpClient.PostAsync(url, content).GetAwaiter().GetResult();
+                        var result = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                        _stack.Push(Value.FromString(result));
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"httpPost failed: {ex.Message}");
+                    }
+                    break;
+                }
+
+                case OpCode.HttpPostJson:
+                {
+                    var json = _stack.Pop().String;
+                    var url = _stack.Pop().String;
+                    try
+                    {
+                        var content = new StringContent(json, Encoding.UTF8, "application/json");
+                        var response = _httpClient.PostAsync(url, content).GetAwaiter().GetResult();
+                        var result = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                        _stack.Push(Value.FromString(result));
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"httpPostJson failed: {ex.Message}");
+                    }
                     break;
                 }
 

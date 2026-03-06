@@ -40,6 +40,9 @@ public class SemanticAnalyzer
         Declare("readLines", SymbolKind.BuiltIn, "string", 0, 0);
         Declare("time", SymbolKind.BuiltIn, "string", 0, 0);
         Declare("timeMs", SymbolKind.BuiltIn, "int", 0, 0);
+        Declare("httpGet", SymbolKind.BuiltIn, "string", 0, 0);
+        Declare("httpPost", SymbolKind.BuiltIn, "string", 0, 0);
+        Declare("httpPostJson", SymbolKind.BuiltIn, "string", 0, 0);
     }
     
     public void AddImportedSymbols(DocumentUri uri, List<Symbol> symbols)

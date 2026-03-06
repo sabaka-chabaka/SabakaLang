@@ -491,6 +491,35 @@ public class Compiler
                 return;
             }
 
+            if (call.Target == null && call.Name == "httpGet")
+            {
+                if (call.Arguments.Count != 1)
+                    throw new CompilerException("httpGet expects 1 argument (url)", 0);
+                Emit(call.Arguments[0]);
+                _instructions.Add(new Instruction(OpCode.HttpGet));
+                return;
+            }
+
+            if (call.Target == null && call.Name == "httpPost")
+            {
+                if (call.Arguments.Count != 2)
+                    throw new CompilerException("httpPost expects 2 arguments (url, body)", 0);
+                Emit(call.Arguments[0]);
+                Emit(call.Arguments[1]);
+                _instructions.Add(new Instruction(OpCode.HttpPost));
+                return;
+            }
+
+            if (call.Target == null && call.Name == "httpPostJson")
+            {
+                if (call.Arguments.Count != 2)
+                    throw new CompilerException("httpPostJson expects 2 arguments (url, json)", 0);
+                Emit(call.Arguments[0]);
+                Emit(call.Arguments[1]);
+                _instructions.Add(new Instruction(OpCode.HttpPostJson));
+                return;
+            }
+
             if (call.Target == null && _externalFunctions.TryGetValue(call.Name, out var extInfo))
             {
                 if (call.Arguments.Count != extInfo.ParamCount)
