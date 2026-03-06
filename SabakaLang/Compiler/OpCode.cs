@@ -51,5 +51,7 @@ public enum OpCode
     AppendFile,
     FileExists,
     DeleteFile,
-    ReadLines
+    ReadLines,
+    Time,
+    TimeMs
 }

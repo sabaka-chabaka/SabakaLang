@@ -38,6 +38,8 @@ public class SemanticAnalyzer
         Declare("fileExists", SymbolKind.BuiltIn, "bool", 0, 0);
         Declare("deleteFile", SymbolKind.BuiltIn, "void", 0, 0);
         Declare("readLines", SymbolKind.BuiltIn, "string", 0, 0);
+        Declare("time", SymbolKind.BuiltIn, "string", 0, 0);
+        Declare("timeMs", SymbolKind.BuiltIn, "int", 0, 0);
     }
     
     public void AddImportedSymbols(DocumentUri uri, List<Symbol> symbols)

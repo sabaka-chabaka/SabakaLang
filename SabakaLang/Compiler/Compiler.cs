@@ -475,6 +475,22 @@ public class Compiler
                 return;
             }
 
+            if (call.Target == null && call.Name == "time")
+            {
+                if (call.Arguments.Count != 0)
+                    throw new CompilerException("time expects no arguments", 0);
+                _instructions.Add(new Instruction(OpCode.Time));
+                return;
+            }
+
+            if (call.Target == null && call.Name == "timeMs")
+            {
+                if (call.Arguments.Count != 0)
+                    throw new CompilerException("timeMs expects no arguments", 0);
+                _instructions.Add(new Instruction(OpCode.TimeMs));
+                return;
+            }
+
             if (call.Target == null && _externalFunctions.TryGetValue(call.Name, out var extInfo))
             {
                 if (call.Arguments.Count != extInfo.ParamCount)

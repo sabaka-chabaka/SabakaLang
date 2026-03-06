@@ -271,6 +271,20 @@ public class VirtualMachine
                     break;
                 }
 
+                case OpCode.Time:
+                {
+                    var ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    _stack.Push(Value.FromFloat(ms / 1000.0));
+                    break;
+                }
+
+                case OpCode.TimeMs:
+                {
+                    var ms = (int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % int.MaxValue);
+                    _stack.Push(Value.FromInt(ms));
+                    break;
+                }
+
                 case OpCode.LoadField:
                 {
                     var obj = _stack.Pop();
