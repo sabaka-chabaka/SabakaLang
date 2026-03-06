@@ -208,10 +208,6 @@ public class Lexer
                     tokens.Add(new Token(TokenType.RBracket, "]", start, start + 1));
                     break;
 
-                case '%':
-                    tokens.Add(new Token(TokenType.Percent, "%", start, start + 1));
-                    break;
-                
                 
                 default:
                     if (!isIde)
@@ -325,7 +321,27 @@ public class Lexer
 
         while (Current != '"' && Current != '\0')
         {
-            sb.Append(Current);
+            if (Current == '\\')
+            {
+                Advance();
+                switch (Current)
+                {
+                    case '"':  sb.Append('"');  break;
+                    case '\\': sb.Append('\\'); break;
+                    case 'n':  sb.Append('\n'); break;
+                    case 'r':  sb.Append('\r'); break;
+                    case 't':  sb.Append('\t'); break;
+                    case '0':  sb.Append('\0'); break;
+                    default:
+                        sb.Append('\\');
+                        sb.Append(Current);
+                        break;
+                }
+            }
+            else
+            {
+                sb.Append(Current);
+            }
             Advance();
         }
 
