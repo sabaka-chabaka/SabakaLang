@@ -45,5 +45,11 @@ public enum OpCode
     Input,
     CallExternal,
     Sleep,
-    Percent
+    Percent,
+    ReadFile,
+    WriteFile,
+    AppendFile,
+    FileExists,
+    DeleteFile,
+    ReadLines
 }

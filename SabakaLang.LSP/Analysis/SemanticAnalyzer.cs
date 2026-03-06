@@ -28,9 +28,16 @@ public class SemanticAnalyzer
 
     private void InitializeGlobalScope()
     {
+        // "readFile", "writeFile", "appendFile", "fileExists", "deleteFile", "readLines"
         Declare("print", SymbolKind.BuiltIn, "void", 0, 0);
         Declare("sleep", SymbolKind.BuiltIn, "void", 0, 0);
         Declare("input", SymbolKind.BuiltIn, "string", 0, 0);
+        Declare("readFile", SymbolKind.BuiltIn, "string", 0, 0);
+        Declare("writeFile", SymbolKind.BuiltIn, "void", 0, 0);
+        Declare("appendFile", SymbolKind.BuiltIn, "void", 0, 0);
+        Declare("fileExists", SymbolKind.BuiltIn, "bool", 0, 0);
+        Declare("deleteFile", SymbolKind.BuiltIn, "void", 0, 0);
+        Declare("readLines", SymbolKind.BuiltIn, "string", 0, 0);
     }
     
     public void AddImportedSymbols(DocumentUri uri, List<Symbol> symbols)

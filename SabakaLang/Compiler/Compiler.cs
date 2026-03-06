@@ -390,10 +390,6 @@ public class Compiler
                 case TokenType.LessEqual:
                     _instructions.Add(new Instruction(OpCode.LessEqual));
                     break;
-                
-                case TokenType.Percent:
-                    _instructions.Add(new Instruction(OpCode.Percent));
-                    break;
             }
         }
         else if (expr is CallExpr call)
@@ -419,6 +415,63 @@ public class Compiler
             if (call.Target == null && call.Name == "input")
             {
                 _instructions.Add(new Instruction(OpCode.Input));
+                return;
+            }
+
+            // File IO builtins
+            if (call.Target == null && call.Name == "readFile")
+            {
+                if (call.Arguments.Count != 1)
+                    throw new CompilerException("readFile expects 1 argument (path)", 0);
+                Emit(call.Arguments[0]);
+                _instructions.Add(new Instruction(OpCode.ReadFile));
+                return;
+            }
+
+            if (call.Target == null && call.Name == "writeFile")
+            {
+                if (call.Arguments.Count != 2)
+                    throw new CompilerException("writeFile expects 2 arguments (path, content)", 0);
+                Emit(call.Arguments[0]);
+                Emit(call.Arguments[1]);
+                _instructions.Add(new Instruction(OpCode.WriteFile));
+                return;
+            }
+
+            if (call.Target == null && call.Name == "appendFile")
+            {
+                if (call.Arguments.Count != 2)
+                    throw new CompilerException("appendFile expects 2 arguments (path, content)", 0);
+                Emit(call.Arguments[0]);
+                Emit(call.Arguments[1]);
+                _instructions.Add(new Instruction(OpCode.AppendFile));
+                return;
+            }
+
+            if (call.Target == null && call.Name == "fileExists")
+            {
+                if (call.Arguments.Count != 1)
+                    throw new CompilerException("fileExists expects 1 argument (path)", 0);
+                Emit(call.Arguments[0]);
+                _instructions.Add(new Instruction(OpCode.FileExists));
+                return;
+            }
+
+            if (call.Target == null && call.Name == "deleteFile")
+            {
+                if (call.Arguments.Count != 1)
+                    throw new CompilerException("deleteFile expects 1 argument (path)", 0);
+                Emit(call.Arguments[0]);
+                _instructions.Add(new Instruction(OpCode.DeleteFile));
+                return;
+            }
+
+            if (call.Target == null && call.Name == "readLines")
+            {
+                if (call.Arguments.Count != 1)
+                    throw new CompilerException("readLines expects 1 argument (path)", 0);
+                Emit(call.Arguments[0]);
+                _instructions.Add(new Instruction(OpCode.ReadLines));
                 return;
             }
 

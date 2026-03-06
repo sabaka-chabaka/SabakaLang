@@ -163,13 +163,6 @@ public class VirtualMachine
                     if (_stack.Count < 2) throw new Exception("Stack empty in Div");
                     BinaryNumeric((a, b) => a / b);
                     break;
-                
-                case OpCode.Percent:
-                {
-                    if (_stack.Count < 2) throw new Exception("Stack empty in Percent");
-                    BinaryNumeric((a, b) => a % b);
-                    break;
-                }
 
                 case OpCode.Store:
                 {
@@ -223,6 +216,58 @@ public class VirtualMachine
                     {
                         _stack.Push(Value.FromString(line));
                     }
+                    break;
+                }
+
+                case OpCode.ReadFile:
+                {
+                    var path = _stack.Pop().String;
+                    if (!File.Exists(path))
+                        throw new Exception($"File not found: {path}");
+                    _stack.Push(Value.FromString(File.ReadAllText(path)));
+                    break;
+                }
+
+                case OpCode.WriteFile:
+                {
+                    var content = _stack.Pop().String;
+                    var path = _stack.Pop().String;
+                    File.WriteAllText(path, content);
+                    break;
+                }
+
+                case OpCode.AppendFile:
+                {
+                    var content = _stack.Pop().String;
+                    var path = _stack.Pop().String;
+                    File.AppendAllText(path, content);
+                    break;
+                }
+
+                case OpCode.FileExists:
+                {
+                    var path = _stack.Pop().String;
+                    _stack.Push(Value.FromBool(File.Exists(path)));
+                    break;
+                }
+
+                case OpCode.DeleteFile:
+                {
+                    var path = _stack.Pop().String;
+                    if (File.Exists(path))
+                        File.Delete(path);
+                    break;
+                }
+
+                case OpCode.ReadLines:
+                {
+                    var path = _stack.Pop().String;
+                    if (!File.Exists(path))
+                        throw new Exception($"File not found: {path}");
+                    var lines = File.ReadAllLines(path)
+                        .Select(Value.FromString)
+                        .ToList();
+                    _stack.Push(Value.FromArray(lines));
                     break;
                 }
 
@@ -371,19 +416,11 @@ public class VirtualMachine
                     var index = _stack.Pop();
                     var array = _stack.Pop();
 
-                    if (index.Type != SabakaType.Int)
-                        throw new Exception("Index must be int");
-
-                    if (array.Type == SabakaType.String)
-                    {
-                        if (index.Int < 0 || index.Int >= array.String.Length)
-                            throw new Exception($"String index {index.Int} out of range");
-                        _stack.Push(Value.FromString(array.String[index.Int].ToString()));
-                        break;
-                    }
-
                     if (array.Type != SabakaType.Array)
                         throw new Exception("Not an array");
+
+                    if (index.Type != SabakaType.Int)
+                        throw new Exception("Index must be int");
 
                     _stack.Push(array.Array![index.Int]);
                     break;
@@ -628,10 +665,7 @@ public class VirtualMachine
                 {
                     var arr = _stack.Pop();
 
-                    if (arr.Type == SabakaType.String)
-                        _stack.Push(Value.FromInt(arr.String?.Length ?? 0));
-                    else
-                        _stack.Push(Value.FromInt(arr.Array!.Count));
+                    _stack.Push(Value.FromInt(arr.Array!.Count));
                     break;
                 }
 
