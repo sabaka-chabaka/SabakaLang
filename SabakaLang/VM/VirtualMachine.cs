@@ -207,18 +207,7 @@ public class VirtualMachine
                 case OpCode.Input:
                 {
                     var line = _input.ReadLine() ?? "";
-                    if (int.TryParse(line, out int intVal))
-                    {
-                        _stack.Push(Value.FromInt(intVal));
-                    }
-                    else if (double.TryParse(line, NumberStyles.Float, CultureInfo.InvariantCulture, out double floatVal))
-                    {
-                        _stack.Push(Value.FromFloat(floatVal));
-                    }
-                    else
-                    {
-                        _stack.Push(Value.FromString(line));
-                    }
+                    _stack.Push(Value.FromString(line));
                     break;
                 }
 
