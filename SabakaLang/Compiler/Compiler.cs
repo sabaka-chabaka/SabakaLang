@@ -520,6 +520,24 @@ public class Compiler
                 return;
             }
 
+            if (call.Target == null && call.Name == "ord")
+            {
+                if (call.Arguments.Count != 1)
+                    throw new CompilerException("ord expects 1 argument (string)", 0);
+                Emit(call.Arguments[0]);
+                _instructions.Add(new Instruction(OpCode.Ord));
+                return;
+            }
+
+            if (call.Target == null && call.Name == "chr")
+            {
+                if (call.Arguments.Count != 1)
+                    throw new CompilerException("chr expects 1 argument (int)", 0);
+                Emit(call.Arguments[0]);
+                _instructions.Add(new Instruction(OpCode.Chr));
+                return;
+            }
+
             if (call.Target == null && _externalFunctions.TryGetValue(call.Name, out var extInfo))
             {
                 if (call.Arguments.Count != extInfo.ParamCount)

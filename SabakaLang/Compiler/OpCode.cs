@@ -56,5 +56,7 @@ public enum OpCode
     TimeMs,
     HttpGet,
     HttpPost,
-    HttpPostJson
+    HttpPostJson,
+    Ord,
+    Chr
 }

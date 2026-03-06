@@ -330,6 +330,22 @@ public class VirtualMachine
                     break;
                 }
 
+                case OpCode.Ord:
+                {
+                    var s = _stack.Pop().String;
+                    if (string.IsNullOrEmpty(s))
+                        throw new Exception("ord: empty string");
+                    _stack.Push(Value.FromInt((int)s[0]));
+                    break;
+                }
+
+                case OpCode.Chr:
+                {
+                    var code = _stack.Pop().Int;
+                    _stack.Push(Value.FromString(((char)code).ToString()));
+                    break;
+                }
+
                 case OpCode.LoadField:
                 {
                     var obj = _stack.Pop();

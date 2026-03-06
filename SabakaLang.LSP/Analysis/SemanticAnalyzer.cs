@@ -43,6 +43,8 @@ public class SemanticAnalyzer
         Declare("httpGet", SymbolKind.BuiltIn, "string", 0, 0);
         Declare("httpPost", SymbolKind.BuiltIn, "string", 0, 0);
         Declare("httpPostJson", SymbolKind.BuiltIn, "string", 0, 0);
+        Declare("ord", SymbolKind.BuiltIn, "string", 0, 0);
+        Declare("chr", SymbolKind.BuiltIn, "string", 0, 0);
     }
     
     public void AddImportedSymbols(DocumentUri uri, List<Symbol> symbols)
