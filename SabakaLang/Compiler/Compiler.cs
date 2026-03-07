@@ -24,6 +24,18 @@ public class Compiler
     private readonly Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> _externalFunctions = new();
     private readonly Dictionary<string, Value> _externalVariables = new(); // For storing imported variables
 
+    // Namespaced modules: alias -> (functions, variables)
+    private readonly Dictionary<string, (
+        Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> Functions,
+        Dictionary<string, Value> Variables
+    )> _modules = new();
+
+    // Maps "alias.funcname" -> real SabakaLang function name (for .sabaka namespaced imports)
+    private readonly Dictionary<string, string> _moduleSabakaFunctions = new();
+
+    // Top-level constants collected during compilation (for module variable access)
+    private readonly Dictionary<string, Value> _globalConstants = new();
+
     private readonly
         Dictionary<string, (object Instance, Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> Methods
             )> _externalClasses = new();
@@ -538,6 +550,37 @@ public class Compiler
                 return;
             }
 
+            // Module alias call: math.sqrt(x), rng.randomRange(0,10)
+            // First check if it's a .sabaka function (Call opcode)
+            if (call.Target is VariableExpr moduleSabakaVe &&
+                _moduleSabakaFunctions.TryGetValue($"{moduleSabakaVe.Name.ToLower()}.{call.Name.ToLower()}", out var realFuncName))
+            {
+                foreach (var arg in call.Arguments)
+                    Emit(arg);
+                _instructions.Add(new Instruction(OpCode.Call, call.Arguments.Count) { Name = realFuncName });
+                return;
+            }
+
+            // Then check if it's a dll function (CallExternal opcode)
+            if (call.Target is VariableExpr moduleVe &&
+                _modules.TryGetValue(moduleVe.Name.ToLower(), out var mod) &&
+                mod.Functions.TryGetValue(call.Name.ToLower(), out var modFunc))
+            {
+                if (call.Arguments.Count != modFunc.ParamCount)
+                    throw new CompilerException(
+                        $"Module function '{moduleVe.Name}.{call.Name}' expects {modFunc.ParamCount} arguments, got {call.Arguments.Count}",
+                        call.Start);
+
+                foreach (var arg in call.Arguments)
+                    Emit(arg);
+
+                _instructions.Add(new Instruction(OpCode.CallExternal, call.Arguments.Count)
+                {
+                    Name = $"{moduleVe.Name.ToLower()}.{call.Name.ToLower()}"
+                });
+                return;
+            }
+
             if (call.Target == null && _externalFunctions.TryGetValue(call.Name, out var extInfo))
             {
                 if (call.Arguments.Count != extInfo.ParamCount)
@@ -721,6 +764,15 @@ public class Compiler
 
         else if (expr is MemberAccessExpr memberAccess)
         {
+            // Module variable access: math.PI, rng.seed
+            if (memberAccess.Object is VariableExpr modVarExpr &&
+                _modules.TryGetValue(modVarExpr.Name.ToLower(), out var modVars) &&
+                modVars.Variables.TryGetValue(memberAccess.Member.ToLower(), out var modVarValue))
+            {
+                _instructions.Add(new Instruction(OpCode.Push) { Operand = modVarValue });
+                return;
+            }
+
             if (memberAccess.Object is VariableExpr varExpr && _enums.ContainsKey(varExpr.Name))
             {
                 var enumValues = _enums[varExpr.Name];
@@ -902,6 +954,16 @@ public class Compiler
             }
 
             // Check if this is an external variable from an imported DLL
+            // Module alias variable: math.PI, rng.seed
+            // This case is handled via MemberAccessExpr below, but guard here too
+            if (_modules.TryGetValue(variable.Name.ToLower(), out _))
+            {
+                // Bare module alias used as expression — push null/zero placeholder
+                // Real value access is via MemberAccessExpr: math.PI
+                _instructions.Add(new Instruction(OpCode.Push) { Operand = Value.FromInt(0) });
+                return;
+            }
+
             if (_externalVariables.TryGetValue(variable.Name.ToLower(), out var externalValue))
             {
                 _instructions.Add(new Instruction(OpCode.Push, externalValue));
@@ -1399,48 +1461,51 @@ public class Compiler
 
     private void HandleImport(ImportStatement import)
     {
-        string extension = Path.GetExtension(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), Path.GetFileName(import.FilePath))).ToLowerInvariant();
-        
+        string extension = Path.GetExtension(import.FilePath).ToLowerInvariant();
+
         if (extension == ".dll")
         {
             string dllFileName = Path.GetFileName(import.FilePath);
-            string dllPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), dllFileName);
-        
-            dllPath = Path.GetFullPath(dllPath);
+
+            // Look next to script first, then next to exe
+            string scriptDir = Path.GetDirectoryName(_currentFilePath) ?? Directory.GetCurrentDirectory();
+            string dllPathNearScript = Path.GetFullPath(Path.Combine(scriptDir, dllFileName));
+            string dllPathNearExe    = Path.GetFullPath(Path.Combine(_executableDirectory, dllFileName));
+
+            string dllPath = File.Exists(dllPathNearScript) ? dllPathNearScript : dllPathNearExe;
 
             if (_importedFiles.Contains(dllPath))
                 return;
 
             if (!File.Exists(dllPath))
-                throw new CompilerException($"Import DLL not found in executable directory: {dllFileName}. Directory: {dllPath}", import.Start);
+                throw new CompilerException(
+                    "Import DLL not found: '" + dllFileName + "'. Looked in:\n  " + dllPathNearScript + "\n  " + dllPathNearExe,
+                    import.Start);
 
-            LoadDll(dllPath, import.ImportNames);
+            string? alias = import.Alias?.ToLower();
+            if (alias == null)
+                alias = Path.GetFileNameWithoutExtension(dllFileName).ToLower();
+
+            LoadDll(dllPath, import.ImportNames, alias, import.Alias != null);
             _importedFiles.Add(dllPath);
             return;
         }
-        
+
+        // .sabaka file import
         string basePath = Path.GetDirectoryName(_currentFilePath) ?? Directory.GetCurrentDirectory();
         string fullPath = Path.Combine(basePath, import.FilePath);
-
         fullPath = Path.GetFullPath(fullPath);
 
         if (_importedFiles.Contains(fullPath))
-        {
             return;
-        }
 
         if (!File.Exists(fullPath))
-        {
             throw new CompilerException($"Import file not found: {import.FilePath}", import.Start);
-        }
 
         Console.WriteLine($"Loading file: {fullPath}");
-        
-        string source = File.ReadAllText(fullPath);
 
+        string source = File.ReadAllText(fullPath);
         var oldFilePath = _currentFilePath;
-        var oldInstructions = _instructions;
-        var oldFunctions = _functions;
 
         _importedFiles.Add(fullPath); // guard BEFORE recursion
 
@@ -1456,13 +1521,10 @@ public class Compiler
 
         var importedInstructions = importCompiler.Compile(program, fullPath);
 
-        // All addresses in importCompiler are relative to its own instruction list (starting at 0).
-        // After AddRange they need to be offset by the current instruction count.
         int addressOffset = _instructions.Count;
-
         _instructions.AddRange(importedInstructions);
 
-        // Fix up Jump targets inside the imported instructions
+        // Fix up Jump targets
         for (int i = addressOffset; i < _instructions.Count; i++)
         {
             var instr = _instructions[i];
@@ -1476,155 +1538,182 @@ public class Compiler
             }
         }
 
-        foreach (var kv in importCompiler._functions)
+        string? fileAlias = import.Alias?.ToLower();
+
+        if (fileAlias != null)
         {
-            if (!_functions.ContainsKey(kv.Key))
-                _functions[kv.Key] = kv.Value; // compile-time only, VM re-scans
+            // Namespaced: register symbols under alias, not globally
+            var modFuncs = new Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)>();
+            var modVars  = new Dictionary<string, Value>();
+
+            foreach (var kv in importCompiler._functions)
+                modFuncs[kv.Key.ToLower()] = (0, null!); // function addresses resolved at runtime via Call opcode
+
+            // Register as callable module functions using Call opcode redirect
+            // For .sabaka modules we store function names so CallExpr can emit Call (not CallExternal)
+            if (!_modules.ContainsKey(fileAlias))
+                _modules[fileAlias] = (new Dictionary<string, (int, Func<Value[], Value>)>(), new Dictionary<string, Value>());
+
+            // Merge sabaka functions into module as Call-based entries
+            foreach (var kv in importCompiler._functions)
+            {
+                var funcName = kv.Key.ToLower();
+                _moduleSabakaFunctions[$"{fileAlias}.{funcName}"] = kv.Key;
+            }
+
+            // Merge variables
+            foreach (var kv in importCompiler._externalVariables)
+                _modules[fileAlias].Variables[kv.Key.ToLower()] = kv.Value;
+
+            // Also copy top-level Declare instructions' values into module vars at compile time
+            // (global float/int/string constants from the imported file)
+            foreach (var kv in importCompiler._globalConstants)
+                _modules[fileAlias].Variables[kv.Key.ToLower()] = kv.Value;
+        }
+        else
+        {
+            // Global: merge everything as-is (old behaviour)
+            foreach (var kv in importCompiler._functions)
+                if (!_functions.ContainsKey(kv.Key))
+                    _functions[kv.Key] = kv.Value;
+
+            foreach (var kv in importCompiler._classes)
+                if (!_classes.ContainsKey(kv.Key))
+                    _classes[kv.Key] = kv.Value;
+
+            foreach (var kv in importCompiler._genericTemplates)
+                if (!_genericTemplates.ContainsKey(kv.Key))
+                    _genericTemplates[kv.Key] = kv.Value;
+
+            foreach (var kv in importCompiler._externalVariables)
+                if (!_externalVariables.ContainsKey(kv.Key))
+                    _externalVariables[kv.Key] = kv.Value;
+
+            foreach (var kv in importCompiler._globalConstants)
+                if (!_externalVariables.ContainsKey(kv.Key))
+                    _externalVariables[kv.Key] = kv.Value;
         }
 
+        // Classes are always global (variant B)
         foreach (var kv in importCompiler._classes)
-        {
             if (!_classes.ContainsKey(kv.Key))
                 _classes[kv.Key] = kv.Value;
-        }
 
         foreach (var kv in importCompiler._genericTemplates)
-        {
             if (!_genericTemplates.ContainsKey(kv.Key))
                 _genericTemplates[kv.Key] = kv.Value;
-        }
 
-        foreach (var kv in importCompiler._externalVariables)
-        {
-            if (!_externalVariables.ContainsKey(kv.Key))
-                _externalVariables[kv.Key] = kv.Value;
-        }
+        // Merge module sabaka functions
+        foreach (var kv in importCompiler._moduleSabakaFunctions)
+            if (!_moduleSabakaFunctions.ContainsKey(kv.Key))
+                _moduleSabakaFunctions[kv.Key] = kv.Value;
 
-        // Merge imported files so transitive imports aren't loaded twice
+        // Merge modules
+        foreach (var kv in importCompiler._modules)
+            if (!_modules.ContainsKey(kv.Key))
+                _modules[kv.Key] = kv.Value;
+
+        // Merge external functions (dll functions from sub-imports)
+        foreach (var kv in importCompiler._externalFunctions)
+            if (!_externalFunctions.ContainsKey(kv.Key))
+                _externalFunctions[kv.Key] = kv.Value;
+
+        // Merge imported files guard
         foreach (var f in importCompiler._importedFiles)
             _importedFiles.Add(f);
 
         _currentFilePath = oldFilePath;
-        
+
         Console.WriteLine($"Loaded file: {fullPath}");
     }
 
-    private void LoadDll(string fullPath, List<string> importNames = null)
+    private void LoadDll(string fullPath, List<string>? importNames, string alias, bool namespaced)
     {
         Assembly asm;
-        try
-        {
-            asm = Assembly.LoadFrom(fullPath);
-        }
+        try { asm = Assembly.LoadFrom(fullPath); }
         catch (Exception ex)
         {
             throw new CompilerException($"Failed to load DLL '{fullPath}': {ex.Message}", 0);
         }
-        
-        // If importNames is specified, convert to lowercase for comparison
-        var importNamesLower = importNames?.Count > 0 
+
+        var importNamesLower = importNames?.Count > 0
             ? new HashSet<string>(importNames.Select(x => x.ToLower()), StringComparer.OrdinalIgnoreCase)
             : null;
+
+        // Prepare module bucket if namespaced
+        if (namespaced && !_modules.ContainsKey(alias))
+            _modules[alias] = (
+                new Dictionary<string, (int, Func<Value[], Value>)>(),
+                new Dictionary<string, Value>()
+            );
 
         foreach (var type in asm.GetTypes())
         {
             var classAttr = type.GetCustomAttribute<SabakaExportAttribute>();
             if (classAttr == null) continue;
 
-            string className = classAttr.Name.ToLower();
-
-            // Найти конструктор с [SabakaExport] и создать экземпляр
-            var exportedCtor = type.GetConstructors()
-                .FirstOrDefault(c => c.GetParameters().Length == 0);
-
-            object createInstance;
-            try 
-            { 
-                createInstance = Activator.CreateInstance(type)!;
-            }
-            catch (Exception ex)
-            {
-                continue;
-            }
-
-            if (exportedCtor == null) continue;
-
             object instance;
-            try { instance = exportedCtor.Invoke(Array.Empty<object>()); }
-            catch (Exception ex)
-            {
-                throw new CompilerException($"Failed to instantiate '{type.Name}': {ex.Message}", 0);
-            }
+            try { instance = Activator.CreateInstance(type)!; }
+            catch { continue; }
 
-            foreach (var ctor in type.GetConstructors())
-            {
-                var attrs = ctor.GetCustomAttributes().ToList();
-            }
-            
-            // Регистрируем все методы как "classname.methodname"
+            // Register methods
             foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
             {
                 var attr = method.GetCustomAttributes()
                     .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
                 if (attr == null) continue;
 
-                string methodExportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
-                string key = $"{className}.{methodExportName.ToLower()}";
-                
-                // If specific imports are requested, check if this method is in the list
-                if (importNamesLower != null && !importNamesLower.Contains(methodExportName))
+                string exportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
+
+                if (importNamesLower != null && !importNamesLower.Contains(exportName))
                     continue;
-    
-                var parameters = method.GetParameters();
-                int paramCount = parameters.Length;
-                var returnType = method.ReturnType;
-                var capturedInstance = instance;
-                var capturedMethod = method;
+
+                var parameters  = method.GetParameters();
+                int paramCount  = parameters.Length;
+                var returnType  = method.ReturnType;
+                var capInstance = instance;
+                var capMethod   = method;
 
                 Func<Value[], Value> wrapper = (args) =>
                 {
-                    try
-                    {
-                        object?[] converted = new object?[paramCount];
-                        for (int i = 0; i < paramCount; i++)
-                            converted[i] = ConvertValueToNative(args[i], parameters[i].ParameterType);
-                        var result = capturedMethod.Invoke(capturedInstance, converted);
-                        return ConvertNativeToValue(result, returnType);
-                    }
-                    catch (TargetInvocationException ex)
-                    {
-                        throw ex.InnerException ?? ex;
-                    }
+                    object?[] converted = new object?[paramCount];
+                    for (int i = 0; i < paramCount; i++)
+                        converted[i] = ConvertValueToNative(args[i], parameters[i].ParameterType);
+                    var result = capMethod.Invoke(capInstance, converted);
+                    return ConvertNativeToValue(result, returnType);
                 };
 
-                _externalFunctions[key] = (paramCount, wrapper);
+                if (namespaced)
+                {
+                    string key = exportName.ToLower();
+                    _modules[alias].Functions[key] = (paramCount, wrapper);
+                    // Also register under "alias.name" in _externalFunctions so CallExternal opcode finds it
+                    _externalFunctions[$"{alias}.{key}"] = (paramCount, wrapper);
+                }
+                else
+                {
+                    string key = $"{classAttr.Name.ToLower()}.{exportName.ToLower()}";
+                    _externalFunctions[key] = (paramCount, wrapper);
+                }
             }
 
-            // Регистрируем все публичные свойства и поля с SabakaExportAttribute
-            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
+            // Register properties/fields as variables
+            foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
             {
-                var attr = property.GetCustomAttributes()
+                var attr = prop.GetCustomAttributes()
                     .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
                 if (attr == null) continue;
 
-                string varExportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
-                
-                // If specific imports are requested, check if this variable is in the list
-                if (importNamesLower != null && !importNamesLower.Contains(varExportName))
-                    continue;
-                
-                string key = varExportName.ToLower();
+                string exportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
+                if (importNamesLower != null && !importNamesLower.Contains(exportName)) continue;
 
                 try
                 {
-                    object? value = property.GetValue(instance);
-                    Value convertedValue = ConvertNativeToValue(value, property.PropertyType);
-                    _externalVariables[key] = convertedValue;
+                    Value val = ConvertNativeToValue(prop.GetValue(instance), prop.PropertyType);
+                    if (namespaced) _modules[alias].Variables[exportName.ToLower()] = val;
+                    else            _externalVariables[exportName.ToLower()] = val;
                 }
-                catch (Exception ex)
-                {
-                    throw new CompilerException($"Failed to read property '{varExportName}' from '{type.Name}': {ex.Message}", 0);
-                }
+                catch { }
             }
 
             foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
@@ -1633,32 +1722,23 @@ public class Compiler
                     .FirstOrDefault(a => a.GetType().Name == "SabakaExportAttribute");
                 if (attr == null) continue;
 
-                string varExportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
-                
-                // If specific imports are requested, check if this variable is in the list
-                if (importNamesLower != null && !importNamesLower.Contains(varExportName))
-                    continue;
-                
-                string key = varExportName.ToLower();
+                string exportName = (string)attr.GetType().GetProperty("Name")!.GetValue(attr)!;
+                if (importNamesLower != null && !importNamesLower.Contains(exportName)) continue;
 
                 try
                 {
-                    object? value = field.GetValue(instance);
-                    Value convertedValue = ConvertNativeToValue(value, field.FieldType);
-                    _externalVariables[key] = convertedValue;
+                    Value val = ConvertNativeToValue(field.GetValue(instance), field.FieldType);
+                    if (namespaced) _modules[alias].Variables[exportName.ToLower()] = val;
+                    else            _externalVariables[exportName.ToLower()] = val;
                 }
-                catch (Exception ex)
-                {
-                    throw new CompilerException($"Failed to read field '{varExportName}' from '{type.Name}': {ex.Message}", 0);
-                }
+                catch { }
             }
 
-            // Регистрируем сам класс как известный (чтобы new directory() не падал)
-            // Добавляем фейковый класс в _classes через специальный маркер
+            // Classes always global
             if (!_classes.ContainsKey(classAttr.Name))
             {
                 _classes[classAttr.Name] = new ClassDeclaration(
-                    classAttr.Name, null, null, new List<string>(),
+                    classAttr.Name, new List<string>(), null, new List<string>(),
                     new List<VariableDeclaration>(), new List<FunctionDeclaration>());
             }
         }
