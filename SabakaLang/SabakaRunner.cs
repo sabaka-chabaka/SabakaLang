@@ -1,3 +1,5 @@
+using System.IO;
+using SabakaLang.Types;
 using SabakaLang.VM;
 
 namespace SabakaLang;
@@ -23,8 +25,31 @@ public class SabakaRunner
         Console.WriteLine();
         
         var externals = compiler.ExternalDelegates;
-        
+
         var vm = new VirtualMachine(input, output, externals);
+
+        // Wire up InvokeCallback for modules implementing ICallbackReceiver.
+        // We use reflection because Compiler doesn't reference the SDK assembly.
+        // The callback is called on the SCRIPT thread (inside ui.run()) — no threading issues.
+        foreach (object receiver in compiler.CallbackReceivers)
+        {
+            var iface = receiver.GetType().GetInterfaces()
+                .FirstOrDefault(i => i.Name == "ICallbackReceiver");
+            if (iface == null) continue;
+
+            var prop = iface.GetProperty("InvokeCallback");
+            if (prop == null) continue;
+
+            Func<string, string[], string> cb = (funcName, args) =>
+            {
+                Value[] vals = args.Select(Value.FromString).ToArray();
+                vm.CallFunction(funcName, vals);
+                return "";
+            };
+
+            prop.SetValue(receiver, cb);
+        }
+
         vm.Execute(bytecode);
     }
 }

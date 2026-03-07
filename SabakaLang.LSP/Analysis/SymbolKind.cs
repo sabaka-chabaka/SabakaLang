@@ -8,5 +8,6 @@ public enum SymbolKind
     Parameter,
     BuiltIn,
     Method,
-    Field
+    Field,
+    Module   // alias from "import X as alias"
 }

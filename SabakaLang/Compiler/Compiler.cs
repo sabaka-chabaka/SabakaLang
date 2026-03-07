@@ -1,9 +1,12 @@
+using System.Runtime.Loader;
 using SabakaLang.AST;
 using SabakaLang.Exceptions;
 using SabakaLang.Lexer;
 using SabakaLang.Types;
 using System;
+using System.IO;
 using System.Reflection;
+using SabakaLang.SDK;
 
 namespace SabakaLang.Compiler;
 
@@ -23,6 +26,10 @@ public class Compiler
     private string? _currentFilePath;
     private readonly Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> _externalFunctions = new();
     private readonly Dictionary<string, Value> _externalVariables = new(); // For storing imported variables
+
+    // Modules implementing ICallbackReceiver — VM wires InvokeCallback into these
+    private readonly List<object> _callbackReceivers = new();
+    public IReadOnlyList<object> CallbackReceivers => _callbackReceivers;
 
     // Namespaced modules: alias -> (functions, variables)
     private readonly Dictionary<string, (
@@ -1629,11 +1636,24 @@ public class Compiler
 
     private void LoadDll(string fullPath, List<string>? importNames, string alias, bool namespaced)
     {
+        // Use a collectible load context so missing dependencies (e.g. WPF)
+        // return null instead of throwing FileNotFoundException.
+        var alc = new SabakaDllLoadContext(fullPath);
         Assembly asm;
-        try { asm = Assembly.LoadFrom(fullPath); }
+        try { asm = alc.LoadFromAssemblyPath(fullPath); }
         catch (Exception ex)
         {
+            alc.Unload();
             throw new CompilerException($"Failed to load DLL '{fullPath}': {ex.Message}", 0);
+        }
+
+        Type[] dllTypes;
+        try { dllTypes = asm.GetTypes(); }
+        catch (ReflectionTypeLoadException ex) { dllTypes = ex.Types.Where(t => t != null).ToArray()!; }
+        catch (Exception ex)
+        {
+            alc.Unload();
+            throw new CompilerException($"Failed to read types from '{fullPath}': {ex.Message}", 0);
         }
 
         var importNamesLower = importNames?.Count > 0
@@ -1647,14 +1667,28 @@ public class Compiler
                 new Dictionary<string, Value>()
             );
 
-        foreach (var type in asm.GetTypes())
+        foreach (var type in dllTypes)
         {
+            if (type == null) continue;
+            // Accept classes marked with [SabakaExport] OR implementing ISabakaModule
             var classAttr = type.GetCustomAttribute<SabakaExportAttribute>();
-            if (classAttr == null) continue;
+            bool isSabakaModule = type.GetInterfaces()
+                .Any(i => i.Name == "ISabakaModule");
+
+            if (classAttr == null && !isSabakaModule) continue;
+
+            // Derive export name: from attribute, or from class name
+            string exportedClassName = classAttr?.Name ?? type.Name;
+            // Patch: replace exportedClassName usages below with exportedClassName
+
 
             object instance;
             try { instance = Activator.CreateInstance(type)!; }
             catch { continue; }
+
+            // Track modules that implement ICallbackReceiver
+            if (type.GetInterfaces().Any(i => i.Name == "ICallbackReceiver"))
+                _callbackReceivers.Add(instance);
 
             // Register methods
             foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
@@ -1692,7 +1726,7 @@ public class Compiler
                 }
                 else
                 {
-                    string key = $"{classAttr.Name.ToLower()}.{exportName.ToLower()}";
+                    string key = $"{exportedClassName.ToLower()}.{exportName.ToLower()}";
                     _externalFunctions[key] = (paramCount, wrapper);
                 }
             }
@@ -1735,10 +1769,10 @@ public class Compiler
             }
 
             // Classes always global
-            if (!_classes.ContainsKey(classAttr.Name))
+            if (!_classes.ContainsKey(exportedClassName))
             {
-                _classes[classAttr.Name] = new ClassDeclaration(
-                    classAttr.Name, new List<string>(), null, new List<string>(),
+                _classes[exportedClassName] = new ClassDeclaration(
+                    exportedClassName, new List<string>(), null, new List<string>(),
                     new List<VariableDeclaration>(), new List<FunctionDeclaration>());
             }
         }
@@ -1800,5 +1834,40 @@ public class Compiler
             return Value.FromString((string)result);
 
         throw new NotSupportedException($"Conversion from type {returnType} not supported");
+    }
+}
+/// <summary>
+/// Collectible AssemblyLoadContext for loading native DLL libraries.
+/// Returns null for unresolvable dependencies (e.g. PresentationFramework/WPF)
+/// instead of throwing — the runtime then skips affected types via
+/// ReflectionTypeLoadException, which the caller handles gracefully.
+/// </summary>
+internal sealed class SabakaDllLoadContext : System.Runtime.Loader.AssemblyLoadContext
+{
+    private readonly string _dllDir;
+
+    public SabakaDllLoadContext(string dllPath)
+        : base(name: "Sabaka-" + Path.GetFileName(dllPath), isCollectible: true)
+    {
+        _dllDir = Path.GetDirectoryName(dllPath) ?? "";
+    }
+
+    protected override Assembly? Load(AssemblyName name)
+    {
+        // 1. Try next to the imported DLL (e.g. SabakaLang.SDK.dll)
+        string local = Path.Combine(_dllDir, name.Name + ".dll");
+        if (File.Exists(local))
+        {
+            try { return LoadFromAssemblyPath(local); }
+            catch { /* fall through */ }
+        }
+
+        // 2. Try the default context (system / already-loaded assemblies)
+        try { return Default.LoadFromAssemblyName(name); }
+        catch { /* fall through */ }
+
+        // 3. Unknown dep (WPF etc.) — return null, caller catches the
+        //    resulting ReflectionTypeLoadException and skips bad types.
+        return null;
     }
 }

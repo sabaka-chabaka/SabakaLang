@@ -3,7 +3,9 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using SabakaLang.Lexer;
+using SabakaLang.LSP.Analysis;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using SymbolKind = SabakaLang.LSP.Analysis.SymbolKind;
 
 namespace SabakaLang.LSP;
 
@@ -15,41 +17,46 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
     public SemanticTokensHandler(DocumentStore documentStore, SymbolIndex symbolIndex)
     {
         _documentStore = documentStore;
-        _symbolIndex = symbolIndex;
+        _symbolIndex   = symbolIndex;
     }
 
-    protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities)
+    protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(
+        SemanticTokensCapability cap, ClientCapabilities cc) => new()
     {
-        return new SemanticTokensRegistrationOptions
+        DocumentSelector = new TextDocumentSelector(
+            new TextDocumentFilter { Pattern = "**/*.sabaka" },
+            new TextDocumentFilter { Language = "sabaka" }
+        ),
+        Legend = new SemanticTokensLegend
         {
-            DocumentSelector = new TextDocumentSelector(
-                new TextDocumentFilter { Pattern = "**/*.sabaka" },
-                new TextDocumentFilter { Language = "sabaka" }
-            ),
-            Legend = new SemanticTokensLegend
+            TokenTypes = new[]
             {
-                TokenTypes = new[]
-                {
-                    "keyword", "type", "number", "string", "comment", "operator", "variable", "function", "parameter", "class"
-                }.Select(x => new SemanticTokenType(x)).ToArray(),
-                TokenModifiers = new SemanticTokenModifier[0]
-            },
-            Full = true,
-            Range = false
-        };
-    }
+                "keyword", "type", "number", "string", "comment",
+                "operator", "variable", "function", "parameter", "class", "module"
+            }.Select(x => new SemanticTokenType(x)).ToArray(),
+            TokenModifiers = Array.Empty<SemanticTokenModifier>()
+        },
+        Full  = true,
+        Range = false
+    };
 
-    protected override async Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken)
+    protected override async Task Tokenize(SemanticTokensBuilder builder,
+        ITextDocumentIdentifierParams id, CancellationToken ct)
     {
-        var source = _documentStore.GetDocument(identifier.TextDocument.Uri);
+        var source = _documentStore.GetDocument(id.TextDocument.Uri);
         if (source == null) return;
 
-        var lexer = new Lexer.Lexer(source);
-        var tokens = lexer.Tokenize(true); // true to include comments
+        var lexer  = new Lexer.Lexer(source);
+        var tokens = lexer.Tokenize(true);
+
+        // Build a fast lookup of all symbols visible in this document
+        var allSymbols = _symbolIndex
+            .GetAvailableSymbols(id.TextDocument.Uri, int.MaxValue / 2)
+            .ToDictionary(s => s.Name, s => s, StringComparer.Ordinal);
 
         foreach (var token in tokens)
         {
-            var type = MapToken(token, identifier.TextDocument.Uri);
+            var type = ClassifyToken(token, id.TextDocument.Uri, allSymbols);
             if (type != null)
             {
                 var range = PositionHelper.GetRange(source, token.TokenStart, token.TokenEnd);
@@ -58,86 +65,77 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
         }
     }
 
-    protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(new SemanticTokensDocument(RegistrationOptions.Legend));
-    }
+    protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(
+        ITextDocumentIdentifierParams id, CancellationToken ct) =>
+        Task.FromResult(new SemanticTokensDocument(RegistrationOptions.Legend));
 
-    private string? MapToken(Token token, DocumentUri uri)
+    private string? ClassifyToken(Token token, DocumentUri uri,
+        Dictionary<string, Symbol> symbols)
     {
         if (token.Type == TokenType.Identifier)
         {
-            if (token.Value == "print" || token.Value == "input" || token.Value == "sleep")
+            // Check module alias first
+            var moduleMembers = _symbolIndex
+                .GetModuleMembers(uri, token.Value.ToLower())
+                .ToList();
+            if (moduleMembers.Count > 0) return "module";
+
+            if (symbols.TryGetValue(token.Value, out var sym))
+                return SymbolKindToTokenType(sym.Kind);
+
+            // Built-in functions
+            if (token.Value is "print" or "input" or "sleep" or
+                "readFile" or "writeFile" or "appendFile" or
+                "fileExists" or "deleteFile" or "readLines" or
+                "time" or "timeMs" or "httpGet" or "httpPost" or
+                "httpPostJson" or "ord" or "chr")
                 return "function";
-
-            if (token.Value == "makedir") // временный дебаг
-            {
-                var all = _symbolIndex.GetAllSymbols().ToList();
-                File.AppendAllText("D:\\sabaka_debug.txt", 
-                    $"makedir search: total symbols={all.Count}, " +
-                    $"found={all.Any(s => s.Name == "makedir")}\n" +
-                    $"all names: {string.Join(", ", all.Select(s => s.Name))}\n");
-            }
-
-            var symbols = _symbolIndex.GetAvailableSymbols(uri, token.TokenStart);
-            var symbol = symbols.FirstOrDefault(s => s.Name == token.Value);
-        
-            if (symbol == null)
-                symbol = _symbolIndex.GetAllSymbols().FirstOrDefault(s => s.Name == token.Value);
-
-            if (symbol != null)
-                return MapSymbolKindToTokenType(symbol.Kind);
         }
 
         return MapTokenType(token.Type);
     }
 
-    private string? MapSymbolKindToTokenType(SabakaLang.LSP.Analysis.SymbolKind kind)
+    private static string SymbolKindToTokenType(SymbolKind k) => k switch
     {
-        return kind switch
-        {
-            SabakaLang.LSP.Analysis.SymbolKind.Variable => "variable",
-            SabakaLang.LSP.Analysis.SymbolKind.Function => "function",
-            SabakaLang.LSP.Analysis.SymbolKind.Class => "class",
-            SabakaLang.LSP.Analysis.SymbolKind.Parameter => "parameter",
-            SabakaLang.LSP.Analysis.SymbolKind.BuiltIn => "function",
-            SabakaLang.LSP.Analysis.SymbolKind.Method => "function",
-            SabakaLang.LSP.Analysis.SymbolKind.Field => "variable",
-            _ => null
-        };
-    }
+        SymbolKind.Variable  => "variable",
+        SymbolKind.Function  => "function",
+        SymbolKind.Class     => "class",
+        SymbolKind.Parameter => "parameter",
+        SymbolKind.BuiltIn   => "function",
+        SymbolKind.Method    => "function",
+        SymbolKind.Field     => "variable",
+        SymbolKind.Module    => "module",
+        _                   => "variable"
+    };
 
-    private string? MapTokenType(TokenType type)
+    private static string? MapTokenType(TokenType t) => t switch
     {
-        return type switch
-        {
-            TokenType.BoolKeyword or TokenType.True or TokenType.False or 
-            TokenType.If or TokenType.Else or TokenType.While or TokenType.For or 
-            TokenType.Enum or TokenType.Function or TokenType.Return or 
-            TokenType.VoidKeyword or TokenType.Foreach or TokenType.In or 
-            TokenType.StructKeyword or TokenType.Class or TokenType.New or 
-            TokenType.Override or TokenType.Super or TokenType.Interface or 
-            TokenType.Switch or TokenType.Case or TokenType.Default or 
-            TokenType.Public or TokenType.Private or TokenType.Protected or 
-            TokenType.Import => "keyword",
+        TokenType.BoolKeyword or TokenType.True or TokenType.False or
+        TokenType.If or TokenType.Else or TokenType.While or TokenType.For or
+        TokenType.Enum or TokenType.Function or TokenType.Return or
+        TokenType.VoidKeyword or TokenType.Foreach or TokenType.In or
+        TokenType.StructKeyword or TokenType.Class or TokenType.New or
+        TokenType.Override or TokenType.Super or TokenType.Interface or
+        TokenType.Switch or TokenType.Case or TokenType.Default or
+        TokenType.Public or TokenType.Private or TokenType.Protected or
+        TokenType.Import => "keyword",
 
-            TokenType.IntKeyword or TokenType.FloatKeyword or 
-            TokenType.StringKeyword => "type",
+        TokenType.IntKeyword or TokenType.FloatKeyword or
+        TokenType.StringKeyword => "type",
 
-            TokenType.IntLiteral or TokenType.Number or TokenType.FloatLiteral => "number",
+        TokenType.IntLiteral or TokenType.Number or TokenType.FloatLiteral => "number",
 
-            TokenType.StringLiteral => "string",
+        TokenType.StringLiteral => "string",
 
-            TokenType.Comment => "comment",
+        TokenType.Comment => "comment",
 
-            TokenType.Plus or TokenType.Minus or TokenType.Star or TokenType.Slash or TokenType.Percent or 
-            TokenType.Equal or TokenType.EqualEqual or TokenType.NotEqual or 
-            TokenType.Greater or TokenType.Less or TokenType.GreaterEqual or 
-            TokenType.LessEqual or TokenType.Dot or TokenType.AndAnd or 
-            TokenType.OrOr or TokenType.Bang or TokenType.Colon or 
-            TokenType.ColonColon => "operator",
+        TokenType.Plus or TokenType.Minus or TokenType.Star or
+        TokenType.Slash or TokenType.Percent or TokenType.Equal or
+        TokenType.EqualEqual or TokenType.NotEqual or TokenType.Greater or
+        TokenType.Less or TokenType.GreaterEqual or TokenType.LessEqual or
+        TokenType.Dot or TokenType.AndAnd or TokenType.OrOr or
+        TokenType.Bang or TokenType.Colon or TokenType.ColonColon => "operator",
 
-            _ => null
-        };
-    }
+        _ => null
+    };
 }

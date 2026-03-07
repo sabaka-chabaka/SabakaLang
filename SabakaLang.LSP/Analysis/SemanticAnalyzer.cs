@@ -1,375 +1,350 @@
-using OmniSharp.Extensions.LanguageServer.Protocol;
 using SabakaLang.AST;
-using SabakaLang.Exceptions;
 using SabakaLang.Lexer;
 
 namespace SabakaLang.LSP.Analysis;
 
+/// <summary>
+/// Walks the AST of a single file, collecting symbols.
+/// Imported symbols are injected before Analyze() via AddGlobalSymbols / AddModuleSymbols.
+/// </summary>
 public class SemanticAnalyzer
 {
     private Scope _currentScope;
     private readonly Scope _globalScope;
     private readonly List<Expr> _ast;
-    private readonly List<Symbol> _allSymbols = new();
+    private readonly List<Symbol> _collected = new();
     private readonly Stack<(int start, int end)> _scopeRanges = new();
-    private string? _currentParent = null;
+    private string? _currentClass = null;
 
-    public IEnumerable<Symbol> AllSymbols => _allSymbols;
-    public IEnumerable<Symbol> GlobalSymbols => _globalScope.Symbols;
-    private readonly Dictionary<string, List<Symbol>> _importedSymbols = new();  // ДОБАВИТЬ ЭТУ СТРОКУ
+    // alias -> list of symbols from that module (for dot-completion)
+    private readonly Dictionary<string, List<Symbol>> _modules = new();
+
+    public IReadOnlyList<Symbol> AllSymbols => _collected;
+    public IReadOnlyDictionary<string, List<Symbol>> Modules => _modules;
 
     public SemanticAnalyzer(List<Expr> ast)
     {
         _ast = ast;
         _globalScope = new Scope();
         _currentScope = _globalScope;
-        InitializeGlobalScope();
+        RegisterBuiltIns();
     }
 
-    private void InitializeGlobalScope()
+    // ── injection API ─────────────────────────────────────────────────────────
+
+    /// <summary>Global import (no alias): symbols go into global scope.</summary>
+    public void AddGlobalSymbols(IEnumerable<Symbol> symbols)
     {
-        // "readFile", "writeFile", "appendFile", "fileExists", "deleteFile", "readLines"
-        Declare("print", SymbolKind.BuiltIn, "void", 0, 0);
-        Declare("sleep", SymbolKind.BuiltIn, "void", 0, 0);
-        Declare("input", SymbolKind.BuiltIn, "string", 0, 0);
-        Declare("readFile", SymbolKind.BuiltIn, "string", 0, 0);
-        Declare("writeFile", SymbolKind.BuiltIn, "void", 0, 0);
-        Declare("appendFile", SymbolKind.BuiltIn, "void", 0, 0);
-        Declare("fileExists", SymbolKind.BuiltIn, "bool", 0, 0);
-        Declare("deleteFile", SymbolKind.BuiltIn, "void", 0, 0);
-        Declare("readLines", SymbolKind.BuiltIn, "string", 0, 0);
-        Declare("time", SymbolKind.BuiltIn, "string", 0, 0);
-        Declare("timeMs", SymbolKind.BuiltIn, "int", 0, 0);
-        Declare("httpGet", SymbolKind.BuiltIn, "string", 0, 0);
-        Declare("httpPost", SymbolKind.BuiltIn, "string", 0, 0);
-        Declare("httpPostJson", SymbolKind.BuiltIn, "string", 0, 0);
-        Declare("ord", SymbolKind.BuiltIn, "string", 0, 0);
-        Declare("chr", SymbolKind.BuiltIn, "string", 0, 0);
-    }
-    
-    public void AddImportedSymbols(DocumentUri uri, List<Symbol> symbols)
-    {
-        var key = uri.ToString();
-        _importedSymbols[key] = symbols;
-    
-        // Добавляем импортированные символы в глобальную область видимости
-        foreach (var symbol in symbols)
+        foreach (var s in symbols)
         {
-            if (symbol.ScopeStart == 0 && symbol.ScopeEnd == int.MaxValue) // Только глобальные символы
-            {
-                _globalScope.Declare(symbol);
-            }
+            var gs = new Symbol(s.Name, s.Kind, s.Type, s.Start, s.End,
+                0, int.MaxValue, s.ParentName, s.SourceFile, s.Parameters, moduleAlias: null);
+            _globalScope.Declare(gs);
+            _collected.Add(gs);
         }
     }
 
-    private bool Declare(string name, SymbolKind kind, string type, int start, int end, 
-        int scopeStart = 0, int scopeEnd = int.MaxValue, string? parentName = null, string? parameters = null)
+    /// <summary>Namespaced import (with alias): symbols go into module dict only.</summary>
+    public void AddModuleSymbols(string alias, IEnumerable<Symbol> symbols)
     {
-        var symbol = new Symbol(name, kind, type, start, end, scopeStart, scopeEnd, parentName, sourceFile: null, parameters: parameters);
-        if (!_currentScope.Declare(symbol))
-            return false;
-        _allSymbols.Add(symbol);
-        return true;
+        if (!_modules.ContainsKey(alias))
+            _modules[alias] = new List<Symbol>();
+
+        foreach (var s in symbols)
+        {
+            var ms = new Symbol(s.Name, s.Kind, s.Type, s.Start, s.End,
+                0, int.MaxValue, s.ParentName, s.SourceFile, s.Parameters, moduleAlias: alias);
+            _modules[alias].Add(ms);
+        }
+
+        // Also register the alias name itself as a Module symbol so hover/completion knows it
+        var aliasSym = new Symbol(alias, SymbolKind.Module, alias, 0, 0,
+            0, int.MaxValue, null, null, null, null);
+        _globalScope.ForceReplace(aliasSym);
+        _collected.RemoveAll(s => s.Name == alias && s.Kind == SymbolKind.Module);
+        _collected.Add(aliasSym);
     }
 
-    private (int start, int end) CurrentScopeRange => _scopeRanges.Count > 0 ? _scopeRanges.Peek() : (0, int.MaxValue);
+    // ── main entry ────────────────────────────────────────────────────────────
 
     public void Analyze()
     {
-        // First pass: Register global declarations and collect imports
+        // Pass 1: hoist top-level declarations so forward-refs work
         foreach (var expr in _ast)
         {
-            if (expr is ImportStatement import) 
-            {
-                continue;
-            }
-            RegisterGlobal(expr);
+            if (expr is ImportStatement) continue;
+            HoistGlobal(expr);
         }
-
-        // Second pass: Analyze bodies and expressions
+        // Pass 2: full analysis
         foreach (var expr in _ast)
         {
-            if (expr is ImportStatement) 
-                continue;
+            if (expr is ImportStatement) continue;
             AnalyzeExpr(expr);
         }
     }
 
-    private void RegisterGlobal(Expr expr)
+    // ── built-ins ─────────────────────────────────────────────────────────────
+
+    private void RegisterBuiltIns()
+    {
+        void B(string name, string ret, string? parms = null) =>
+            Declare(name, SymbolKind.BuiltIn, ret, 0, 0, parameters: parms);
+
+        B("print",        "void",   "value");
+        B("sleep",        "void",   "ms");
+        B("input",        "string");
+        B("readFile",     "string", "path");
+        B("writeFile",    "void",   "path, content");
+        B("appendFile",   "void",   "path, content");
+        B("fileExists",   "bool",   "path");
+        B("deleteFile",   "void",   "path");
+        B("readLines",    "string[]","path");
+        B("time",         "string");
+        B("timeMs",       "int");
+        B("httpGet",      "string", "url");
+        B("httpPost",     "string", "url, body");
+        B("httpPostJson", "string", "url, json");
+        B("ord",          "int",    "str");
+        B("chr",          "string", "code");
+    }
+
+    // ── hoist ─────────────────────────────────────────────────────────────────
+
+    private void HoistGlobal(Expr expr)
     {
         switch (expr)
         {
-            case FunctionDeclaration func:
-                string funcReturnType = func.ReturnType == TokenType.Identifier ? "unknown" : func.ReturnType.ToString();
-                if (!Declare(func.Name, SymbolKind.Function, funcReturnType, func.Start, func.End))
-                {
-                    throw new SemanticException($"Function '{func.Name}' is already declared", func.Start);
-                }
+            case FunctionDeclaration f:
+                DeclareIfNew(f.Name, SymbolKind.Function,
+                    TokenTypeToString(f.ReturnType, f.Name), f.Start, f.End,
+                    parameters: ParamsString(f.Parameters));
                 break;
-            case ClassDeclaration cls:
-                if (!Declare(cls.Name, SymbolKind.Class, cls.Name, cls.Start, cls.End))
-                {
-                    throw new SemanticException($"Class '{cls.Name}' is already declared", cls.Start);
-                }
+            case ClassDeclaration c:
+                DeclareIfNew(c.Name, SymbolKind.Class, c.Name, c.Start, c.End);
                 break;
-            case StructDeclaration str:
-                if (!Declare(str.Name, SymbolKind.Class, str.Name, str.Start, str.End))
-                {
-                    throw new SemanticException($"Struct '{str.Name}' is already declared", str.Start);
-                }
+            case StructDeclaration s:
+                DeclareIfNew(s.Name, SymbolKind.Class, s.Name, s.Start, s.End);
                 break;
-            case EnumDeclaration en:
-                if (!Declare(en.Name, SymbolKind.Class, en.Name, en.Start, en.End))
-                {
-                    throw new SemanticException($"Enum '{en.Name}' is already declared", en.Start);
-                }
+            case EnumDeclaration e:
+                DeclareIfNew(e.Name, SymbolKind.Class, e.Name, e.Start, e.End);
                 break;
         }
     }
+
+    // ── full analysis ─────────────────────────────────────────────────────────
 
     private void AnalyzeExpr(Expr expr)
     {
         switch (expr)
         {
-            case VariableDeclaration varDecl:
-                if (varDecl.Initializer != null)
-                    AnalyzeExpr(varDecl.Initializer);
-                
-                var varKind = _currentParent != null ? SymbolKind.Field : SymbolKind.Variable;
-                string typeName = varDecl.CustomType ?? varDecl.TypeToken.ToString();
-                if (!Declare(varDecl.Name, varKind, typeName, varDecl.Start, varDecl.End, varDecl.End, CurrentScopeRange.end, _currentParent))
-                {
-                    throw new SemanticException($"Variable '{varDecl.Name}' is already declared in this scope", varDecl.Start);
-                }
+            case VariableDeclaration v:
+                if (v.Initializer != null) AnalyzeExpr(v.Initializer);
+                var vKind = _currentClass != null ? SymbolKind.Field : SymbolKind.Variable;
+                string vType = v.CustomType ?? TokenTypeToString(v.TypeToken, null);
+                Declare(v.Name, vKind, vType, v.Start, v.End,
+                    v.End, CurrentRange.end, _currentClass);
                 break;
 
-            case FunctionDeclaration funcDecl:
+            case FunctionDeclaration f:
+                var fKind = _currentClass != null ? SymbolKind.Method : SymbolKind.Function;
+                string fType = TokenTypeToString(f.ReturnType, f.Name);
+                Declare(f.Name, fKind, fType, f.Start, f.End,
+                    CurrentRange.start, CurrentRange.end, _currentClass,
+                    parameters: ParamsString(f.Parameters));
+
+                var prevScope = _currentScope;
+                var prevClass = _currentClass;
+                _currentScope = new Scope(prevScope);
+                _scopeRanges.Push((f.Start, f.End));
+                _currentClass = null;
+
+                foreach (var p in f.Parameters)
+                    Declare(p.Name, SymbolKind.Parameter,
+                        p.CustomType ?? TokenTypeToString(p.Type, null),
+                        f.Start, f.End, f.Start, f.End);
+
+                foreach (var s in f.Body) AnalyzeExpr(s);
+
+                _scopeRanges.Pop();
+                _currentScope = prevScope;
+                _currentClass = prevClass;
+                break;
+
+            case ClassDeclaration c:
+                Declare(c.Name, SymbolKind.Class, c.Name, c.Start, c.End,
+                    CurrentRange.start, CurrentRange.end);
+
+                var cs = _currentScope;
+                _currentScope = new Scope(cs);
+                _scopeRanges.Push((c.Start, c.End));
+                var pc = _currentClass;
+                _currentClass = c.Name;
+
+                Declare("this", SymbolKind.Variable, c.Name,
+                    c.Start, c.End, c.Start, c.End);
+
+                foreach (var field in c.Fields)   AnalyzeExpr(field);
+                foreach (var method in c.Methods) AnalyzeExpr(method);
+
+                _currentClass = pc;
+                _scopeRanges.Pop();
+                _currentScope = cs;
+                break;
+
+            case StructDeclaration s:
+                Declare(s.Name, SymbolKind.Class, s.Name, s.Start, s.End,
+                    CurrentRange.start, CurrentRange.end);
+                foreach (var fn in s.Fields)
+                    Declare(fn, SymbolKind.Field, "unknown",
+                        s.Start, s.End, s.Start, s.End, s.Name);
+                break;
+
+            case EnumDeclaration e:
+                Declare(e.Name, SymbolKind.Class, e.Name, e.Start, e.End,
+                    CurrentRange.start, CurrentRange.end);
+                foreach (var mn in e.Members)
+                    Declare(mn, SymbolKind.Field, e.Name,
+                        e.Start, e.End, e.Start, e.End, e.Name);
+                break;
+
+            case AssignmentExpr a:
+                AnalyzeExpr(a.Value);
+                break;
+
+            case BinaryExpr b:
+                AnalyzeExpr(b.Left);
+                AnalyzeExpr(b.Right);
+                break;
+
+            case UnaryExpr u:
+                AnalyzeExpr(u.Operand);
+                break;
+
+            case CallExpr call:
+                if (call.Target != null) AnalyzeExpr(call.Target);
+                foreach (var a in call.Arguments) AnalyzeExpr(a);
+                break;
+
+            case IfStatement ifs:
+                AnalyzeExpr(ifs.Condition);
+                WithScope(ifs.Start, ifs.End, () => { foreach (var s in ifs.ThenBlock) AnalyzeExpr(s); });
+                if (ifs.ElseBlock != null)
+                    WithScope(ifs.Start, ifs.End, () => { foreach (var s in ifs.ElseBlock) AnalyzeExpr(s); });
+                break;
+
+            case WhileExpr w:
+                AnalyzeExpr(w.Condition);
+                WithScope(w.Start, w.End, () => { foreach (var s in w.Body) AnalyzeExpr(s); });
+                break;
+
+            case ForStatement f2:
+                WithScope(f2.Start, f2.End, () =>
                 {
-                    var funcKind = _currentParent != null ? SymbolKind.Method : SymbolKind.Function;
-                    string returnType = funcDecl.ReturnType == TokenType.Identifier ? (funcDecl.Name == "Constructor" ? "" : "unknown") : funcDecl.ReturnType.ToString();
-                    var paramsStr = string.Join(", ", funcDecl.Parameters
-                        .Select(p => $"{p.CustomType ?? p.Type.ToString()} {p.Name}"));
-                    Declare(funcDecl.Name, funcKind, returnType, funcDecl.Start, funcDecl.End, CurrentScopeRange.start, CurrentScopeRange.end, _currentParent, parameters: paramsStr);
+                    if (f2.Initializer != null) AnalyzeExpr(f2.Initializer);
+                    if (f2.Condition != null)   AnalyzeExpr(f2.Condition);
+                    if (f2.Increment != null)   AnalyzeExpr(f2.Increment);
+                    foreach (var s in f2.Body)  AnalyzeExpr(s);
+                });
+                break;
 
-                    var previousScope = _currentScope;
-                    _currentScope = new Scope(previousScope);
-                    _scopeRanges.Push((funcDecl.Start, funcDecl.End));
-                    
-                    var previousParent = _currentParent;
-                    _currentParent = null;
+            case ForeachStatement fe:
+                WithScope(fe.Start, fe.End, () =>
+                {
+                    AnalyzeExpr(fe.Collection);
+                    Declare(fe.VarName, SymbolKind.Variable, "unknown",
+                        fe.Start, fe.End, fe.Start, fe.End);
+                    foreach (var s in fe.Body) AnalyzeExpr(s);
+                });
+                break;
 
-                    foreach (var param in funcDecl.Parameters)
+            case SwitchStatement sw:
+                AnalyzeExpr(sw.Expression);
+                foreach (var c in sw.Cases)
+                    WithScope(sw.Start, sw.End, () =>
                     {
-                        string paramType = param.CustomType ?? param.Type.ToString();
-                        if (!Declare(param.Name, SymbolKind.Parameter, paramType, funcDecl.Start, funcDecl.End, funcDecl.Start, funcDecl.End))
-                        {
-                             throw new SemanticException($"Parameter '{param.Name}' is already declared in this scope", funcDecl.Start);
-                        }
-                    }
-                    
-                    foreach (var bodyExpr in funcDecl.Body)
-                        AnalyzeExpr(bodyExpr);
-                    
-                    _currentParent = previousParent;
-                    _scopeRanges.Pop();
-                    _currentScope = previousScope;
-                }
+                        if (c.Value != null) AnalyzeExpr(c.Value);
+                        foreach (var s in c.Body) AnalyzeExpr(s);
+                    });
                 break;
 
-            case ClassDeclaration classDecl:
-                {
-                    Declare(classDecl.Name, SymbolKind.Class, classDecl.Name, classDecl.Start, classDecl.End, CurrentScopeRange.start, CurrentScopeRange.end);
-
-                    var previousScope = _currentScope;
-                    _currentScope = new Scope(previousScope);
-                    _scopeRanges.Push((classDecl.Start, classDecl.End));
-                    
-                    Declare("this", SymbolKind.Variable, classDecl.Name, classDecl.Start, classDecl.End, classDecl.Start, classDecl.End);
-
-                    var previousParent = _currentParent;
-                    _currentParent = classDecl.Name;
-
-                    foreach (var field in classDecl.Fields)
-                        AnalyzeExpr(field);
-                    foreach (var method in classDecl.Methods)
-                        AnalyzeExpr(method);
-                    
-                    _currentParent = previousParent;
-                    _scopeRanges.Pop();
-                    _currentScope = previousScope;
-                }
+            case ReturnStatement r:
+                if (r.Value != null) AnalyzeExpr(r.Value);
                 break;
 
-            case StructDeclaration structDecl:
-                Declare(structDecl.Name, SymbolKind.Class, structDecl.Name, structDecl.Start, structDecl.End, CurrentScopeRange.start, CurrentScopeRange.end);
-                foreach (var fieldName in structDecl.Fields)
-                {
-                    Declare(fieldName, SymbolKind.Field, "unknown", structDecl.Start, structDecl.End, structDecl.Start, structDecl.End, structDecl.Name);
-                }
+            case MemberAccessExpr m:
+                AnalyzeExpr(m.Object);
                 break;
 
-            case EnumDeclaration enumDecl:
-                Declare(enumDecl.Name, SymbolKind.Class, enumDecl.Name, enumDecl.Start, enumDecl.End, CurrentScopeRange.start, CurrentScopeRange.end);
-                foreach (var memberName in enumDecl.Members)
-                {
-                    Declare(memberName, SymbolKind.Field, enumDecl.Name, enumDecl.Start, enumDecl.End, enumDecl.Start, enumDecl.End, enumDecl.Name);
-                }
+            case MemberAssignmentExpr ma:
+                AnalyzeExpr(ma.Object);
+                AnalyzeExpr(ma.Value);
                 break;
 
-            case VariableExpr varExpr:
-                if (_currentScope.Resolve(varExpr.Name) == null && !IsImportedSymbol(varExpr.Name))
-                {
-                    throw new SemanticException($"Undefined variable '{varExpr.Name}'", varExpr.Start);
-                }
+            case NewExpr n:
+                foreach (var a in n.Arguments) AnalyzeExpr(a);
                 break;
 
-            case AssignmentExpr assignExpr:
-                AnalyzeExpr(assignExpr.Value);
-                if (_currentScope.Resolve(assignExpr.Name) == null && !IsImportedSymbol(assignExpr.Name)) 
-                {
-                    throw new SemanticException($"Undefined variable '{assignExpr.Name}'", assignExpr.Start);
-                }
+            case ArrayAccessExpr aa:
+                AnalyzeExpr(aa.Array);
+                AnalyzeExpr(aa.Index);
                 break;
 
-            case BinaryExpr binaryExpr:
-                AnalyzeExpr(binaryExpr.Left);
-                AnalyzeExpr(binaryExpr.Right);
+            case ArrayExpr ae:
+                foreach (var e in ae.Elements) AnalyzeExpr(e);
                 break;
 
-            case UnaryExpr unaryExpr:
-                AnalyzeExpr(unaryExpr.Operand);
-                break;
-
-            case CallExpr callExpr:
-                if (callExpr.Target != null)
-                    AnalyzeExpr(callExpr.Target);
-                else if (_currentScope.Resolve(callExpr.Name) == null && !IsImportedSymbol(callExpr.Name)) 
-                {
-                    throw new SemanticException($"Undefined function '{callExpr.Name}'", callExpr.Start);
-                }
-
-                foreach (var arg in callExpr.Arguments)
-                    AnalyzeExpr(arg);
-                break;
-
-            case IfStatement ifStmt:
-                AnalyzeExpr(ifStmt.Condition);
-                {
-                    var previousScope = _currentScope;
-                    _currentScope = new Scope(previousScope);
-                    _scopeRanges.Push((ifStmt.Start, ifStmt.End)); // Simplified range for both branches
-                    foreach (var stmt in ifStmt.ThenBlock) AnalyzeExpr(stmt);
-                    _scopeRanges.Pop();
-                    _currentScope = previousScope;
-
-                    if (ifStmt.ElseBlock != null)
-                    {
-                         _currentScope = new Scope(previousScope);
-                         _scopeRanges.Push((ifStmt.Start, ifStmt.End));
-                         foreach (var stmt in ifStmt.ElseBlock) AnalyzeExpr(stmt);
-                         _scopeRanges.Pop();
-                         _currentScope = previousScope;
-                    }
-                }
-                break;
-
-            case WhileExpr whileExpr:
-                AnalyzeExpr(whileExpr.Condition);
-                {
-                    var previousScope = _currentScope;
-                    _currentScope = new Scope(previousScope);
-                    _scopeRanges.Push((whileExpr.Start, whileExpr.End));
-                    foreach (var stmt in whileExpr.Body) AnalyzeExpr(stmt);
-                    _scopeRanges.Pop();
-                    _currentScope = previousScope;
-                }
-                break;
-
-            case ForStatement forStmt:
-                {
-                    var previousScope = _currentScope;
-                    _currentScope = new Scope(previousScope);
-                    _scopeRanges.Push((forStmt.Start, forStmt.End));
-                    if (forStmt.Initializer != null) AnalyzeExpr(forStmt.Initializer);
-                    if (forStmt.Condition != null) AnalyzeExpr(forStmt.Condition);
-                    if (forStmt.Increment != null) AnalyzeExpr(forStmt.Increment);
-                    foreach (var stmt in forStmt.Body) AnalyzeExpr(stmt);
-                    _scopeRanges.Pop();
-                    _currentScope = previousScope;
-                }
-                break;
-
-            case ForeachStatement foreachStmt:
-                {
-                    var previousScope = _currentScope;
-                    _currentScope = new Scope(previousScope);
-                    _scopeRanges.Push((foreachStmt.Start, foreachStmt.End));
-                    AnalyzeExpr(foreachStmt.Collection);
-                    Declare(foreachStmt.VarName, SymbolKind.Variable, "unknown", foreachStmt.Start, foreachStmt.End, foreachStmt.Start, foreachStmt.End);
-                    foreach (var stmt in foreachStmt.Body) AnalyzeExpr(stmt);
-                    _scopeRanges.Pop();
-                    _currentScope = previousScope;
-                }
-                break;
-
-            case SwitchStatement switchStmt:
-                AnalyzeExpr(switchStmt.Expression);
-                foreach (var @case in switchStmt.Cases)
-                {
-                    var previousScope = _currentScope;
-                    _currentScope = new Scope(previousScope);
-                    _scopeRanges.Push((switchStmt.Start, switchStmt.End));
-                    if (@case.Value != null) AnalyzeExpr(@case.Value);
-                    foreach (var stmt in @case.Body) AnalyzeExpr(stmt);
-                    _scopeRanges.Pop();
-                    _currentScope = previousScope;
-                }
-                break;
-
-            case ReturnStatement ret:
-                if (ret.Value != null)
-                    AnalyzeExpr(ret.Value);
-                break;
-
-            case MemberAccessExpr member:
-                AnalyzeExpr(member.Object);
-                break;
-            
-            case MemberAssignmentExpr memberAssign:
-                AnalyzeExpr(memberAssign.Object);
-                AnalyzeExpr(memberAssign.Value);
-                break;
-
-            case NewExpr newExpr:
-                foreach (var arg in newExpr.Arguments)
-                    AnalyzeExpr(arg);
-                break;
-
-            case ArrayAccessExpr arrayAccess:
-                AnalyzeExpr(arrayAccess.Array);
-                AnalyzeExpr(arrayAccess.Index);
-                break;
-
-            case ArrayExpr arrayLiteral:
-                foreach (var element in arrayLiteral.Elements)
-                    AnalyzeExpr(element);
-                break;
-
-            case ArrayStoreExpr arrayStore:
-                AnalyzeExpr(arrayStore.Array);
-                AnalyzeExpr(arrayStore.Index);
-                AnalyzeExpr(arrayStore.Value);
+            case ArrayStoreExpr ast2:
+                AnalyzeExpr(ast2.Array);
+                AnalyzeExpr(ast2.Index);
+                AnalyzeExpr(ast2.Value);
                 break;
         }
     }
-    
-    private bool IsImportedSymbol(string name)
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    private (int start, int end) CurrentRange =>
+        _scopeRanges.Count > 0 ? _scopeRanges.Peek() : (0, int.MaxValue);
+
+    private void WithScope(int start, int end, Action body)
     {
-        foreach (var symbols in _importedSymbols.Values)
-        {
-            if (symbols.Any(s => s.Name == name))
-                return true;
-        }
-        return false;
+        var prev = _currentScope;
+        _currentScope = new Scope(prev);
+        _scopeRanges.Push((start, end));
+        body();
+        _scopeRanges.Pop();
+        _currentScope = prev;
     }
+
+    private bool Declare(string name, SymbolKind kind, string type,
+        int start, int end,
+        int scopeStart = 0, int scopeEnd = int.MaxValue,
+        string? parentName = null, string? parameters = null)
+    {
+        var sym = new Symbol(name, kind, type, start, end,
+            scopeStart, scopeEnd, parentName, null, parameters);
+        _collected.Add(sym);
+        return _currentScope.Declare(sym);
+    }
+
+    private void DeclareIfNew(string name, SymbolKind kind, string type,
+        int start, int end, string? parameters = null)
+    {
+        if (_currentScope.Resolve(name) == null)
+            Declare(name, kind, type, start, end, parameters: parameters);
+    }
+
+    private static string ParamsString(IEnumerable<Parameter> ps) =>
+        string.Join(", ", ps.Select(p => $"{p.CustomType ?? p.Type.ToString()} {p.Name}"));
+
+    private static string TokenTypeToString(TokenType t, string? funcName) => t switch
+    {
+        TokenType.IntKeyword    => "int",
+        TokenType.FloatKeyword  => "float",
+        TokenType.StringKeyword => "string",
+        TokenType.BoolKeyword   => "bool",
+        TokenType.VoidKeyword   => "void",
+        TokenType.Identifier    => funcName ?? "unknown",
+        _                       => t.ToString()
+    };
 }

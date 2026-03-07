@@ -1,6 +1,7 @@
 using SabakaLang.Compiler;
 using SabakaLang.Types;
 using System.Globalization;
+using System.IO;
 using System.Net.Http;
 using System.Text;
 
@@ -37,8 +38,51 @@ public class VirtualMachine
         _output = output ?? Console.Out;
     }
 
+        // Stored for use by CallFunction (set at start of Execute)
+    private List<Instruction> _instructions = new();
+
+    /// <summary>
+    /// Call a SabakaLang function by name from C# code.
+    /// Must be called on the same thread as Execute() — no threading magic needed.
+    /// Used by SabakaUI: ui.run() blocks the script thread and calls this
+    /// for each incoming UI event.
+    /// </summary>
+    public void CallFunction(string name, Value[] args)
+    {
+        if (!_functions.TryGetValue(name, out var func))
+            throw new Exception($"CallFunction: '{name}' not found in script");
+
+        if (_instructions.Count == 0)
+            throw new Exception("CallFunction: Execute() has not been called yet");
+
+        // Mirror exactly what the Call opcode does
+        _callStack.Push(_instructions.Count); // return to "end" — exits inner Execute loop
+        _scopeDepthStack.Push(_scopes.Count);
+        _stackDepthStack.Push(_stack.Count);
+        _methodCallStack.Push(false);
+
+        EnterScope();
+
+        for (int i = 0; i < func.Parameters.Count; i++)
+        {
+            _scopes.Peek()[func.Parameters[i]] = i < args.Length
+                ? args[i]
+                : Value.FromString("");
+        }
+
+        // Execute from function entry until Return brings ip back to _instructions.Count
+        ExecuteFrom(func.Address);
+    }
+
+    private void ExecuteFrom(int startIp)
+    {
+        int ip = startIp;
+        RunLoop(_instructions, ref ip);
+    }
+
     public void Execute(List<Instruction> instructions)
     {
+        _instructions = instructions;
         _scopes.Push(new Dictionary<string, Value>());
         int ip = 0;
 
@@ -62,6 +106,11 @@ public class VirtualMachine
         }
 
         
+        RunLoop(_instructions, ref ip);
+    }
+
+    private void RunLoop(List<Instruction> instructions, ref int ip)
+    {
         while (ip < instructions.Count)
         {
             var instruction = instructions[ip];

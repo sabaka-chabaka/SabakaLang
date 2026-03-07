@@ -2,8 +2,8 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using SabakaLang.LSP.Analysis;
+using System.IO;
 using SabakaSymbolKind = SabakaLang.LSP.Analysis.SymbolKind;
-using System.IO; 
 
 namespace SabakaLang.LSP;
 
@@ -18,140 +18,165 @@ public class CompletionHandler : CompletionHandlerBase
         _documentStore = documentStore;
     }
 
-    private readonly string[] _keywords = {
+    private static readonly string[] Keywords =
+    {
         "if", "else", "while", "for", "foreach", "in", "func", "return", "void",
         "int", "float", "string", "bool", "true", "false",
         "struct", "class", "interface", "new", "override", "super",
         "switch", "case", "default", "enum",
-        "public", "private", "protected", "import"
+        "public", "private", "protected", "import", "as"
     };
 
-    private readonly string[] _builtInFunctions = {
-        "print", "input", "sleep", "readFile", "writeFile", "appendFile", "fileExists", "deleteFile", "readLines", "time", "timeMs", "httpGet", "httpPost", "httpPostJson", "ord", "chr"
-    };
-
-    protected override CompletionRegistrationOptions CreateRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)
+    private static readonly string[] BuiltIns =
     {
-        return new CompletionRegistrationOptions
-        {
-            DocumentSelector = new TextDocumentSelector(
-                new TextDocumentFilter { Pattern = "**/*.sabaka" },
-                new TextDocumentFilter { Language = "sabaka" }
-            ),
-            TriggerCharacters = new Container<string>(".", ":")
-        };
-    }
+        "print", "input", "sleep",
+        "readFile", "writeFile", "appendFile", "fileExists", "deleteFile", "readLines",
+        "time", "timeMs", "httpGet", "httpPost", "httpPostJson", "ord", "chr"
+    };
 
-    public override Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
+    protected override CompletionRegistrationOptions CreateRegistrationOptions(
+        CompletionCapability cap, ClientCapabilities cc) => new()
+    {
+        DocumentSelector = new TextDocumentSelector(
+            new TextDocumentFilter { Pattern = "**/*.sabaka" },
+            new TextDocumentFilter { Language = "sabaka" }
+        ),
+        TriggerCharacters = new Container<string>(".", ":"),
+        ResolveProvider = false
+    };
+
+    public override Task<CompletionList> Handle(CompletionParams request,
+        CancellationToken cancellationToken)
     {
         var source = _documentStore.GetDocument(request.TextDocument.Uri);
         if (source == null) return Task.FromResult(new CompletionList());
 
         int offset = PositionHelper.GetOffset(source, request.Position);
 
-        // Check for member completion (e.g., "a." or "E::")
-        if (offset > 0)
+        // ── dot completion: something.| ───────────────────────────────────────
+        if (offset > 0 && source[offset - 1] == '.')
         {
-            int triggerOffset = -1;
-            if (source[offset - 1] == '.') triggerOffset = offset - 1;
-            else if (offset > 1 && source[offset - 1] == ':' && source[offset - 2] == ':') triggerOffset = offset - 2;
-
-            if (triggerOffset >= 0)
+            string target = ExtractWordBefore(source, offset - 1);
+            if (!string.IsNullOrEmpty(target))
             {
-                int end = triggerOffset - 1;
-                while (end >= 0 && char.IsWhiteSpace(source[end])) end--;
-                
-                int start = end;
-                while (start >= 0 && (char.IsLetterOrDigit(source[start]) || source[start] == '_')) start--;
-                
-                if (end >= 0)
-                {
-                    string targetName = source.Substring(start + 1, end - start);
-                    var symbol = _symbolIndex.GetAvailableSymbols(request.TextDocument.Uri, end)
-                        .FirstOrDefault(s => s.Name == targetName);
-                    
-                    if (symbol != null)
-                    {
-                        string typeName = symbol.Kind == SabakaSymbolKind.Class ? symbol.Name : symbol.Type;
-                        
-                        // Handle built-in type names which might be TokenTypes as strings
-                        if (typeName == "IntKeyword") typeName = "int";
-                        else if (typeName == "FloatKeyword") typeName = "float";
-                        else if (typeName == "StringKeyword") typeName = "string";
-                        else if (typeName == "BoolKeyword") typeName = "bool";
-                        else if (typeName == "VoidKeyword") typeName = "void";
+                // 1. Is it a module alias? (import X as alias)
+                var moduleSymbols = _symbolIndex.GetModuleMembers(
+                    request.TextDocument.Uri, target.ToLower());
+                var moduleList = moduleSymbols.ToList();
+                if (moduleList.Count > 0)
+                    return Task.FromResult(new CompletionList(
+                        moduleList.Select(s => MakeItem(s, showFile: true))));
 
-                        var members = _symbolIndex.GetMembers(typeName)
-                            .Select(s => new CompletionItem
-                            {
-                                Label = s.Name,
-                                Kind = MapSymbolKind(s.Kind),
-                                Detail = GetPrettyType(s.Type),
-                                Documentation = s.SourceFile != null ? $"From: {Path.GetFileName(s.SourceFile)}" : null  // ДОБАВЛЕНО
-                            });
-                        
-                        return Task.FromResult(new CompletionList(members));
-                    }
-                }
+                // 2. Is it a class/struct/object type?
+                var sym = _symbolIndex
+                    .GetAvailableSymbols(request.TextDocument.Uri, offset - target.Length - 1)
+                    .FirstOrDefault(s => s.Name == target);
+
+                string typeName = sym != null
+                    ? (sym.Kind == SabakaSymbolKind.Class ? sym.Name : sym.Type)
+                    : target; // fallback: assume it IS the type name
+
+                typeName = NormalizeType(typeName);
+
+                var members = _symbolIndex.GetMembers(typeName).ToList();
+                if (members.Count > 0)
+                    return Task.FromResult(new CompletionList(
+                        members.Select(s => MakeItem(s, showFile: true))));
             }
+
+            // Nothing found — empty list (don't show general completions after dot)
+            return Task.FromResult(new CompletionList());
         }
 
-        var items = _keywords.Select(k => new CompletionItem
+        // ── general completion ─────────────────────────────────────────────────
+        var items = new List<CompletionItem>();
+
+        items.AddRange(Keywords.Select(k => new CompletionItem
         {
-            Label = k,
-            Kind = CompletionItemKind.Keyword,
-            Detail = "Keyword"
-        }).Concat(_builtInFunctions.Select(f => new CompletionItem
-        {
-            Label = f,
-            Kind = CompletionItemKind.Function,
-            Detail = "Built-in Function"
+            Label  = k,
+            Kind   = CompletionItemKind.Keyword,
+            Detail = "keyword"
         }));
 
-        var symbols = _symbolIndex.GetAvailableSymbols(request.TextDocument.Uri, offset)
+        items.AddRange(BuiltIns.Select(f => new CompletionItem
+        {
+            Label  = f,
+            Kind   = CompletionItemKind.Function,
+            Detail = "built-in"
+        }));
+
+        var available = _symbolIndex.GetAvailableSymbols(request.TextDocument.Uri, offset);
+        items.AddRange(available
             .Where(s => s.Kind != SabakaSymbolKind.BuiltIn)
-            .Select(s => new CompletionItem
-            {
-                Label = s.Name,
-                Kind = MapSymbolKind(s.Kind),
-                Detail = GetPrettyType(s.Type),
-                Documentation = s.SourceFile != null && s.SourceFile != request.TextDocument.Uri.GetFileSystemPath() 
-                    ? $"Imported from: {Path.GetFileName(s.SourceFile)}"
-                    : null
-            });
+            .Select(s => MakeItem(s,
+                showFile: s.SourceFile != null &&
+                          s.SourceFile != request.TextDocument.Uri.GetFileSystemPath())));
 
-        return Task.FromResult(new CompletionList(items.Concat(symbols)));
+        return Task.FromResult(new CompletionList(items));
     }
 
-    private CompletionItemKind MapSymbolKind(SabakaSymbolKind kind)
+    public override Task<CompletionItem> Handle(CompletionItem request,
+        CancellationToken cancellationToken) => Task.FromResult(request);
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    private CompletionItem MakeItem(Symbol s, bool showFile)
     {
-        return kind switch
+        string detail = s.Kind switch
         {
-            SabakaSymbolKind.Variable => CompletionItemKind.Variable,
-            SabakaSymbolKind.Function => CompletionItemKind.Function,
-            SabakaSymbolKind.Class => CompletionItemKind.Class,
-            SabakaSymbolKind.Parameter => CompletionItemKind.Variable,
-            SabakaSymbolKind.Method => CompletionItemKind.Method,
-            SabakaSymbolKind.Field => CompletionItemKind.Field,
-            _ => CompletionItemKind.Text
+            SabakaSymbolKind.Function or
+            SabakaSymbolKind.Method   => $"{NormalizeType(s.Type)} {s.Name}({s.Parameters ?? ""})",
+            SabakaSymbolKind.Module   => $"module {s.Name}",
+            SabakaSymbolKind.Class    => $"class {s.Name}",
+            _                        => NormalizeType(s.Type)
+        };
+
+        string? doc = (showFile && s.SourceFile != null)
+            ? $"From: {Path.GetFileName(s.SourceFile)}"
+            : null;
+
+        return new CompletionItem
+        {
+            Label         = s.Name,
+            Kind          = MapKind(s.Kind),
+            Detail        = detail,
+            Documentation = doc != null
+                ? new StringOrMarkupContent(new MarkupContent
+                    { Kind = MarkupKind.Markdown, Value = doc })
+                : null
         };
     }
 
-    private string GetPrettyType(string type)
+    private static string ExtractWordBefore(string source, int beforeIndex)
     {
-        return type switch
-        {
-            "IntKeyword" => "int",
-            "FloatKeyword" => "float",
-            "StringKeyword" => "string",
-            "BoolKeyword" => "bool",
-            "VoidKeyword" => "void",
-            _ => type
-        };
+        int end = beforeIndex - 1;
+        while (end >= 0 && char.IsWhiteSpace(source[end])) end--;
+        int start = end;
+        while (start >= 0 && (char.IsLetterOrDigit(source[start]) || source[start] == '_'))
+            start--;
+        if (end < start) return "";
+        return source.Substring(start + 1, end - start);
     }
 
-    public override Task<CompletionItem> Handle(CompletionItem request, CancellationToken cancellationToken)
+    private static string NormalizeType(string t) => t switch
     {
-        return Task.FromResult(request);
-    }
+        "IntKeyword"    => "int",
+        "FloatKeyword"  => "float",
+        "StringKeyword" => "string",
+        "BoolKeyword"   => "bool",
+        "VoidKeyword"   => "void",
+        _               => t
+    };
+
+    private static CompletionItemKind MapKind(SabakaSymbolKind k) => k switch
+    {
+        SabakaSymbolKind.Variable  => CompletionItemKind.Variable,
+        SabakaSymbolKind.Function  => CompletionItemKind.Function,
+        SabakaSymbolKind.Class     => CompletionItemKind.Class,
+        SabakaSymbolKind.Parameter => CompletionItemKind.Variable,
+        SabakaSymbolKind.Method    => CompletionItemKind.Method,
+        SabakaSymbolKind.Field     => CompletionItemKind.Field,
+        SabakaSymbolKind.Module    => CompletionItemKind.Module,
+        _                         => CompletionItemKind.Text
+    };
 }
