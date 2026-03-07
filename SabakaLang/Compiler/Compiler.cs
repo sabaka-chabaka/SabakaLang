@@ -30,6 +30,7 @@ public class Compiler
     // Modules implementing ICallbackReceiver — VM wires InvokeCallback into these
     private readonly List<object> _callbackReceivers = new();
     public IReadOnlyList<object> CallbackReceivers => _callbackReceivers;
+    private bool _isSubCompiler = false;
 
     // Namespaced modules: alias -> (functions, variables)
     private readonly Dictionary<string, (
@@ -88,7 +89,10 @@ public class Compiler
         Console.WriteLine("Compiling...");
         
         _currentFilePath = filePath;
-        _importedFiles.Clear();
+        if (!_isSubCompiler) {
+            _importedFiles.Clear();
+            if (filePath != null) _importedFiles.Add(filePath);
+        }
         if (_currentFilePath != null)
             _importedFiles.Add(_currentFilePath);
 
@@ -1518,8 +1522,8 @@ public class Compiler
 
         var importCompiler = new Compiler();
         importCompiler._currentFilePath = fullPath;
-        importCompiler._importedFiles = new HashSet<string>(_importedFiles);
-        importCompiler._importedFiles.Add(fullPath);
+        importCompiler._isSubCompiler = true;
+        importCompiler._importedFiles = _importedFiles; 
 
         var lexer = new Lexer.Lexer(source);
         var tokens = lexer.Tokenize(false);
@@ -1775,6 +1779,7 @@ public class Compiler
                     exportedClassName, new List<string>(), null, new List<string>(),
                     new List<VariableDeclaration>(), new List<FunctionDeclaration>());
             }
+            
         }
     }
 
