@@ -26,17 +26,28 @@ public class Compiler
     private string? _currentFilePath;
     private readonly Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> _externalFunctions = new();
     private readonly Dictionary<string, Value> _externalVariables = new(); // For storing imported variables
+    
 
     // Modules implementing ICallbackReceiver — VM wires InvokeCallback into these
     private readonly List<object> _callbackReceivers = new();
     public IReadOnlyList<object> CallbackReceivers => _callbackReceivers;
+    public IReadOnlySet<string> ImportedFiles => _importedFiles;
+    public IReadOnlyDictionary<string, int> Functions => _functions;
     private bool _isSubCompiler = false;
+    
+    private Dictionary<string, string?> _dllAliases = new();
+    public IReadOnlyDictionary<string, string?> ImportedDllsWithAlias => _dllAliases;
 
     // Namespaced modules: alias -> (functions, variables)
     private readonly Dictionary<string, (
         Dictionary<string, (int ParamCount, Func<Value[], Value> Delegate)> Functions,
         Dictionary<string, Value> Variables
     )> _modules = new();
+    
+    public IReadOnlyList<string> ImportedDlls =>
+        _importedFiles
+            .Where(f => f.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
     // Maps "alias.funcname" -> real SabakaLang function name (for .sabaka namespaced imports)
     private readonly Dictionary<string, string> _moduleSabakaFunctions = new();

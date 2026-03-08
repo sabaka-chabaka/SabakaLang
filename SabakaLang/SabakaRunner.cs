@@ -9,29 +9,30 @@ public class SabakaRunner
     public static void Run(string source, string? filePath = null, TextReader? input = null, TextWriter? output = null)
     {
         var start = DateTime.Now;
-        
-        var lexer = new Lexer.Lexer(source);
-        var tokens = lexer.Tokenize(false);
 
-        var parser = new Parser.Parser(tokens);
+        var lexer   = new Lexer.Lexer(source);
+        var tokens  = lexer.Tokenize(false);
+        var parser  = new Parser.Parser(tokens);
         var program = parser.ParseProgram();
 
         var compiler = new Compiler.Compiler();
         var bytecode = compiler.Compile(program, filePath);
-        
-        var stop = DateTime.Now;
-        
-        Console.WriteLine($"Compilation time: {(stop - start).TotalMilliseconds}ms. Starting");
+
+        Console.WriteLine($"Compilation time: {(DateTime.Now - start).TotalMilliseconds}ms. Starting");
         Console.WriteLine();
-        
-        var externals = compiler.ExternalDelegates;
 
-        var vm = new VirtualMachine(input, output, externals);
+        var vm = new VirtualMachine(input, output, compiler.ExternalDelegates);
 
-        // Wire up InvokeCallback for modules implementing ICallbackReceiver.
-        // We use reflection because Compiler doesn't reference the SDK assembly.
-        // The callback is called on the SCRIPT thread (inside ui.run()) — no threading issues.
-        foreach (object receiver in compiler.CallbackReceivers)
+        // Устанавливаем InvokeCallback для DLL-модулей (SabakaUI и т.п.)
+        // чтобы они могли вызывать SabakaLang-функции обратно.
+        WireCallbacks(compiler.CallbackReceivers, vm);
+
+        vm.Execute(bytecode);
+    }
+
+    internal static void WireCallbacks(IReadOnlyList<object> receivers, VirtualMachine vm)
+    {
+        foreach (var receiver in receivers)
         {
             var iface = receiver.GetType().GetInterfaces()
                 .FirstOrDefault(i => i.Name == "ICallbackReceiver");
@@ -40,16 +41,13 @@ public class SabakaRunner
             var prop = iface.GetProperty("InvokeCallback");
             if (prop == null) continue;
 
-            Func<string, string[], string> cb = (funcName, args) =>
+            Func<string, string[], string> callback = (funcName, args) =>
             {
-                Value[] vals = args.Select(Value.FromString).ToArray();
-                vm.CallFunction(funcName, vals);
+                vm.CallFunction(funcName, args.Select(Value.FromString).ToArray());
                 return "";
             };
 
-            prop.SetValue(receiver, cb);
+            prop.SetValue(receiver, callback);
         }
-
-        vm.Execute(bytecode);
     }
 }
