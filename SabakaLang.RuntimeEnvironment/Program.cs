@@ -10,18 +10,30 @@ namespace SabakaLang.RuntimeEnvironment;
 
 public class Program
 {
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
+    private static readonly IntPtr IntPtr_Zero = IntPtr.Zero;
+
     public static void Main(string[] args)
     {
-        if (args.Length == 0)
+        try
         {
-            Console.Error.WriteLine("Usage: sre <file.sar|file.sabakac>");
+            if (args.Length == 0)
+            {
+                MessageBox(IntPtr.Zero, "Usage: sre <file.sar|file.sabakac>", "SabakaLang RuntimeEnvironment", 0x10);
+                Environment.Exit(1);
+            }
+            string path = args[0];
+            if (path.EndsWith(".sar", StringComparison.OrdinalIgnoreCase))
+                RunSar(path);
+            else
+                RunBytecode(path);
+        }
+        catch (Exception ex)
+        {
+            MessageBox(IntPtr.Zero, ex.Message, "SRE Error — " + (args.Length > 0 ? System.IO.Path.GetFileName(args[0]) : ""), 0x10);
             Environment.Exit(1);
         }
-        string path = args[0];
-        if (path.EndsWith(".sar", StringComparison.OrdinalIgnoreCase))
-            RunSar(path);
-        else
-            RunBytecode(path);
     }
 
     private static void RunBytecode(string path)
@@ -56,6 +68,9 @@ public class Program
             var externals         = new Dictionary<string, Func<Value[], Value>>(StringComparer.OrdinalIgnoreCase);
             var callbackReceivers = new List<object>();
 
+            // Папка рядом с .sar — там лежат WebView2 и другие нативные зависимости
+            string sarDir = Path.GetDirectoryName(Path.GetFullPath(sarPath)) ?? "";
+
             foreach (var dllEntry in manifest.Dlls)
             {
                 string dllPath = Path.Combine(tmpDir,
@@ -71,7 +86,7 @@ public class Program
                 string alias      = dllEntry.Alias
                     ?? Path.GetFileNameWithoutExtension(dllPath).ToLower();
 
-                LoadDll(dllPath, alias, namespaced, externals, callbackReceivers);
+                LoadDll(dllPath, alias, namespaced, sarDir, externals, callbackReceivers);
                 Console.WriteLine($"[SRE] Loaded: {Path.GetFileName(dllPath)}" +
                     (namespaced ? $" as {alias}" : ""));
             }
@@ -112,11 +127,12 @@ public class Program
         string dllPath,
         string alias,
         bool namespaced,
+        string sarDir,
         Dictionary<string, Func<Value[], Value>> externals,
         List<object> callbackReceivers)
     {
-        // Collectible load context — не бросает при отсутствии WPF и других зависимостей
-        var alc = new SabakaDllLoadContext(dllPath);
+        // Collectible load context — ищет зависимости в tmpDir/dlls, рядом с .sar и рядом с exe
+        var alc = new SabakaDllLoadContext(dllPath, sarDir);
         Assembly asm;
         try { asm = alc.LoadFromAssemblyPath(dllPath); }
         catch (Exception ex)
@@ -207,24 +223,32 @@ public class Program
     }
 }
 
-// ── Точная копия SabakaDllLoadContext из Compiler.cs ─────────────────────────
+// ── SabakaDllLoadContext — ищет зависимости в нескольких папках ──────────────
 internal sealed class SabakaDllLoadContext : AssemblyLoadContext
 {
-    private readonly string _dllDir;
+    private readonly string _dllDir;       // tmpDir/dlls/
+    private readonly string _sarDir;       // папка рядом с .sar (там WebView2 и т.п.)
+    private readonly string _sreDir;       // папка рядом с SRE exe
 
-    public SabakaDllLoadContext(string dllPath)
+    public SabakaDllLoadContext(string dllPath, string sarDir)
         : base(name: "Sabaka-" + Path.GetFileName(dllPath), isCollectible: true)
     {
         _dllDir = Path.GetDirectoryName(dllPath) ?? "";
+        _sarDir = sarDir;
+        _sreDir = Path.GetDirectoryName(
+            System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "";
     }
 
     protected override Assembly? Load(AssemblyName name)
     {
-        string local = Path.Combine(_dllDir, name.Name + ".dll");
-        if (File.Exists(local))
+        foreach (var dir in new[] { _dllDir, _sarDir, _sreDir })
         {
-            try { return LoadFromAssemblyPath(local); }
-            catch { }
+            string candidate = Path.Combine(dir, name.Name + ".dll");
+            if (File.Exists(candidate))
+            {
+                try { return LoadFromAssemblyPath(candidate); }
+                catch { }
+            }
         }
         try { return Default.LoadFromAssemblyName(name); }
         catch { }
