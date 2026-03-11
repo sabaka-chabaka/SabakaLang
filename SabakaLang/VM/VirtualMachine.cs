@@ -21,7 +21,7 @@ public class VirtualMachine
     private readonly TextReader _input;
     private readonly TextWriter _output;
     private static readonly HttpClient _httpClient = new();
-    
+
     private readonly IReadOnlyDictionary<string, Func<Value[], Value>> _externals;
 
     public VirtualMachine(TextReader? input = null, TextWriter? output = null,
@@ -38,7 +38,7 @@ public class VirtualMachine
         _output = output ?? Console.Out;
     }
 
-        // Stored for use by CallFunction (set at start of Execute)
+    // Stored for use by CallFunction (set at start of Execute)
     private List<Instruction> _instructions = new();
 
     /// <summary>
@@ -105,7 +105,15 @@ public class VirtualMachine
             }
         }
 
-        
+        if (instructions.Last().OpCode != OpCode.Input)
+        {
+            instructions.Add(new Instruction(OpCode.Push,
+                Value.FromString("Program has been successfully executed, press enter for exit...")));
+            instructions.Add(new Instruction(OpCode.Print));
+            instructions.Add(new Instruction(OpCode.Input));
+        }
+
+
         RunLoop(_instructions, ref ip);
     }
 
@@ -116,721 +124,725 @@ public class VirtualMachine
             var instruction = instructions[ip];
             try
             {
-
-            switch (instruction.OpCode)
-            {
-                case OpCode.CreateObject:
+                switch (instruction.OpCode)
                 {
-                    var fieldNames = UnwrapStringList(instruction.Extra);
-                    var fields = new Dictionary<string, Value>();
-                    if (fieldNames != null)
+                    case OpCode.CreateObject:
                     {
-                        foreach (var name in fieldNames)
+                        var fieldNames = UnwrapStringList(instruction.Extra);
+                        var fields = new Dictionary<string, Value>();
+                        if (fieldNames != null)
                         {
-                            fields[name] = Value.FromInt(0);
+                            foreach (var name in fieldNames)
+                            {
+                                fields[name] = Value.FromInt(0);
+                            }
                         }
-                    }
 
-                    var obj = new Value
-                    {
-                        Type = SabakaType.Object,
-                        ObjectFields = fields,
-                        ClassName = instruction.Name
-                    };
+                        var obj = new Value
+                        {
+                            Type = SabakaType.Object,
+                            ObjectFields = fields,
+                            ClassName = instruction.Name
+                        };
 
-                    _stack.Push(obj);
-                    break;
-                }
-
-                case OpCode.PushThis:
-                {
-                    if (_thisStack.Count == 0) throw new Exception("No 'this' in current context");
-                    _stack.Push(_thisStack.Peek());
-                    break;
-                }
-
-                case OpCode.Dup:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in Dup");
-                    _stack.Push(_stack.Peek());
-                    break;
-                }
-
-                case OpCode.Pop:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in Pop");
-                    _stack.Pop();
-                    break;
-                }
-
-                case OpCode.Push:
-                    _stack.Push(UnwrapValue(instruction.Operand));
-                    break;
-
-                case OpCode.CallExternal:
-                {
-                    int argCount = UnwrapInt(instruction.Operand);
-                    var args = new List<Value>();
-                    for (int i = 0; i < argCount; i++)
-                    {
-                        if (_stack.Count == 0) throw new Exception("Stack empty in CallExternal");
-                        args.Add(_stack.Pop());
-                    }
-                    args.Reverse();
-
-                    string name = instruction.Name!;
-                    if (!_externals.TryGetValue(name, out var nativeFunc))
-                        throw new Exception($"External function '{name}' not registered");
-
-                    var result = nativeFunc(args.ToArray());
-                    _stack.Push(result);
-                    break;
-                }
-                
-                case OpCode.Add:
-                    if (_stack.Count < 2) throw new Exception("Stack empty in Add");
-                    
-                    if (IsStringAtTop())
-                    {
-                        var ba = _stack.Pop();
-                        var ab = _stack.Pop();
-                        _stack.Push(Value.FromString(ab.ToString() + ba.ToString()));
-                    }
-                    else
-                    {
-                        BinaryNumeric((a, b) => a + b);
-                    }
-
-                    break;
-
-                case OpCode.Sub:
-                    if (_stack.Count < 2) throw new Exception("Stack empty in Sub");
-                    BinaryNumeric((a, b) => a - b);
-                    break;
-
-                case OpCode.Mul:
-                    if (_stack.Count < 2) throw new Exception("Stack empty in Mul");
-                    BinaryNumeric((a, b) => a * b);
-                    break;
-
-                case OpCode.Div:
-                    if (_stack.Count < 2) throw new Exception("Stack empty in Div");
-                    BinaryNumeric((a, b) => a / b);
-                    break;
-
-                case OpCode.Store:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in Store");
-                    var value = _stack.Pop();
-                    var name = instruction.Name!;
-                    Assign(name, value);
-                    break;
-                }
-
-
-
-                case OpCode.Load:
-                {
-                    var name = instruction.Name!;
-                    var value = Resolve(name);
-                    _stack.Push(value);
-                    break;
-                }
-
-
-
-                case OpCode.Print:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in Print");
-                    var value = _stack.Pop();
-                    _output.WriteLine(value.ToString());
-                    break;
-                }
-
-                case OpCode.Sleep:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in Print");
-                    var value = _stack.Pop();
-                    Thread.Sleep((int)(value.Float * 1000f));
-                    break;
-                }
-
-                case OpCode.Input:
-                {
-                    var line = _input.ReadLine() ?? "";
-                    _stack.Push(Value.FromString(line));
-                    break;
-                }
-
-                case OpCode.ReadFile:
-                {
-                    var path = _stack.Pop().String;
-                    if (!File.Exists(path))
-                    {
-                        _stack.Push(Value.FromString(""));
+                        _stack.Push(obj);
                         break;
                     }
-                    _stack.Push(Value.FromString(File.ReadAllText(path)));
-                    break;
-                }
 
-                case OpCode.WriteFile:
-                {
-                    var content = _stack.Pop().String;
-                    var path = _stack.Pop().String;
-                    File.WriteAllText(path, content);
-                    break;
-                }
-
-                case OpCode.AppendFile:
-                {
-                    var content = _stack.Pop().String;
-                    var path = _stack.Pop().String;
-                    File.AppendAllText(path, content);
-                    break;
-                }
-
-                case OpCode.FileExists:
-                {
-                    var path = _stack.Pop().String;
-                    _stack.Push(Value.FromBool(File.Exists(path)));
-                    break;
-                }
-
-                case OpCode.DeleteFile:
-                {
-                    var path = _stack.Pop().String;
-                    if (File.Exists(path))
-                        File.Delete(path);
-                    break;
-                }
-
-                case OpCode.ReadLines:
-                {
-                    var path = _stack.Pop().String;
-                    if (!File.Exists(path))
-                        throw new Exception($"File not found: {path}");
-                    var lines = File.ReadAllLines(path)
-                        .Select(Value.FromString)
-                        .ToList();
-                    _stack.Push(Value.FromArray(lines));
-                    break;
-                }
-
-                case OpCode.Time:
-                {
-                    var ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                    _stack.Push(Value.FromFloat(ms / 1000.0));
-                    break;
-                }
-
-                case OpCode.TimeMs:
-                {
-                    var ms = (int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % int.MaxValue);
-                    _stack.Push(Value.FromInt(ms));
-                    break;
-                }
-
-                case OpCode.HttpGet:
-                {
-                    var url = _stack.Pop().String;
-                    try
+                    case OpCode.PushThis:
                     {
-                        var response = _httpClient.GetStringAsync(url).GetAwaiter().GetResult();
-                        _stack.Push(Value.FromString(response));
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new Exception($"httpGet failed: {ex.Message}");
-                    }
-                    break;
-                }
-
-                case OpCode.HttpPost:
-                {
-                    var body = _stack.Pop().String;
-                    var url = _stack.Pop().String;
-                    try
-                    {
-                        var content = new StringContent(body, Encoding.UTF8, "text/plain");
-                        var response = _httpClient.PostAsync(url, content).GetAwaiter().GetResult();
-                        var result = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                        _stack.Push(Value.FromString(result));
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new Exception($"httpPost failed: {ex.Message}");
-                    }
-                    break;
-                }
-
-                case OpCode.HttpPostJson:
-                {
-                    var json = _stack.Pop().String;
-                    var url = _stack.Pop().String;
-                    try
-                    {
-                        var content = new StringContent(json, Encoding.UTF8, "application/json");
-                        var response = _httpClient.PostAsync(url, content).GetAwaiter().GetResult();
-                        var result = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                        _stack.Push(Value.FromString(result));
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new Exception($"httpPostJson failed: {ex.Message}");
-                    }
-                    break;
-                }
-
-                case OpCode.Ord:
-                {
-                    var s = _stack.Pop().String;
-                    if (string.IsNullOrEmpty(s))
-                        throw new Exception("ord: empty string");
-                    _stack.Push(Value.FromInt((int)s[0]));
-                    break;
-                }
-
-                case OpCode.Chr:
-                {
-                    var code = _stack.Pop().Int;
-                    _stack.Push(Value.FromString(((char)code).ToString()));
-                    break;
-                }
-
-                case OpCode.LoadField:
-                {
-                    var obj = _stack.Pop();
-                    if (obj.Type != SabakaType.Object && obj.Type != SabakaType.Struct)
-                    {
-                        throw new Exception("Cannot load field from non-object/struct");
+                        if (_thisStack.Count == 0) throw new Exception("No 'this' in current context");
+                        _stack.Push(_thisStack.Peek());
+                        break;
                     }
 
-                    var fields = obj.Type == SabakaType.Object ? obj.ObjectFields : obj.Struct;
-                    if (fields == null) throw new Exception("Fields dictionary is null");
+                    case OpCode.Dup:
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in Dup");
+                        _stack.Push(_stack.Peek());
+                        break;
+                    }
 
-                    if (fields.TryGetValue(instruction.Name!, out var value))
+                    case OpCode.Pop:
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in Pop");
+                        _stack.Pop();
+                        break;
+                    }
+
+                    case OpCode.Push:
+                        _stack.Push(UnwrapValue(instruction.Operand));
+                        break;
+
+                    case OpCode.CallExternal:
+                    {
+                        int argCount = UnwrapInt(instruction.Operand);
+                        var args = new List<Value>();
+                        for (int i = 0; i < argCount; i++)
+                        {
+                            if (_stack.Count == 0) throw new Exception("Stack empty in CallExternal");
+                            args.Add(_stack.Pop());
+                        }
+
+                        args.Reverse();
+
+                        string name = instruction.Name!;
+                        if (!_externals.TryGetValue(name, out var nativeFunc))
+                            throw new Exception($"External function '{name}' not registered");
+
+                        var result = nativeFunc(args.ToArray());
+                        _stack.Push(result);
+                        break;
+                    }
+
+                    case OpCode.Add:
+                        if (_stack.Count < 2) throw new Exception("Stack empty in Add");
+
+                        if (IsStringAtTop())
+                        {
+                            var ba = _stack.Pop();
+                            var ab = _stack.Pop();
+                            _stack.Push(Value.FromString(ab.ToString() + ba.ToString()));
+                        }
+                        else
+                        {
+                            BinaryNumeric((a, b) => a + b);
+                        }
+
+                        break;
+
+                    case OpCode.Sub:
+                        if (_stack.Count < 2) throw new Exception("Stack empty in Sub");
+                        BinaryNumeric((a, b) => a - b);
+                        break;
+
+                    case OpCode.Mul:
+                        if (_stack.Count < 2) throw new Exception("Stack empty in Mul");
+                        BinaryNumeric((a, b) => a * b);
+                        break;
+
+                    case OpCode.Div:
+                        if (_stack.Count < 2) throw new Exception("Stack empty in Div");
+                        BinaryNumeric((a, b) => a / b);
+                        break;
+
+                    case OpCode.Store:
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in Store");
+                        var value = _stack.Pop();
+                        var name = instruction.Name!;
+                        Assign(name, value);
+                        break;
+                    }
+
+
+                    case OpCode.Load:
+                    {
+                        var name = instruction.Name!;
+                        var value = Resolve(name);
                         _stack.Push(value);
-                    else
-                        _stack.Push(Value.FromInt(0)); // Default value
-
-                    break;
-                }
-
-                case OpCode.StoreField:
-                {
-                    var value = _stack.Pop();
-                    var obj = _stack.Pop();
-
-                    if (obj.Type != SabakaType.Object && obj.Type != SabakaType.Struct)
-                        throw new Exception("Cannot store field in non-object/struct");
-
-                    var fields = obj.Type == SabakaType.Object ? obj.ObjectFields : obj.Struct;
-                    if (fields == null) throw new Exception("Fields dictionary is null");
-
-                    fields[instruction.Name!] = value;
-                    break;
-                }
-
-                case OpCode.CallMethod:
-                {
-                    int argCount = UnwrapInt(instruction.Operand);
-                    var args = new List<Value>();
-
-                    for (int i = 0; i < argCount; i++)
-                    {
-                        if (_stack.Count == 0) throw new Exception("Stack empty in CallMethod (args)");
-                        args.Add(_stack.Pop());
-                    }
-
-                    args.Reverse();
-
-                    if (_stack.Count == 0) throw new Exception("Stack empty in CallMethod (object)");
-                    var obj = _stack.Pop();
-
-                    if (obj.Type != SabakaType.Object)
-                        throw new Exception("Cannot call method on non-object");
-
-                    string startClassName = obj.ClassName!;
-                    if (instruction.Extra is string baseClassName)
-                    {
-                        startClassName = baseClassName;
-                    }
-                    
-                    string extKey = $"{startClassName.ToLower()}.{instruction.Name!.ToLower()}";
-                    if (_externals.TryGetValue(extKey, out var extMethod))
-                    {
-                        var extResult = extMethod(args.ToArray());
-                        _stack.Push(extResult);
                         break;
                     }
 
-                    var function = ResolveMethod(startClassName, instruction.Name!);
 
-                    _callStack.Push(ip + 1);
-                    _scopeDepthStack.Push(_scopes.Count);
-                    _stackDepthStack.Push(_stack.Count);
-                    _thisStack.Push(obj);
-                    _methodCallStack.Push(true);
-
-                    EnterScope();
-
-                    for (int i = 0; i < function.Parameters.Count; i++)
+                    case OpCode.Print:
                     {
-                        _scopes.Peek()[function.Parameters[i]] = args[i];
-                    }
-
-                    ip = function.Address;
-                    continue;
-                }
-
-                case OpCode.Inherit:
-                {
-                    // Already handled in pre-scan
-                    break;
-                }
-
-                case OpCode.Call:
-                {
-                    int argCount = UnwrapInt(instruction.Operand);
-                    var args = new List<Value>();
-
-                    for (int i = 0; i < argCount; i++)
-                    {
-                        if (_stack.Count == 0) throw new Exception("Stack empty in Call");
-                        args.Add(_stack.Pop());
-                    }
-
-                    args.Reverse();
-
-                    if (!_functions.TryGetValue(instruction.Name!, out var function))
-                        throw new Exception($"Undefined function '{instruction.Name}'");
-
-                    _callStack.Push(ip + 1);
-                    _scopeDepthStack.Push(_scopes.Count);
-                    _stackDepthStack.Push(_stack.Count);
-                    _methodCallStack.Push(false);
-
-                    EnterScope();
-
-                    for (int i = 0; i < function.Parameters.Count; i++)
-                    {
-                        _scopes.Peek()[function.Parameters[i]] = args[i];
-                    }
-
-                    ip = function.Address;
-                    continue;
-                }
-
-
-                case OpCode.CreateArray:
-                {
-                    int count = UnwrapInt(instruction.Operand);
-                    var list = new List<Value>();
-
-                    for (int i = 0; i < count; i++)
-                        list.Add(_stack.Pop());
-
-                    list.Reverse();
-
-                    _stack.Push(Value.FromArray(list));
-                    break;
-                }
-
-                
-                case OpCode.ArrayLoad:
-                {
-                    var index = _stack.Pop();
-                    var array = _stack.Pop();
-
-                    if (index.Type != SabakaType.Int)
-                        throw new Exception("Index must be int");
-
-                    if (array.Type == SabakaType.String)
-                    {
-                        if (index.Int < 0 || index.Int >= array.String.Length)
-                            throw new Exception($"String index {index.Int} out of range");
-                        _stack.Push(Value.FromString(array.String[index.Int].ToString()));
+                        if (_stack.Count == 0) throw new Exception("Stack empty in Print");
+                        var value = _stack.Pop();
+                        _output.WriteLine(value.ToString());
                         break;
                     }
 
-                    if (array.Type != SabakaType.Array)
-                        throw new Exception("Not an array");
-
-                    if (array.Array == null)
-                        throw new Exception("ArrayLoad: array is null");
-
-                    if (index.Int < 0 || index.Int >= array.Array.Count)
-                        throw new Exception($"ArrayLoad out of bounds: index={index.Int} size={array.Array.Count}");
-
-                    _stack.Push(array.Array[index.Int]);
-                    break;
-                }
-
-                case OpCode.ArrayStore:
-                {
-                    var value = _stack.Pop();
-                    var index = _stack.Pop();
-                    var array = _stack.Pop();
-
-                    if (array.Type != SabakaType.Array)
-                        throw new Exception("Not an array");
-
-                    if (index.Type != SabakaType.Int)
-                        throw new Exception("Index must be int");
-
-                    while (array.Array.Count <= index.Int)
+                    case OpCode.Sleep:
                     {
-                        array.Array.Add(value);
+                        if (_stack.Count == 0) throw new Exception("Stack empty in Print");
+                        var value = _stack.Pop();
+                        Thread.Sleep((int)(value.Float * 1000f));
+                        break;
                     }
-                    
-                    array.Array![index.Int] = value;
-                    break;
-                }
 
-
-                
-                case OpCode.Return:
-                {
-                    Value returnValue = Value.FromInt(0); // Default for void
-                    int targetStackDepth = _stackDepthStack.Count > 0 ? _stackDepthStack.Pop() : 0;
-
-                    if (_stack.Count > targetStackDepth)
+                    case OpCode.Input:
                     {
-                        returnValue = _stack.Pop();
-                        while (_stack.Count > targetStackDepth)
+                        var line = _input.ReadLine() ?? "";
+                        _stack.Push(Value.FromString(line));
+                        break;
+                    }
+
+                    case OpCode.ReadFile:
+                    {
+                        var path = _stack.Pop().String;
+                        if (!File.Exists(path))
                         {
-                            _stack.Pop();
+                            _stack.Push(Value.FromString(""));
+                            break;
                         }
+
+                        _stack.Push(Value.FromString(File.ReadAllText(path)));
+                        break;
                     }
 
-                    if (_methodCallStack.Count > 0 && _methodCallStack.Pop())
+                    case OpCode.WriteFile:
                     {
-                        if (_thisStack.Count > 0)
+                        var content = _stack.Pop().String;
+                        var path = _stack.Pop().String;
+                        File.WriteAllText(path, content);
+                        break;
+                    }
+
+                    case OpCode.AppendFile:
+                    {
+                        var content = _stack.Pop().String;
+                        var path = _stack.Pop().String;
+                        File.AppendAllText(path, content);
+                        break;
+                    }
+
+                    case OpCode.FileExists:
+                    {
+                        var path = _stack.Pop().String;
+                        _stack.Push(Value.FromBool(File.Exists(path)));
+                        break;
+                    }
+
+                    case OpCode.DeleteFile:
+                    {
+                        var path = _stack.Pop().String;
+                        if (File.Exists(path))
+                            File.Delete(path);
+                        break;
+                    }
+
+                    case OpCode.ReadLines:
+                    {
+                        var path = _stack.Pop().String;
+                        if (!File.Exists(path))
+                            throw new Exception($"File not found: {path}");
+                        var lines = File.ReadAllLines(path)
+                            .Select(Value.FromString)
+                            .ToList();
+                        _stack.Push(Value.FromArray(lines));
+                        break;
+                    }
+
+                    case OpCode.Time:
+                    {
+                        var ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                        _stack.Push(Value.FromFloat(ms / 1000.0));
+                        break;
+                    }
+
+                    case OpCode.TimeMs:
+                    {
+                        var ms = (int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % int.MaxValue);
+                        _stack.Push(Value.FromInt(ms));
+                        break;
+                    }
+
+                    case OpCode.HttpGet:
+                    {
+                        var url = _stack.Pop().String;
+                        try
                         {
-                            _thisStack.Pop();
+                            var response = _httpClient.GetStringAsync(url).GetAwaiter().GetResult();
+                            _stack.Push(Value.FromString(response));
                         }
+                        catch (Exception ex)
+                        {
+                            throw new Exception($"httpGet failed: {ex.Message}");
+                        }
+
+                        break;
                     }
 
-                    if (_scopeDepthStack.Count > 0)
+                    case OpCode.HttpPost:
                     {
-                        int targetDepth = _scopeDepthStack.Pop();
-                        while (_scopes.Count > targetDepth)
+                        var body = _stack.Pop().String;
+                        var url = _stack.Pop().String;
+                        try
+                        {
+                            var content = new StringContent(body, Encoding.UTF8, "text/plain");
+                            var response = _httpClient.PostAsync(url, content).GetAwaiter().GetResult();
+                            var result = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                            _stack.Push(Value.FromString(result));
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new Exception($"httpPost failed: {ex.Message}");
+                        }
+
+                        break;
+                    }
+
+                    case OpCode.HttpPostJson:
+                    {
+                        var json = _stack.Pop().String;
+                        var url = _stack.Pop().String;
+                        try
+                        {
+                            var content = new StringContent(json, Encoding.UTF8, "application/json");
+                            var response = _httpClient.PostAsync(url, content).GetAwaiter().GetResult();
+                            var result = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                            _stack.Push(Value.FromString(result));
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new Exception($"httpPostJson failed: {ex.Message}");
+                        }
+
+                        break;
+                    }
+
+                    case OpCode.Ord:
+                    {
+                        var s = _stack.Pop().String;
+                        if (string.IsNullOrEmpty(s))
+                            throw new Exception("ord: empty string");
+                        _stack.Push(Value.FromInt((int)s[0]));
+                        break;
+                    }
+
+                    case OpCode.Chr:
+                    {
+                        var code = _stack.Pop().Int;
+                        _stack.Push(Value.FromString(((char)code).ToString()));
+                        break;
+                    }
+
+                    case OpCode.LoadField:
+                    {
+                        var obj = _stack.Pop();
+                        if (obj.Type != SabakaType.Object && obj.Type != SabakaType.Struct)
+                        {
+                            throw new Exception("Cannot load field from non-object/struct");
+                        }
+
+                        var fields = obj.Type == SabakaType.Object ? obj.ObjectFields : obj.Struct;
+                        if (fields == null) throw new Exception("Fields dictionary is null");
+
+                        if (fields.TryGetValue(instruction.Name!, out var value))
+                            _stack.Push(value);
+                        else
+                            _stack.Push(Value.FromInt(0)); // Default value
+
+                        break;
+                    }
+
+                    case OpCode.StoreField:
+                    {
+                        var value = _stack.Pop();
+                        var obj = _stack.Pop();
+
+                        if (obj.Type != SabakaType.Object && obj.Type != SabakaType.Struct)
+                            throw new Exception("Cannot store field in non-object/struct");
+
+                        var fields = obj.Type == SabakaType.Object ? obj.ObjectFields : obj.Struct;
+                        if (fields == null) throw new Exception("Fields dictionary is null");
+
+                        fields[instruction.Name!] = value;
+                        break;
+                    }
+
+                    case OpCode.CallMethod:
+                    {
+                        int argCount = UnwrapInt(instruction.Operand);
+                        var args = new List<Value>();
+
+                        for (int i = 0; i < argCount; i++)
+                        {
+                            if (_stack.Count == 0) throw new Exception("Stack empty in CallMethod (args)");
+                            args.Add(_stack.Pop());
+                        }
+
+                        args.Reverse();
+
+                        if (_stack.Count == 0) throw new Exception("Stack empty in CallMethod (object)");
+                        var obj = _stack.Pop();
+
+                        if (obj.Type != SabakaType.Object)
+                            throw new Exception("Cannot call method on non-object");
+
+                        string startClassName = obj.ClassName!;
+                        if (instruction.Extra is string baseClassName)
+                        {
+                            startClassName = baseClassName;
+                        }
+
+                        string extKey = $"{startClassName.ToLower()}.{instruction.Name!.ToLower()}";
+                        if (_externals.TryGetValue(extKey, out var extMethod))
+                        {
+                            var extResult = extMethod(args.ToArray());
+                            _stack.Push(extResult);
+                            break;
+                        }
+
+                        var function = ResolveMethod(startClassName, instruction.Name!);
+
+                        _callStack.Push(ip + 1);
+                        _scopeDepthStack.Push(_scopes.Count);
+                        _stackDepthStack.Push(_stack.Count);
+                        _thisStack.Push(obj);
+                        _methodCallStack.Push(true);
+
+                        EnterScope();
+
+                        for (int i = 0; i < function.Parameters.Count; i++)
+                        {
+                            _scopes.Peek()[function.Parameters[i]] = args[i];
+                        }
+
+                        ip = function.Address;
+                        continue;
+                    }
+
+                    case OpCode.Inherit:
+                    {
+                        // Already handled in pre-scan
+                        break;
+                    }
+
+                    case OpCode.Call:
+                    {
+                        int argCount = UnwrapInt(instruction.Operand);
+                        var args = new List<Value>();
+
+                        for (int i = 0; i < argCount; i++)
+                        {
+                            if (_stack.Count == 0) throw new Exception("Stack empty in Call");
+                            args.Add(_stack.Pop());
+                        }
+
+                        args.Reverse();
+
+                        if (!_functions.TryGetValue(instruction.Name!, out var function))
+                            throw new Exception($"Undefined function '{instruction.Name}'");
+
+                        _callStack.Push(ip + 1);
+                        _scopeDepthStack.Push(_scopes.Count);
+                        _stackDepthStack.Push(_stack.Count);
+                        _methodCallStack.Push(false);
+
+                        EnterScope();
+
+                        for (int i = 0; i < function.Parameters.Count; i++)
+                        {
+                            _scopes.Peek()[function.Parameters[i]] = args[i];
+                        }
+
+                        ip = function.Address;
+                        continue;
+                    }
+
+
+                    case OpCode.CreateArray:
+                    {
+                        int count = UnwrapInt(instruction.Operand);
+                        var list = new List<Value>();
+
+                        for (int i = 0; i < count; i++)
+                            list.Add(_stack.Pop());
+
+                        list.Reverse();
+
+                        _stack.Push(Value.FromArray(list));
+                        break;
+                    }
+
+
+                    case OpCode.ArrayLoad:
+                    {
+                        var index = _stack.Pop();
+                        var array = _stack.Pop();
+
+                        if (index.Type != SabakaType.Int)
+                            throw new Exception("Index must be int");
+
+                        if (array.Type == SabakaType.String)
+                        {
+                            if (index.Int < 0 || index.Int >= array.String.Length)
+                                throw new Exception($"String index {index.Int} out of range");
+                            _stack.Push(Value.FromString(array.String[index.Int].ToString()));
+                            break;
+                        }
+
+                        if (array.Type != SabakaType.Array)
+                            throw new Exception("Not an array");
+
+                        if (array.Array == null)
+                            throw new Exception("ArrayLoad: array is null");
+
+                        if (index.Int < 0 || index.Int >= array.Array.Count)
+                            throw new Exception($"ArrayLoad out of bounds: index={index.Int} size={array.Array.Count}");
+
+                        _stack.Push(array.Array[index.Int]);
+                        break;
+                    }
+
+                    case OpCode.ArrayStore:
+                    {
+                        var value = _stack.Pop();
+                        var index = _stack.Pop();
+                        var array = _stack.Pop();
+
+                        if (array.Type != SabakaType.Array)
+                            throw new Exception("Not an array");
+
+                        if (index.Type != SabakaType.Int)
+                            throw new Exception("Index must be int");
+
+                        while (array.Array.Count <= index.Int)
+                        {
+                            array.Array.Add(value);
+                        }
+
+                        array.Array![index.Int] = value;
+                        break;
+                    }
+
+
+                    case OpCode.Return:
+                    {
+                        Value returnValue = Value.FromInt(0); // Default for void
+                        int targetStackDepth = _stackDepthStack.Count > 0 ? _stackDepthStack.Pop() : 0;
+
+                        if (_stack.Count > targetStackDepth)
+                        {
+                            returnValue = _stack.Pop();
+                            while (_stack.Count > targetStackDepth)
+                            {
+                                _stack.Pop();
+                            }
+                        }
+
+                        if (_methodCallStack.Count > 0 && _methodCallStack.Pop())
+                        {
+                            if (_thisStack.Count > 0)
+                            {
+                                _thisStack.Pop();
+                            }
+                        }
+
+                        if (_scopeDepthStack.Count > 0)
+                        {
+                            int targetDepth = _scopeDepthStack.Pop();
+                            while (_scopes.Count > targetDepth)
+                            {
+                                ExitScope();
+                            }
+                        }
+                        else
                         {
                             ExitScope();
                         }
+
+                        if (_callStack.Count == 0)
+                            return;
+
+                        ip = _callStack.Pop();
+                        _stack.Push(returnValue);
+                        continue;
                     }
-                    else
+
+
+                    case OpCode.Jump:
+                        ip = UnwrapInt(instruction.Operand);
+                        continue;
+
+                    case OpCode.JumpIfFalse:
                     {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in JumpIfFalse");
+                        var condition = _stack.Pop();
+
+                        if (condition.Type != SabakaType.Bool)
+                            throw new Exception("Condition must be bool");
+
+                        if (!condition.Bool)
+                        {
+                            ip = UnwrapInt(instruction.Operand);
+                            continue;
+                        }
+
+                        break;
+                    }
+
+                    case OpCode.Equal:
+                    {
+                        if (_stack.Count < 2) throw new Exception("Stack empty in Equal");
+                        var b = _stack.Pop();
+                        var a = _stack.Pop();
+
+                        if (IsNumber(a) && IsNumber(b))
+                        {
+                            _stack.Push(Value.FromBool(ToDouble(a) == ToDouble(b)));
+                        }
+                        else if (a.Type != b.Type)
+                        {
+                            throw new Exception(
+                                $"Type mismatch in ==: left={a.Type} right={b.Type} | left_val={a} right_val={b}");
+                        }
+                        else
+                        {
+                            bool result = a.Type switch
+                            {
+                                SabakaType.Bool => a.Bool == b.Bool,
+                                SabakaType.String => a.String == b.String,
+                                SabakaType.Array => a.Array == b.Array, // Reference equality for now
+                                _ => throw new Exception("Invalid type for ==")
+                            };
+                            _stack.Push(Value.FromBool(result));
+                        }
+
+                        break;
+                    }
+
+
+                    case OpCode.NotEqual:
+                    {
+                        if (_stack.Count < 2) throw new Exception("Stack empty in NotEqual");
+                        var b = _stack.Pop();
+                        var a = _stack.Pop();
+
+                        if (IsNumber(a) && IsNumber(b))
+                        {
+                            _stack.Push(Value.FromBool(ToDouble(a) != ToDouble(b)));
+                        }
+                        else if (a.Type != b.Type)
+                        {
+                            throw new Exception("Type mismatch in !=");
+                        }
+                        else
+                        {
+                            bool result = a.Type switch
+                            {
+                                SabakaType.Bool => a.Bool != b.Bool,
+                                SabakaType.String => a.String != b.String,
+                                SabakaType.Array => a.Array != b.Array,
+                                _ => throw new Exception("Invalid type for !=")
+                            };
+                            _stack.Push(Value.FromBool(result));
+                        }
+
+                        break;
+                    }
+
+
+                    case OpCode.Greater:
+                        CompareNumeric((a, b) => a > b);
+                        break;
+
+                    case OpCode.Less:
+                        CompareNumeric((a, b) => a < b);
+                        break;
+
+                    case OpCode.GreaterEqual:
+                        CompareNumeric((a, b) => a >= b);
+                        break;
+
+                    case OpCode.LessEqual:
+                        CompareNumeric((a, b) => a <= b);
+                        break;
+
+                    case OpCode.Negate:
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in Negate");
+                        var value = _stack.Pop();
+
+                        if (value.Type == SabakaType.Int)
+                            _stack.Push(Value.FromInt(-value.Int));
+                        else if (value.Type == SabakaType.Float)
+                            _stack.Push(Value.FromFloat(-value.Float));
+                        else
+                            throw new Exception("Negate requires numeric type");
+
+                        break;
+                    }
+
+                    case OpCode.Declare:
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in Declare");
+                        var value = _stack.Pop();
+                        var currentScope = _scopes.Peek();
+
+                        if (currentScope.ContainsKey(instruction.Name!))
+                            throw new Exception("Variable already declared in this scope");
+
+                        _scopes.Peek()[instruction.Name!] = value;
+                        break;
+                    }
+
+
+                    case OpCode.EnterScope:
+                        EnterScope();
+                        break;
+
+                    case OpCode.ExitScope:
                         ExitScope();
+                        break;
+
+                    case OpCode.Not:
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in Not");
+                        var a = _stack.Pop();
+
+                        if (a.Type != SabakaType.Bool)
+                            throw new Exception("! requires bool");
+
+                        _stack.Push(Value.FromBool(!a.Bool));
+                        break;
                     }
 
-                    if (_callStack.Count == 0)
-                        return;
+                    case OpCode.JumpIfTrue:
+                    {
+                        if (_stack.Count == 0) throw new Exception("Stack empty in JumpIfTrue");
+                        var condition = _stack.Pop();
 
-                    ip = _callStack.Pop();
-                    _stack.Push(returnValue);
-                    continue;
-                }
+                        if (condition.Type != SabakaType.Bool)
+                            throw new Exception("Condition must be bool");
 
+                        if (condition.Bool)
+                        {
+                            ip = UnwrapInt(instruction.Operand);
+                            continue;
+                        }
 
+                        break;
+                    }
 
-                case OpCode.Jump:
-                    ip = UnwrapInt(instruction.Operand);
-                    continue;
-
-                case OpCode.JumpIfFalse:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in JumpIfFalse");
-                    var condition = _stack.Pop();
-
-                    if (condition.Type != SabakaType.Bool)
-                        throw new Exception("Condition must be bool");
-
-                    if (!condition.Bool)
+                    case OpCode.Function:
                     {
                         ip = UnwrapInt(instruction.Operand);
                         continue;
                     }
 
-                    break;
-                }
+                    case OpCode.ArrayLength:
+                    {
+                        var arr = _stack.Pop();
 
-                case OpCode.Equal:
-                {
-                    if (_stack.Count < 2) throw new Exception("Stack empty in Equal");
-                    var b = _stack.Pop();
-                    var a = _stack.Pop();
+                        if (arr.Type == SabakaType.String)
+                            _stack.Push(Value.FromInt(arr.String?.Length ?? 0));
+                        else
+                            _stack.Push(Value.FromInt(arr.Array!.Count));
+                        break;
+                    }
 
-                    if (IsNumber(a) && IsNumber(b))
+                    case OpCode.CreateStruct:
                     {
-                        _stack.Push(Value.FromBool(ToDouble(a) == ToDouble(b)));
-                    }
-                    else if (a.Type != b.Type)
-                    {
-                        throw new Exception($"Type mismatch in ==: left={a.Type} right={b.Type} | left_val={a} right_val={b}");
-                    }
-                    else
-                    {
-                        bool result = a.Type switch
+                        var fields = UnwrapStringList(instruction.Extra);
+                        var structData = new Dictionary<string, Value>();
+                        foreach (var field in fields)
                         {
-                            SabakaType.Bool => a.Bool == b.Bool,
-                            SabakaType.String => a.String == b.String,
-                            SabakaType.Array => a.Array == b.Array, // Reference equality for now
-                            _ => throw new Exception("Invalid type for ==")
-                        };
-                        _stack.Push(Value.FromBool(result));
-                    }
-                    break;
-                }
+                            structData[field] = Value.FromInt(0);
+                        }
 
-
-                case OpCode.NotEqual:
-                {
-                    if (_stack.Count < 2) throw new Exception("Stack empty in NotEqual");
-                    var b = _stack.Pop();
-                    var a = _stack.Pop();
-
-                    if (IsNumber(a) && IsNumber(b))
-                    {
-                        _stack.Push(Value.FromBool(ToDouble(a) != ToDouble(b)));
-                    }
-                    else if (a.Type != b.Type)
-                    {
-                        throw new Exception("Type mismatch in !=");
-                    }
-                    else
-                    {
-                        bool result = a.Type switch
-                        {
-                            SabakaType.Bool => a.Bool != b.Bool,
-                            SabakaType.String => a.String != b.String,
-                            SabakaType.Array => a.Array != b.Array,
-                            _ => throw new Exception("Invalid type for !=")
-                        };
-                        _stack.Push(Value.FromBool(result));
-                    }
-                    break;
-                }
-
-
-                case OpCode.Greater:
-                    CompareNumeric((a, b) => a > b);
-                    break;
-
-                case OpCode.Less:
-                    CompareNumeric((a, b) => a < b);
-                    break;
-
-                case OpCode.GreaterEqual:
-                    CompareNumeric((a, b) => a >= b);
-                    break;
-
-                case OpCode.LessEqual:
-                    CompareNumeric((a, b) => a <= b);
-                    break;
-
-                case OpCode.Negate:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in Negate");
-                    var value = _stack.Pop();
-
-                    if (value.Type == SabakaType.Int)
-                        _stack.Push(Value.FromInt(-value.Int));
-                    else if (value.Type == SabakaType.Float)
-                        _stack.Push(Value.FromFloat(-value.Float));
-                    else
-                        throw new Exception("Negate requires numeric type");
-
-                    break;
-                }
-                
-                case OpCode.Declare:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in Declare");
-                    var value = _stack.Pop();
-                    var currentScope = _scopes.Peek();
-
-                    if (currentScope.ContainsKey(instruction.Name!))
-                        throw new Exception("Variable already declared in this scope");
-
-                    _scopes.Peek()[instruction.Name!] = value;
-                    break;
-                }
-
-
-                case OpCode.EnterScope:
-                    EnterScope();
-                    break;
-
-                case OpCode.ExitScope:
-                    ExitScope();
-                    break;
-
-                case OpCode.Not:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in Not");
-                    var a = _stack.Pop();
-
-                    if (a.Type != SabakaType.Bool)
-                        throw new Exception("! requires bool");
-
-                    _stack.Push(Value.FromBool(!a.Bool));
-                    break;
-                }
-
-                case OpCode.JumpIfTrue:
-                {
-                    if (_stack.Count == 0) throw new Exception("Stack empty in JumpIfTrue");
-                    var condition = _stack.Pop();
-
-                    if (condition.Type != SabakaType.Bool)
-                        throw new Exception("Condition must be bool");
-
-                    if (condition.Bool)
-                    {
-                        ip = UnwrapInt(instruction.Operand);
-                        continue;
+                        _stack.Push(Value.FromStruct(structData));
+                        break;
                     }
 
-                    break;
+
+                    default:
+                        throw new Exception($"Unknown opcode {instruction.OpCode}");
                 }
 
-                case OpCode.Function:
-                {
-                    ip = UnwrapInt(instruction.Operand);
-                    continue;
-                }
-
-                case OpCode.ArrayLength:
-                {
-                    var arr = _stack.Pop();
-
-                    if (arr.Type == SabakaType.String)
-                        _stack.Push(Value.FromInt(arr.String?.Length ?? 0));
-                    else
-                        _stack.Push(Value.FromInt(arr.Array!.Count));
-                    break;
-                }
-
-                case OpCode.CreateStruct:
-                {
-                    var fields = UnwrapStringList(instruction.Extra);
-                    var structData = new Dictionary<string, Value>();
-                    foreach (var field in fields)
-                    {
-                        structData[field] = Value.FromInt(0);
-                    }
-                    _stack.Push(Value.FromStruct(structData));
-                    break;
-                }
-
-                
-                default:
-                    throw new Exception($"Unknown opcode {instruction.OpCode}");
-            }
-
-            ip++;
+                ip++;
             }
             catch (Exception ex)
             {
@@ -874,6 +886,7 @@ public class VirtualMachine
         {
             return v.Array.Select(x => x.String).ToList();
         }
+
         if (extra is System.Collections.IEnumerable enumerable)
         {
             var result = new List<string>();
@@ -883,8 +896,10 @@ public class VirtualMachine
                 else if (item is Value val && val.Type == SabakaType.String) result.Add(val.String);
                 else result.Add(item?.ToString() ?? "");
             }
+
             return result;
         }
+
         return new List<string>();
     }
 
@@ -969,7 +984,7 @@ public class VirtualMachine
     {
         _scopes.Pop();
     }
-    
+
     private Value GetVariable(string name)
     {
         foreach (var scope in _scopes)
@@ -1042,7 +1057,6 @@ public class VirtualMachine
 
         throw new Exception($"Undefined method '{methodName}' in class '{className}'");
     }
-
 }
 
 public class FunctionInfo

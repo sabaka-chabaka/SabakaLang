@@ -1,0 +1,7 @@
+class Human{
+    string name;
+    
+    void Human(string nameIn){
+        name = nameIn;
+    }
+}
