@@ -108,7 +108,7 @@ public class VirtualMachine
         if (instructions.Last().OpCode != OpCode.Input)
         {
             instructions.Add(new Instruction(OpCode.Push,
-                Value.FromString("Program has been successfully executed, press enter for exit...")));
+                Value.FromString("[VM] Program has been successfully executed, press enter for exit...")));
             instructions.Add(new Instruction(OpCode.Print));
             instructions.Add(new Instruction(OpCode.Input));
         }
