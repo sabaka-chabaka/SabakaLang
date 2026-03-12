@@ -1,5 +1,6 @@
 ﻿using System.IO.Compression;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Text.Json;
 using SabakaLang.RuntimeEnvironment.Models;
@@ -10,12 +11,26 @@ namespace SabakaLang.RuntimeEnvironment;
 
 public class Program
 {
-    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
-    private static readonly IntPtr IntPtr_Zero = IntPtr.Zero;
+
+    [DllImport("kernel32.dll")]
+    private static extern bool AllocConsole();
+
+    [DllImport("kernel32.dll")]
+    private static extern bool FreeConsole();
+
+    [DllImport("kernel32.dll")]
+    private static extern bool AttachConsole(int dwProcessId);
+
+    private const int ATTACH_PARENT_PROCESS = -1;
 
     public static void Main(string[] args)
     {
+        // По умолчанию показываем консоль (пробуем подключиться к родительской или создать новую)
+        if (!AttachConsole(ATTACH_PARENT_PROCESS))
+            AllocConsole();
+
         try
         {
             if (args.Length == 0)
@@ -23,6 +38,7 @@ public class Program
                 MessageBox(IntPtr.Zero, "Usage: sre <file.sar|file.sabakac>", "SabakaLang RuntimeEnvironment", 0x10);
                 Environment.Exit(1);
             }
+
             string path = args[0];
             if (path.EndsWith(".sar", StringComparison.OrdinalIgnoreCase))
                 RunSar(path);
@@ -42,6 +58,16 @@ public class Program
         new VirtualMachine(null, null).Execute(instructions);
     }
 
+    /// <summary>
+    /// Проверяет, есть ли SabakaUI.dll среди DLL-зависимостей в манифесте .sar файла.
+    /// Если есть — скрывает консоль (UI-приложение).
+    /// </summary>
+    private static bool HasSabakaUI(SarManifest manifest)
+    {
+        return manifest.Dlls.Any(d =>
+            Path.GetFileName(d.Path).Equals("SabakaUI.dll", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static void RunSar(string sarPath)
     {
         string tmpDir = Path.Combine(
@@ -56,6 +82,10 @@ public class Program
             var manifest = JsonSerializer.Deserialize<SarManifest>(
                 File.ReadAllText(Path.Combine(tmpDir, "manifest.json")))
                 ?? throw new InvalidOperationException("Invalid manifest.json");
+
+            // Скрываем консоль только если используется SabakaUI.dll
+            if (HasSabakaUI(manifest))
+                FreeConsole();
 
             Console.WriteLine($"[SRE] {manifest.Name} v{manifest.Version}");
             Console.WriteLine($"[SRE] DLL entries in manifest: {manifest.Dlls.Count}");
@@ -188,7 +218,6 @@ public class Program
                 };
 
                 if (namespaced)
-                    // "ui.title" — точно как Compiler при namespaced=true
                     externals[$"{alias}.{exportName.ToLower()}"] = wrapper;
                 else
                 {
@@ -201,7 +230,7 @@ public class Program
         }
     }
 
-    // ── Конверсии — точные копии Compiler.ConvertValueToNative/ConvertNativeToValue ─
+    // ── Конверсии ────────────────────────────────────────────────────────────
     private static object? ToNative(Value val, Type t)
     {
         if (t == typeof(int)    || t == typeof(int?))    { if (val.Type != SabakaType.Int)   throw new Exception($"Expected int, got {val.Type}");   return val.Int; }
@@ -223,12 +252,12 @@ public class Program
     }
 }
 
-// ── SabakaDllLoadContext — ищет зависимости в нескольких папках ──────────────
+// ── SabakaDllLoadContext ──────────────────────────────────────────────────────
 internal sealed class SabakaDllLoadContext : AssemblyLoadContext
 {
-    private readonly string _dllDir;       // tmpDir/dlls/
-    private readonly string _sarDir;       // папка рядом с .sar (там WebView2 и т.п.)
-    private readonly string _sreDir;       // папка рядом с SRE exe
+    private readonly string _dllDir;
+    private readonly string _sarDir;
+    private readonly string _sreDir;
 
     public SabakaDllLoadContext(string dllPath, string sarDir)
         : base(name: "Sabaka-" + Path.GetFileName(dllPath), isCollectible: true)
