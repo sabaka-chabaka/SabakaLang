@@ -1,5 +1,1 @@
-import "test2.sabaka";
-
-Human h = new Human("ebik");
-
-print(h.name);
+print(5);

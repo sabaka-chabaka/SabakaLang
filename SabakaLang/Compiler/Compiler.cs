@@ -379,6 +379,26 @@ public class Compiler
                 endJump.Operand = _instructions.Count;
                 return;
             }
+            
+            if (bin.Left is IntExpr li && bin.Right is IntExpr ri)
+            {
+                int result = bin.Operator switch
+                {
+                    TokenType.Plus => li.Value + ri.Value,
+                    TokenType.Minus => li.Value - ri.Value,
+                    TokenType.Star => li.Value * ri.Value,
+                    TokenType.Slash => li.Value / ri.Value,
+                    _ => int.MinValue
+                };
+
+                if (result != int.MinValue)
+                {
+                    _instructions.Add(
+                        new Instruction(OpCode.Push, Value.FromInt(result))
+                    );
+                    return;
+                }
+            }
 
             Emit(bin.Left);
             Emit(bin.Right);
