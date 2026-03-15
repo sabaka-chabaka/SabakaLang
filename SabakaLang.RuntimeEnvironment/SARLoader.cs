@@ -1,3 +1,5 @@
+//legacy unused code
+
 using SabakaLang.RuntimeEnvironment.Models;
 
 namespace SabakaLang.RuntimeEnvironment;
