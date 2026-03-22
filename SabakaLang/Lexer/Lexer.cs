@@ -275,7 +275,7 @@ public class Lexer
             "float" => new Token(TokenType.FloatKeyword, text, start, _position),
             "string" => new Token(TokenType.StringKeyword, text, start, _position),
             "void" => new Token(TokenType.VoidKeyword, text, start, _position),
-            "func" => new Token(TokenType.Function, text, start, _position),
+            // "func" => new Token(TokenType.Function, text, start, _position),
             "return" => new Token(TokenType.Return, text, start, _position),
             "for" => new Token(TokenType.For, text, start, _position),
             "foreach" => new Token(TokenType.Foreach, text, start, _position),
