@@ -1,6 +1,6 @@
 string inp = input();
 
-if (inp != "0" || inp != "1")
+if (inp != "0" && inp != "1")
 {
     print("incorrect");
 }
