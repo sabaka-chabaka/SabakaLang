@@ -63,11 +63,11 @@ class Program
         }
         catch (SabakaLangException ex)
         {
-            Console.WriteLine($"[SabakaLang Error] {ex.Message}");
+            Console.WriteLine($"[Compiler Error] {ex.Message}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Internal Error] {ex}");
+            Console.WriteLine($"[Runtime Error] {ex}");
         }
     }
 

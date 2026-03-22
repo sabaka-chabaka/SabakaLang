@@ -1,1 +1,13 @@
-print(5);
+string inp = input();
+
+if (inp != "0" || inp != "1")
+{
+    print("incorrect");
+}
+
+if (inp == "0") {
+    print("is false");
+}
+else {
+    print("is true");
+}
