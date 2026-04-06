@@ -1,4 +1,3 @@
-using System.Runtime.Intrinsics.Arm;
 using System.Text;
 
 namespace SabakaLang.Compiler;
@@ -152,7 +151,7 @@ public sealed class Lexer
         }
 
         var type = hasDot ? TokenType.FloatLiteral : TokenType.IntLiteral;
-        return new Token(type, sb.ToString(), start, CurrentPosition());
+        return new Token(type, sb.ToString(), start, PreviousPosition());
     }
     
     private Token ReadIdentifier(Position start)
@@ -167,7 +166,7 @@ public sealed class Lexer
         var text = sb.ToString();
         var type = Keywords.GetValueOrDefault(text, TokenType.Identifier);
         
-        return new Token(type, text, start, new Position(CurrentPosition().Line, CurrentPosition().Column - 1, _offset));
+        return new Token(type, text, start, PreviousPosition());
     }
     
     private Token ReadString(Position start)
@@ -204,7 +203,7 @@ public sealed class Lexer
         else
             Advance();
  
-        return new Token(TokenType.StringLiteral, sb.ToString(), start, CurrentPosition());
+        return new Token(TokenType.StringLiteral, sb.ToString(), start, PreviousPosition());
     }
     
     private Token ReadSlashOrComment(Position start)
@@ -223,7 +222,7 @@ public sealed class Lexer
                 Advance();
             }
  
-            return new Token(TokenType.Comment, sb.ToString(), commentStart, CurrentPosition());
+            return new Token(TokenType.Comment, sb.ToString(), commentStart, PreviousPosition());
         }
  
         return new Token(TokenType.Slash, "/", start, CurrentPosition());
@@ -235,11 +234,11 @@ public sealed class Lexer
         if (!IsAtEnd() && Current() == next)
         {
             Advance();
-            return new Token(doubleType, _source.Substring(start.Offset, _offset - start.Offset), start, CurrentPosition());
+            return new Token(doubleType, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
         }
  
         if (singleType.HasValue)
-            return new Token(singleType.Value, _source.Substring(start.Offset, _offset - start.Offset), start, CurrentPosition());
+            return new Token(singleType.Value, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
  
         AddError($"Expected '{next}' after '{_source[start.Offset]}'", start);
         return null;
@@ -248,7 +247,7 @@ public sealed class Lexer
     private Token Consume(TokenType type, string value, Position start)
     {
         Advance();
-        return new Token(type, value, start, CurrentPosition());
+        return new Token(type, value, start, PreviousPosition());
     }
     
     private Token? HandleUnknown(Position start)
@@ -286,6 +285,22 @@ public sealed class Lexer
     private bool IsAtEnd() => _offset >= _source.Length;
  
     private Position CurrentPosition() => new(_line, _column, _offset);
+    
+    private Position PreviousPosition()
+    {
+        if (_offset == 0) return new Position(_line, _column, _offset);
+
+        var col = _column - 1;
+        var line = _line;
+
+        if (col <= 0)
+        {
+            line--;
+            col = 1;
+        }
+
+        return new Position(line, col, _offset - 1);
+    }
  
     private Token MakeToken(TokenType type, string value) =>
         new(type, value, CurrentPosition(), CurrentPosition());
