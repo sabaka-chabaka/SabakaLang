@@ -18,4 +18,8 @@
         <Using Include="Xunit"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\SabakaLang.Compiler\SabakaLang.Compiler.csproj" />
+    </ItemGroup>
+
 </Project>
