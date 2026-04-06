@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="SabakaLang.Compiler.UnitTests/SabakaLang.Compiler.UnitTests.csproj" />
   <Project Path="SabakaLang.Compiler/SabakaLang.Compiler.csproj" />
 </Solution>
