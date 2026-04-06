@@ -167,7 +167,7 @@ public sealed class Lexer
         var text = sb.ToString();
         var type = Keywords.GetValueOrDefault(text, TokenType.Identifier);
         
-        return new Token(type, text, start, CurrentPosition());
+        return new Token(type, text, start, new Position(CurrentPosition().Line, CurrentPosition().Column - 1, _offset));
     }
     
     private Token ReadString(Position start)
