@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace SabakaLang.Compiler;
 
 public readonly record struct Span(Position Start, Position End);
@@ -158,7 +160,668 @@ public sealed class Parser
 
     private IStmt? ParseTopLevel()
     {
-        return null;
+        try
+        {
+            return Current.Type switch
+            {
+                TokenType.Import    => ParseImport(),
+                TokenType.Class     => ParseClass(),
+                TokenType.Interface => ParseInterface(),
+                TokenType.StructKeyword => ParseStruct(),
+                TokenType.Enum      => ParseEnum(),
+                _                   => ParseStatement()
+            };
+        }
+        catch (ParseException)
+        {
+            Synchronize();
+            return null;
+        }
+    }
+
+    private IStmt ParseStatement()
+    {
+        return Current.Type switch
+        {
+            TokenType.If      => ParseIf(),
+            TokenType.While   => ParseWhile(),
+            TokenType.For     => ParseFor(),
+            TokenType.Foreach => ParseForeach(),
+            TokenType.Return  => ParseReturn(),
+            TokenType.Switch  => ParseSwitch(),
+            TokenType.Class     => ParseClass(),
+            TokenType.Interface => ParseInterface(),
+            TokenType.StructKeyword => ParseStruct(),
+            TokenType.Enum      => ParseEnum(),
+            TokenType.Import    => ParseImport(),
+            _ => IsVarDecl() ? ParseVarDecl() : ParseExprStmt()
+        };
+    }
+
+    private List<IStmt> ParseBlock()
+    {
+        Expect(TokenType.LBrace);
+        var stmts = new List<IStmt>();
+        while (!Check(TokenType.RBrace) && !IsAtEnd()) stmts.Add(ParseStatement());
+        Expect(TokenType.RBrace);
+        return stmts;
+    }
+
+    private List<IStmt> ParseBlockOrStmt()
+    {
+        if (Check(TokenType.LBrace)) return ParseBlock();
+        return [ParseStatement()];
+    }
+
+    private bool IsVarDecl()
+    {
+        int offset = 0;
+        if (IsAccessMod(Peek(offset).Type)) offset++;
+
+        var cur = Peek(offset).Type;
+
+        if (IsBuiltinType(cur) && cur != TokenType.VoidKeyword) return true;
+
+        if (cur == TokenType.Identifier)
+        {
+            offset++;
+            if (Peek(offset).Type == TokenType.Less)
+                offset = SkipAngles(offset);
+            while (Peek(offset).Type == TokenType.LBracket && Peek(offset + 1).Type == TokenType.RBracket)
+                offset += 2;
+            return Peek(offset).Type == TokenType.Identifier;
+        }
+        
+        return false;
+    }
+    
+    private int SkipAngles(int offset)
+    {
+        offset++; 
+        int depth = 1;
+        while (depth > 0 && _pos + offset < _tokens.Count)
+        {
+            var t = Peek(offset).Type;
+            if (t == TokenType.Less) depth++;
+            else if (t == TokenType.Greater) depth--;
+            else if (t is TokenType.Semicolon or TokenType.EOF) break;
+            offset++;
+        }
+        return offset;
+    }
+
+    private VarDecl ParseVarDecl(AccessMod defaultAccess  = AccessMod.Public)
+    {
+        var start = Current.Start;
+        var access = TryConsumeAccessMod(defaultAccess);
+        var type = ParseTypeRef();
+        var name = Expect(TokenType.Identifier).Value;
+        IExpr? init = null;
+        if (Match(TokenType.Equal))
+            init = ParseExpr();
+        Match(TokenType.Semicolon);
+        return new VarDecl(type, name, init, access, SpanFrom(start));
+    }
+
+    private FuncDecl ParseFuncDecl(AccessMod defaultAccess = AccessMod.Public)
+    {
+        var start = Current.Start;
+        var access = TryConsumeAccessMod(defaultAccess);
+        var isOverride = Match(TokenType.Override);
+        var returnType = ParseTypeRef();
+        var name = Expect(TokenType.Identifier).Value;
+        var typeParams = TryParseTypeParams();
+        Expect(TokenType.LParen);
+        var parms = ParseParams();
+        Expect(TokenType.RParen);
+        var body = ParseBlock();
+        return new FuncDecl(returnType, name, typeParams, parms, body, access, isOverride, SpanFrom(start));
+    }
+    
+    private IfStmt ParseIf()
+    {
+        var start = Current.Start;
+        Expect(TokenType.If);
+        Expect(TokenType.LParen);
+        var cond = ParseExpr();
+        Expect(TokenType.RParen);
+        var then = ParseBlockOrStmt();
+        List<IStmt>? els = null;
+        if (Match(TokenType.Else))
+            els = ParseBlockOrStmt();
+        return new IfStmt(cond, then, els, SpanFrom(start));
+    }
+ 
+    private WhileStmt ParseWhile()
+    {
+        var start = Current.Start;
+        Expect(TokenType.While);
+        Expect(TokenType.LParen);
+        var cond = ParseExpr();
+        Expect(TokenType.RParen);
+        var body = ParseBlock();
+        return new WhileStmt(cond, body, SpanFrom(start));
+    }
+ 
+    private ForStmt ParseFor()
+    {
+        var start = Current.Start;
+        Expect(TokenType.For);
+        Expect(TokenType.LParen);
+        IStmt? init = null;
+        if (!Check(TokenType.Semicolon))
+            init = IsVarDecl() ? ParseVarDecl() : ParseExprStmt();
+        else
+            Advance();
+        IExpr? cond = null;
+        if (!Check(TokenType.Semicolon))
+            cond = ParseExpr();
+        Expect(TokenType.Semicolon);
+        IExpr? step = null;
+        if (!Check(TokenType.RParen))
+            step = ParseExpr();
+        Expect(TokenType.RParen);
+        var body = ParseBlockOrStmt();
+        return new ForStmt(init, cond, step, body, SpanFrom(start));
+    }
+ 
+    private ForeachStmt ParseForeach()
+    {
+        var start = Current.Start;
+        Expect(TokenType.Foreach);
+        Expect(TokenType.LParen);
+        var type = ParseTypeRef();
+        var name = Expect(TokenType.Identifier).Value;
+        Expect(TokenType.In);
+        var col = ParseExpr();
+        Expect(TokenType.RParen);
+        var body = ParseBlock();
+        return new ForeachStmt(type, name, col, body, SpanFrom(start));
+    }
+ 
+    private ReturnStmt ParseReturn()
+    {
+        var start = Current.Start;
+        Expect(TokenType.Return);
+        IExpr? val = null;
+        if (!Check(TokenType.Semicolon))
+            val = ParseExpr();
+        Match(TokenType.Semicolon);
+        return new ReturnStmt(val, SpanFrom(start));
+    }
+ 
+    private SwitchStmt ParseSwitch()
+    {
+        var start = Current.Start;
+        Expect(TokenType.Switch);
+        Expect(TokenType.LParen);
+        var val = ParseExpr();
+        Expect(TokenType.RParen);
+        Expect(TokenType.LBrace);
+        var cases = new List<SwitchCase>();
+        while (!Check(TokenType.RBrace) && !IsAtEnd())
+        {
+            if (Check(TokenType.Case))
+            {
+                Advance();
+                var caseVal = ParseExpr();
+                Expect(TokenType.Colon);
+                cases.Add(new SwitchCase(caseVal, ParseBlockOrStmt()));
+            }
+            else if (Check(TokenType.Default))
+            {
+                Advance();
+                Expect(TokenType.Colon);
+                cases.Add(new SwitchCase(null, ParseBlockOrStmt()));
+            }
+            else
+            {
+                AddError($"Expected 'case' or 'default', got {Current.Type}", Current.Start);
+                Synchronize();
+            }
+        }
+        Expect(TokenType.RBrace);
+        return new SwitchStmt(val, cases, SpanFrom(start));
+    }
+ 
+    private ImportStmt ParseImport()
+    {
+        var start = Current.Start;
+        Expect(TokenType.Import);
+        var path = Expect(TokenType.StringLiteral).Value;
+        var names = new List<string>();
+        string? alias = null;
+        if (Current.Type == TokenType.Identifier && Current.Value == "from")
+        {
+            Advance();
+            names.Add(Expect(TokenType.Identifier).Value);
+            while (Match(TokenType.Comma))
+                names.Add(Expect(TokenType.Identifier).Value);
+        }
+        if (Current.Type == TokenType.Identifier && Current.Value == "as")
+        {
+            Advance();
+            alias = Expect(TokenType.Identifier).Value;
+        }
+        Match(TokenType.Semicolon);
+        return new ImportStmt(path, names, alias, SpanFrom(start));
+    }
+ 
+    private ClassDecl ParseClass()
+    {
+        var start = Current.Start;
+        Expect(TokenType.Class);
+        var name = Expect(TokenType.Identifier).Value;
+        var typeParams = TryParseTypeParams();
+        string? baseClass = null;
+        var interfaces = new List<string>();
+        if (Match(TokenType.Colon))
+        {
+            baseClass = Expect(TokenType.Identifier).Value;
+            while (Match(TokenType.Comma))
+                interfaces.Add(Expect(TokenType.Identifier).Value);
+        }
+        Expect(TokenType.LBrace);
+        var fields = new List<VarDecl>();
+        var methods = new List<FuncDecl>();
+        while (!Check(TokenType.RBrace) && !IsAtEnd())
+        {
+            if (IsFuncDecl()) methods.Add(ParseFuncDecl());
+            else
+            {
+                fields.Add(ParseVarDecl());
+            }
+        }
+        Expect(TokenType.RBrace);
+        return new ClassDecl(name, typeParams, baseClass, interfaces, fields, methods, SpanFrom(start));
+    }
+ 
+    private InterfaceDecl ParseInterface()
+    {
+        var start = Current.Start;
+        Expect(TokenType.Interface);
+        var name = Expect(TokenType.Identifier).Value;
+        var typeParams = TryParseTypeParams();
+        var parents = new List<string>();
+        if (Match(TokenType.Colon))
+        {
+            parents.Add(Expect(TokenType.Identifier).Value);
+            while (Match(TokenType.Comma))
+                parents.Add(Expect(TokenType.Identifier).Value);
+        }
+        Expect(TokenType.LBrace);
+        var methods = new List<FuncDecl>();
+        while (!Check(TokenType.RBrace) && !IsAtEnd())
+        {
+            var mStart = Current.Start;
+            var retType = ParseTypeRef();
+            var mName = Expect(TokenType.Identifier).Value;
+            Expect(TokenType.LParen);
+            var parms = ParseParams();
+            Expect(TokenType.RParen);
+            Expect(TokenType.Semicolon);
+            methods.Add(new FuncDecl(retType, mName, [], parms, [], AccessMod.Public, false, SpanFrom(mStart)));
+        }
+        Expect(TokenType.RBrace);
+        return new InterfaceDecl(name, typeParams, parents, methods, SpanFrom(start));
+    }
+ 
+    private StructDecl ParseStruct()
+    {
+        var start = Current.Start;
+        Expect(TokenType.StructKeyword);
+        var name = Expect(TokenType.Identifier).Value;
+        Expect(TokenType.LBrace);
+        var fields = new List<VarDecl>();
+        while (!Check(TokenType.RBrace) && !IsAtEnd())
+            fields.Add(ParseVarDecl());
+        Expect(TokenType.RBrace);
+        return new StructDecl(name, fields, SpanFrom(start));
+    }
+ 
+    private EnumDecl ParseEnum()
+    {
+        var start = Current.Start;
+        Expect(TokenType.Enum);
+        var name = Expect(TokenType.Identifier).Value;
+        Expect(TokenType.LBrace);
+        var members = new List<string>();
+        while (!Check(TokenType.RBrace) && !IsAtEnd())
+        {
+            members.Add(Expect(TokenType.Identifier).Value);
+            if (!Match(TokenType.Comma)) break;
+        }
+        Expect(TokenType.RBrace);
+        return new EnumDecl(name, members, SpanFrom(start));
+    }
+ 
+    private ExprStmt ParseExprStmt()
+    {
+        var start = Current.Start;
+        var expr = ParseExpr();
+        Match(TokenType.Semicolon);
+        return new ExprStmt(expr, SpanFrom(start));
+    }
+
+    private IExpr ParseExpr() => ParseAssign();
+
+    private IExpr ParseAssign()
+    {
+        var start = Current.Start;
+        var left = ParseLogicalOr();
+ 
+        if (Check(TokenType.Equal))
+        {
+            Advance();
+            var right = ParseAssign();
+            if (left is NameExpr or MemberExpr or IndexExpr)
+                return new AssignExpr(left, right, SpanFrom(start));
+            AddError("Invalid assignment target", start);
+            return left;
+        }
+ 
+        return left;
+    }
+
+    private IExpr ParseLogicalOr()
+    {
+        var start = Current.Start;
+        var left = ParseLogicalAnd();
+        while (Check(TokenType.OrOr))
+        {
+            var op = Advance().Type;
+            var right = ParseLogicalAnd();
+            left = new BinaryExpr(left, op, right, SpanFrom(start));
+        }
+        return left;
+    }
+    
+    private IExpr ParseLogicalAnd()
+    {
+        var start = Current.Start;
+        var left = ParseEquality();
+        while (Check(TokenType.AndAnd))
+        {
+            var op = Advance().Type;
+            var right = ParseEquality();
+            left = new BinaryExpr(left, op, right, SpanFrom(start));
+        }
+        return left;
+    }
+ 
+    private IExpr ParseEquality()
+    {
+        var start = Current.Start;
+        var left = ParseComparison();
+        while (Check(TokenType.EqualEqual) || Check(TokenType.NotEqual))
+        {
+            var op = Advance().Type;
+            var right = ParseComparison();
+            left = new BinaryExpr(left, op, right, SpanFrom(start));
+        }
+        return left;
+    }
+ 
+    private IExpr ParseComparison()
+    {
+        var start = Current.Start;
+        var left = ParseAdditive();
+        while (Check(TokenType.Greater) || Check(TokenType.Less) ||
+               Check(TokenType.GreaterEqual) || Check(TokenType.LessEqual))
+        {
+            var op = Advance().Type;
+            var right = ParseAdditive();
+            left = new BinaryExpr(left, op, right, SpanFrom(start));
+        }
+        return left;
+    }
+ 
+    private IExpr ParseAdditive()
+    {
+        var start = Current.Start;
+        var left = ParseMultiplicative();
+        while (Check(TokenType.Plus) || Check(TokenType.Minus))
+        {
+            var op = Advance().Type;
+            var right = ParseMultiplicative();
+            left = new BinaryExpr(left, op, right, SpanFrom(start));
+        }
+        return left;
+    }
+ 
+    private IExpr ParseMultiplicative()
+    {
+        var start = Current.Start;
+        var left = ParseUnary();
+        while (Check(TokenType.Star) || Check(TokenType.Slash) || Check(TokenType.Percent))
+        {
+            var op = Advance().Type;
+            var right = ParseUnary();
+            left = new BinaryExpr(left, op, right, SpanFrom(start));
+        }
+        return left;
+    }
+ 
+    private IExpr ParseUnary()
+    {
+        var start = Current.Start;
+        if (Check(TokenType.Minus) || Check(TokenType.Bang))
+        {
+            var op = Advance().Type;
+            var operand = ParseUnary();
+            return new UnaryExpr(op, operand, SpanFrom(start));
+        }
+        return ParsePostfix();
+    }
+
+    private IExpr ParsePostfix()
+    {
+        var start = Current.Start;
+        var expr = ParsePrimary();
+ 
+        while (true)
+        {
+            if (Check(TokenType.LParen))
+            {
+                Advance();
+                var args = ParseArgList();
+                Expect(TokenType.RParen);
+                expr = new CallExpr(expr, args, SpanFrom(start));
+            }
+            else if (Check(TokenType.Dot))
+            {
+                Advance();
+                var member = Expect(TokenType.Identifier).Value;
+                expr = new MemberExpr(expr, member, SpanFrom(start));
+            }
+            else if (Check(TokenType.LBracket))
+            {
+                Advance();
+                var index = ParseExpr();
+                Expect(TokenType.RBracket);
+                expr = new IndexExpr(expr, index, SpanFrom(start));
+            }
+            else break;
+        }
+ 
+        return expr;
+    }
+    
+    private IExpr ParsePrimary()
+    {
+        var start = Current.Start;
+ 
+        if (Check(TokenType.IntLiteral))
+        {
+            var v = int.Parse(Advance().Value, CultureInfo.InvariantCulture);
+            return new IntLit(v, SpanFrom(start));
+        }
+        if (Check(TokenType.FloatLiteral))
+        {
+            var v = double.Parse(Advance().Value, CultureInfo.InvariantCulture);
+            return new FloatLit(v, SpanFrom(start));
+        }
+        if (Check(TokenType.StringLiteral))
+            return new StringLit(Advance().Value, SpanFrom(start));
+        if (Check(TokenType.True))  { Advance(); return new BoolLit(true,  SpanFrom(start)); }
+        if (Check(TokenType.False)) { Advance(); return new BoolLit(false, SpanFrom(start)); }
+ 
+        if (Check(TokenType.Identifier))
+            return new NameExpr(Advance().Value, SpanFrom(start));
+ 
+        if (Check(TokenType.Super))
+        {
+            Advance();
+            return new SuperExpr(SpanFrom(start));
+        }
+ 
+        if (Check(TokenType.New))
+        {
+            Advance();
+            var typeName = Expect(TokenType.Identifier).Value;
+            var typeArgs = TryParseTypeArgs();
+            Expect(TokenType.LParen);
+            var args = ParseArgList();
+            Expect(TokenType.RParen);
+            return new NewExpr(typeName, typeArgs, args, SpanFrom(start));
+        }
+ 
+        if (Check(TokenType.LBracket))
+        {
+            Advance();
+            var elements = new List<IExpr>();
+            if (!Check(TokenType.RBracket))
+            {
+                elements.Add(ParseExpr());
+                while (Match(TokenType.Comma))
+                    elements.Add(ParseExpr());
+            }
+            Expect(TokenType.RBracket);
+            return new ArrayExpr(elements, SpanFrom(start));
+        }
+ 
+        if (Check(TokenType.LParen))
+        {
+            Advance();
+            var expr = ParseExpr();
+            Expect(TokenType.RParen);
+            return expr;
+        }
+ 
+        AddError($"Unexpected token: {Current.Type}", Current.Start);
+        throw new ParseException();
+    }
+    
+    private List<IExpr> ParseArgList()
+    {
+        var args = new List<IExpr>();
+        if (Check(TokenType.RParen)) return args;
+        args.Add(ParseExpr());
+        while (Match(TokenType.Comma)) args.Add(ParseExpr());
+        return args;
+    }
+    
+    private List<Param> ParseParams()
+    {
+        var parms = new List<Param>();
+        if (Check(TokenType.RParen)) return parms;
+        parms.Add(new Param(ParseTypeRef(), Expect(TokenType.Identifier).Value));
+        while (Match(TokenType.Comma))
+            parms.Add(new Param(ParseTypeRef(), Expect(TokenType.Identifier).Value));
+        return parms;
+    }
+    
+    private TypeRef ParseTypeRef()
+    {
+        var name = Current.Type switch
+        {
+            TokenType.IntKeyword    => "int",
+            TokenType.FloatKeyword  => "float",
+            TokenType.BoolKeyword   => "bool",
+            TokenType.StringKeyword => "string",
+            TokenType.VoidKeyword   => "void",
+            TokenType.Identifier    => Current.Value,
+            _ => null
+        };
+        if (name is null) { AddError($"Expected type, got {Current.Type}", Current.Start); return new TypeRef("?", [], false); }
+        Advance();
+        var typeArgs = TryParseTypeArgs();
+        bool isArray = false;
+        if (Check(TokenType.LBracket) && Peek(1).Type == TokenType.RBracket)
+        {
+            Advance(); Advance();
+            isArray = true;
+        }
+        return new TypeRef(name, typeArgs, isArray);
+    }
+    
+    private List<TypeParam> TryParseTypeParams()
+    {
+        if (!Check(TokenType.Less)) return [];
+        var saved = _pos;
+        Advance(); 
+        var result = new List<TypeParam>();
+        while (Check(TokenType.Identifier))
+        {
+            result.Add(new TypeParam(Advance().Value));
+            if (!Match(TokenType.Comma)) break;
+        }
+        if (!Check(TokenType.Greater)) { _pos = saved; return []; }
+        Advance();
+        return result;
+    }
+ 
+    private List<string> TryParseTypeArgs()
+    {
+        if (!Check(TokenType.Less)) return [];
+        var saved = _pos;
+        Advance(); 
+        var result = new List<string>();
+        while (IsTypeStart(Current.Type))
+        {
+            result.Add(Current.Value);
+            Advance();
+            if (!Match(TokenType.Comma)) break;
+        }
+        if (!Check(TokenType.Greater)) { _pos = saved; return []; }
+        Advance();
+        return result;
+    }
+    
+    private bool IsFuncDecl()
+    {
+        int o = 0;
+        if (IsAccessMod(Peek(o).Type)) o++;
+        if (Peek(o).Type == TokenType.Override) o++;
+        if (!IsTypeStart(Peek(o).Type)) return false;
+        o++;
+        if (Peek(o).Type == TokenType.Less) o = SkipAngles(o);
+        while (Peek(o).Type == TokenType.LBracket && Peek(o + 1).Type == TokenType.RBracket) o += 2;
+        if (Peek(o).Type != TokenType.Identifier) return false;
+        o++;
+        if (Peek(o).Type == TokenType.Less) o = SkipAngles(o);
+        return Peek(o).Type == TokenType.LParen;
+    }
+ 
+    private static bool IsBuiltinType(TokenType t) =>
+        t is TokenType.IntKeyword or TokenType.FloatKeyword or
+            TokenType.BoolKeyword or TokenType.StringKeyword or TokenType.VoidKeyword;
+ 
+    private static bool IsTypeStart(TokenType t) => IsBuiltinType(t) || t == TokenType.Identifier;
+ 
+    private static bool IsAccessMod(TokenType t) =>
+        t is TokenType.Public or TokenType.Private or TokenType.Protected;
+ 
+    private AccessMod TryConsumeAccessMod(AccessMod def)
+    {
+        if (!IsAccessMod(Current.Type)) return def;
+        return Advance().Type switch
+        {
+            TokenType.Public    => AccessMod.Public,
+            TokenType.Private   => AccessMod.Private,
+            TokenType.Protected => AccessMod.Protected,
+            _                   => def
+        };
     }
     
     private void AddError(string message, Position position)
