@@ -194,7 +194,7 @@ public sealed class Parser
             TokenType.StructKeyword => ParseStruct(),
             TokenType.Enum      => ParseEnum(),
             TokenType.Import    => ParseImport(),
-            _ => IsVarDecl() ? ParseVarDecl() : ParseExprStmt()
+            _ => IsFuncDecl() ? ParseFuncDecl() : IsVarDecl() ? ParseVarDecl() : ParseExprStmt()
         };
     }
 
