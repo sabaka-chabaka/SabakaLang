@@ -87,6 +87,24 @@ public sealed class SymbolTable
     public Symbol? SymbolAt(int offset) => _all.FirstOrDefault(s => s.Span.Start.Offset <= offset && offset <= s.Span.End.Offset);
 }
 
+public readonly record struct BindError(string Message, Position Position)
+{
+    public override string ToString() => $"[{Position.Line}:{Position.Column}] {Message}";
+}
+
+public sealed class BindResult
+{
+    public SymbolTable              Symbols   { get; }
+    public IReadOnlyList<BindError> Errors    { get; }
+    public bool                     HasErrors => Errors.Count > 0;
+ 
+    public BindResult(SymbolTable symbols, IReadOnlyList<BindError> errors)
+    {
+        Symbols = symbols;
+        Errors  = errors;
+    }
+}
+
 public class Binder
 {
     
