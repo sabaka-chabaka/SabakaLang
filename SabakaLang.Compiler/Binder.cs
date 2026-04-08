@@ -73,6 +73,20 @@ public sealed class Scope
     public void ForceReplace(Symbol symbol) => _symbols[symbol.Name] = symbol;
 }
 
+public sealed class SymbolTable
+{
+    private readonly List<Symbol> _all = [];
+    public IReadOnlyList<Symbol> All => _all;
+    
+    internal void Add(Symbol symbol) => _all.Add(symbol);
+    
+    public IEnumerable<Symbol> Lookup(string name) => _all.Where(s => s.Name == name);
+    
+    public IEnumerable<Symbol> MembersOf(string typeName) => _all.Where(s => s.ParentName == typeName);
+    
+    public Symbol? SymbolAt(int offset) => _all.FirstOrDefault(s => s.Span.Start.Offset <= offset && offset <= s.Span.End.Offset);
+}
+
 public class Binder
 {
     
