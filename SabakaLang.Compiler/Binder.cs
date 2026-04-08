@@ -14,19 +14,19 @@ public enum SymbolKind
     EnumMember,
     TypeParam,
     BuiltIn,
-    Module
+    Module,
 }
 
 public sealed class Symbol
 {
-    public string Name { get; }
-    public SymbolKind Kind { get; }
-    public string Type { get; }
-    public Span Span { get; }
-    public string? ParentName { get; }
-    public string? Parameters { get; }
+    public string     Name        { get; }
+    public SymbolKind Kind        { get; }
+    public string     Type        { get; }
+    public Span       Span        { get; }
+    public string?    ParentName  { get; }
+    public string?    Parameters  { get; }
     public IReadOnlyList<string> TypeParams { get; }
-    
+
     public Symbol(
         string name, SymbolKind kind, string type, Span span,
         string? parentName = null, string? parameters = null,
@@ -40,10 +40,11 @@ public sealed class Symbol
         Parameters = parameters;
         TypeParams = typeParams ?? [];
     }
-    
-    public override string ToString() => ParentName is null
-        ? $"{Kind} {Name} : {Type}"
-        : $"{Kind} {ParentName}.{Name} : {Type}";
+
+    public override string ToString() =>
+        ParentName is null
+            ? $"{Kind} {Name} : {Type}"
+            : $"{Kind} {ParentName}.{Name} : {Type}";
 }
 
 public sealed class Scope
@@ -51,40 +52,52 @@ public sealed class Scope
     public Scope? Parent { get; }
     private readonly Dictionary<string, Symbol> _symbols = new();
     public IEnumerable<Symbol> LocalSymbols => _symbols.Values;
- 
+
     public Scope(Scope? parent = null) => Parent = parent;
- 
+
     public bool Declare(Symbol symbol)
     {
         if (_symbols.ContainsKey(symbol.Name)) return false;
         _symbols[symbol.Name] = symbol;
         return true;
     }
- 
+
     public Symbol? Resolve(string name)
     {
         if (_symbols.TryGetValue(name, out var s)) return s;
         return Parent?.Resolve(name);
     }
- 
+
     public Symbol? ResolveLocal(string name) =>
         _symbols.GetValueOrDefault(name);
- 
+
     public void ForceReplace(Symbol symbol) => _symbols[symbol.Name] = symbol;
 }
 
 public sealed class SymbolTable
 {
     private readonly List<Symbol> _all = [];
+
     public IReadOnlyList<Symbol> All => _all;
+
+    internal void Add(Symbol s) => _all.Add(s);
     
-    internal void Add(Symbol symbol) => _all.Add(symbol);
-    
-    public IEnumerable<Symbol> Lookup(string name) => _all.Where(s => s.Name == name);
-    
-    public IEnumerable<Symbol> MembersOf(string typeName) => _all.Where(s => s.ParentName == typeName);
-    
-    public Symbol? SymbolAt(int offset) => _all.FirstOrDefault(s => s.Span.Start.Offset <= offset && offset <= s.Span.End.Offset);
+    internal void AddOrReplace(Symbol s)
+    {
+        var idx = _all.FindIndex(x => x.Name == s.Name && x.ParentName == s.ParentName);
+        if (idx >= 0) _all[idx] = s;
+        else          _all.Add(s);
+    }
+
+    public IEnumerable<Symbol> Lookup(string name) =>
+        _all.Where(s => s.Name == name);
+
+    public IEnumerable<Symbol> MembersOf(string typeName) =>
+        _all.Where(s => s.ParentName == typeName);
+
+    public Symbol? SymbolAt(int offset) =>
+        _all.FirstOrDefault(s =>
+            s.Span.Start.Offset <= offset && offset <= s.Span.End.Offset);
 }
 
 public readonly record struct BindError(string Message, Position Position)
@@ -97,7 +110,7 @@ public sealed class BindResult
     public SymbolTable              Symbols   { get; }
     public IReadOnlyList<BindError> Errors    { get; }
     public bool                     HasErrors => Errors.Count > 0;
- 
+
     public BindResult(SymbolTable symbols, IReadOnlyList<BindError> errors)
     {
         Symbols = symbols;
@@ -105,14 +118,15 @@ public sealed class BindResult
     }
 }
 
-public class Binder
+public sealed class Binder
 {
-    private Scope _scope;
+    private Scope          _scope;
     private readonly Scope _globalScope;
-    private readonly SymbolTable _table = new();
-    private readonly List<BindError> _errors = [];
+    private readonly SymbolTable         _table  = new();
+    private readonly List<BindError>     _errors = [];
 
     private string? _currentType = null;
+
     private string? _currentReturn = null;
     private static readonly HashSet<string> BuiltinTypes =
         ["int", "float", "bool", "string", "void"];
@@ -123,7 +137,7 @@ public class Binder
         _scope       = _globalScope;
         RegisterBuiltIns();
     }
-    
+
     public void AddGlobalSymbols(IEnumerable<Symbol> symbols)
     {
         foreach (var s in symbols)
@@ -132,15 +146,15 @@ public class Binder
             _table.Add(s);
         }
     }
- 
+
     public BindResult Bind(IReadOnlyList<IStmt> statements)
     {
         foreach (var stmt in statements)
             HoistTopLevel(stmt);
- 
+
         foreach (var stmt in statements)
             BindStmt(stmt);
- 
+
         return new BindResult(_table, _errors);
     }
     
@@ -149,7 +163,7 @@ public class Binder
         void B(string name, string ret, string parms = "") =>
             DeclareGlobal(name, SymbolKind.BuiltIn, ret,
                 new Span(default, default), parameters: parms);
- 
+
         B("print",        "void",     "value");
         B("sleep",        "void",     "int ms");
         B("input",        "string");
@@ -167,7 +181,7 @@ public class Binder
         B("ord",          "int",      "string str");
         B("chr",          "string",   "int code");
     }
-    
+
     private void HoistTopLevel(IStmt stmt)
     {
         switch (stmt)
@@ -178,27 +192,27 @@ public class Binder
                     parameters: ParamsString(f.Params),
                     typeParams:  f.TypeParams.Select(tp => tp.Name).ToArray());
                 break;
- 
+
             case ClassDecl c:
                 DeclareIfAbsent(c.Name, SymbolKind.Class, c.Name, c.Span,
                     typeParams: c.TypeParams.Select(tp => tp.Name).ToArray());
                 break;
- 
+
             case InterfaceDecl i:
                 DeclareIfAbsent(i.Name, SymbolKind.Interface, i.Name, i.Span,
                     typeParams: i.TypeParams.Select(tp => tp.Name).ToArray());
                 break;
- 
+
             case StructDecl s:
                 DeclareIfAbsent(s.Name, SymbolKind.Struct, s.Name, s.Span);
                 break;
- 
+
             case EnumDecl e:
                 DeclareIfAbsent(e.Name, SymbolKind.Enum, e.Name, e.Span);
                 break;
         }
     }
-
+    
     private void BindStmt(IStmt stmt)
     {
         switch (stmt)
@@ -219,7 +233,7 @@ public class Binder
             case ExprStmt   es:      BindExpr(es.Expr);    break;
         }
     }
-    
+
     private void BindImport(ImportStmt imp)
     {
         if (imp.Alias is not null)
@@ -232,33 +246,33 @@ public class Binder
     private void BindVarDecl(VarDecl v, string? forceParent = null)
     {
         if (v.Init is not null) BindExpr(v.Init);
- 
+
         var kind = (forceParent ?? _currentType) is not null
             ? SymbolKind.Field
             : SymbolKind.Variable;
- 
+
         var sym = new Symbol(v.Name, kind, TypeRefToString(v.Type), v.Span,
             parentName: forceParent ?? _currentType);
         DeclareSymbol(sym, v.Span.Start);
     }
-    
+
     private void BindFuncDecl(FuncDecl f, string? ownerType = null)
     {
         var kind = ownerType is not null ? SymbolKind.Method : SymbolKind.Function;
- 
+
         var funcSym = new Symbol(f.Name, kind, TypeRefToString(f.ReturnType), f.Span,
             parentName: ownerType,
             parameters: ParamsString(f.Params),
             typeParams:  f.TypeParams.Select(tp => tp.Name).ToArray());
         _scope.ForceReplace(funcSym);
-        _table.Add(funcSym);
- 
+        _table.AddOrReplace(funcSym);
+
         if (f.IsOverride && ownerType is null)
             AddError("'override' is only valid inside a class.", f.Span.Start);
- 
+
         var savedReturn = _currentReturn;
         _currentReturn  = TypeRefToString(f.ReturnType);
- 
+
         WithScope(() =>
         {
             foreach (var tp in f.TypeParams)
@@ -273,22 +287,22 @@ public class Binder
             }
             foreach (var s in f.Body) BindStmt(s);
         });
- 
+
         _currentReturn = savedReturn;
     }
-    
+
     private void BindClassDecl(ClassDecl c)
     {
         if (c.Base is not null && _scope.Resolve(c.Base) is null)
             AddError($"Unknown base class '{c.Base}'.", c.Span.Start);
- 
+
         foreach (var iface in c.Interfaces)
             if (_scope.Resolve(iface) is null)
                 AddError($"Unknown interface '{iface}'.", c.Span.Start);
- 
+
         var savedType = _currentType;
         _currentType  = c.Name;
- 
+
         WithScope(() =>
         {
             foreach (var tp in c.TypeParams)
@@ -296,11 +310,11 @@ public class Binder
                 var tpSym = new Symbol(tp.Name, SymbolKind.TypeParam, tp.Name, c.Span);
                 DeclareSymbol(tpSym, c.Span.Start);
             }
- 
+
             var thisSym = new Symbol("this", SymbolKind.Variable, c.Name, c.Span);
             _scope.Declare(thisSym);
             _table.Add(thisSym);
- 
+
             foreach (var m in c.Methods)
             {
                 var ms = new Symbol(m.Name, SymbolKind.Method, TypeRefToString(m.ReturnType),
@@ -310,23 +324,23 @@ public class Binder
                 _scope.Declare(ms);
                 _table.Add(ms);
             }
- 
+
             foreach (var field  in c.Fields)  BindVarDecl(field,  c.Name);
             foreach (var method in c.Methods) BindFuncDecl(method, c.Name);
         });
- 
+
         _currentType = savedType;
     }
- 
+
     private void BindInterfaceDecl(InterfaceDecl i)
     {
         foreach (var parent in i.Parents)
             if (_scope.Resolve(parent) is null)
                 AddError($"Unknown parent interface '{parent}'.", i.Span.Start);
- 
+
         var savedType = _currentType;
         _currentType  = i.Name;
- 
+
         WithScope(() =>
         {
             foreach (var tp in i.TypeParams)
@@ -334,7 +348,7 @@ public class Binder
                 var tpSym = new Symbol(tp.Name, SymbolKind.TypeParam, tp.Name, i.Span);
                 DeclareSymbol(tpSym, i.Span.Start);
             }
- 
+
             foreach (var m in i.Methods)
             {
                 var ms = new Symbol(m.Name, SymbolKind.Method, TypeRefToString(m.ReturnType),
@@ -342,7 +356,7 @@ public class Binder
                 DeclareSymbol(ms, m.Span.Start);
             }
         });
- 
+
         _currentType = savedType;
     }
 
@@ -356,7 +370,7 @@ public class Binder
             foreach (var field in s.Fields)
                 BindVarDecl(field, s.Name);
         });
- 
+
         _currentType = savedType;
     }
 
@@ -368,7 +382,7 @@ public class Binder
             DeclareSymbol(ms, e.Span.Start);
         }
     }
-    
+
     private void BindIf(IfStmt s)
     {
         BindExpr(s.Condition);
@@ -376,13 +390,13 @@ public class Binder
         if (s.Else is not null)
             WithScope(() => { foreach (var st in s.Else) BindStmt(st); });
     }
- 
+
     private void BindWhile(WhileStmt s)
     {
         BindExpr(s.Condition);
         WithScope(() => { foreach (var st in s.Body) BindStmt(st); });
     }
- 
+
     private void BindFor(ForStmt s)
     {
         WithScope(() =>
@@ -393,7 +407,7 @@ public class Binder
             foreach (var st in s.Body) BindStmt(st);
         });
     }
- 
+
     private void BindForeach(ForeachStmt s)
     {
         BindExpr(s.Collection);
@@ -405,7 +419,7 @@ public class Binder
             foreach (var st in s.Body) BindStmt(st);
         });
     }
-    
+
     private void BindSwitch(SwitchStmt s)
     {
         BindExpr(s.Value);
@@ -415,11 +429,11 @@ public class Binder
             WithScope(() => { foreach (var st in c.Body) BindStmt(st); });
         }
     }
- 
+
     private void BindReturn(ReturnStmt r)
     {
         if (r.Value is not null) BindExpr(r.Value);
- 
+
         if (_currentReturn is null)
             AddError("'return' outside a function.", r.Span.Start);
         else if (r.Value is null && _currentReturn != "void")
@@ -427,7 +441,7 @@ public class Binder
         else if (r.Value is not null && _currentReturn == "void")
             AddError("Cannot return a value from a void function.", r.Span.Start);
     }
-    
+
     private void BindExpr(IExpr expr)
     {
         switch (expr)
@@ -437,50 +451,50 @@ public class Binder
             case StringLit:
             case BoolLit:
                 break;
- 
+
             case NameExpr n:
                 if (_scope.Resolve(n.Name) is null)
                     AddError($"Undefined symbol '{n.Name}'.", n.Span.Start);
                 break;
- 
+
             case BinaryExpr b:
                 BindExpr(b.Left);
                 BindExpr(b.Right);
                 break;
- 
+
             case UnaryExpr u:
                 BindExpr(u.Operand);
                 break;
- 
+
             case AssignExpr a:
                 BindExpr(a.Target);
                 BindExpr(a.Value);
                 break;
- 
+
             case CallExpr call:
                 BindExpr(call.Callee);
                 foreach (var arg in call.Args) BindExpr(arg);
                 break;
- 
+
             case MemberExpr m:
                 BindExpr(m.Object);
                 break;
- 
+
             case IndexExpr idx:
                 BindExpr(idx.Object);
                 BindExpr(idx.Index);
                 break;
- 
+
             case ArrayExpr arr:
                 foreach (var el in arr.Elements) BindExpr(el);
                 break;
- 
+
             case NewExpr nw:
                 if (_scope.Resolve(nw.TypeName) is null)
                     AddError($"Unknown type '{nw.TypeName}'.", nw.Span.Start);
                 foreach (var arg in nw.Args) BindExpr(arg);
                 break;
- 
+
             case SuperExpr sup:
                 if (_currentType is null)
                     AddError("'super' used outside a class.", sup.Span.Start);
@@ -495,7 +509,7 @@ public class Binder
         body();
         _scope = prev;
     }
-    
+
     private void DeclareSymbol(Symbol sym, Position pos)
     {
         if (!_scope.Declare(sym))
@@ -510,7 +524,7 @@ public class Binder
         _globalScope.ForceReplace(sym);
         _table.Add(sym);
     }
-    
+
     private void DeclareIfAbsent(string name, SymbolKind kind, string type, Span span,
         string? parameters = null, string[]? typeParams = null)
     {
@@ -520,10 +534,10 @@ public class Binder
         _scope.Declare(sym);
         _table.Add(sym);
     }
-    
+
     private void AddError(string message, Position pos) =>
         _errors.Add(new BindError(message, pos));
-    
+  
     private static string TypeRefToString(TypeRef t)
     {
         var sb = new System.Text.StringBuilder(t.Name);
@@ -536,7 +550,7 @@ public class Binder
         if (t.IsArray) sb.Append("[]");
         return sb.ToString();
     }
- 
+
     private static string ParamsString(IEnumerable<Param> ps) =>
         string.Join(", ", ps.Select(p => $"{TypeRefToString(p.Type)} {p.Name}"));
 }
