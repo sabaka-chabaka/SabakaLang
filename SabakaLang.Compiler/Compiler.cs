@@ -7,20 +7,21 @@ public enum OpCode
     Push,
     Pop,
     Dup,
-    
+    Swap,
+ 
     Add, Sub, Mul, Div, Mod,
-    
+ 
     Equal, NotEqual, Greater, Less, GreaterEqual, LessEqual,
-    
+ 
     And, Or, Not, Negate,
-    
+ 
     Declare,
     Load,
     Store,
-    
+ 
     EnterScope,
     ExitScope,
-    
+ 
     Jump,
     JumpIfFalse,
     JumpIfTrue,
@@ -35,16 +36,16 @@ public enum OpCode
     StoreField,
     PushThis,
     Inherit,
-    
+ 
     CreateArray,
     ArrayLoad,
     ArrayStore,
     ArrayLength,
-    
+ 
     CreateStruct,
-    
+ 
     PushEnum,
-    
+ 
     Print,
     Input,
     Sleep,
@@ -58,17 +59,18 @@ public enum OpCode
 
 public sealed class Instruction
 {
-    public OpCode OpCode { get; }
+    public OpCode  OpCode  { get; }
     public object? Operand { get; set; }
-    public string? Name { get; }
-    public object? Extra { get; }
-    
-    public Instruction(OpCode opCode, object? operand = null, string? name = null, object? extra = null)
+    public string? Name    { get; }
+    public object? Extra   { get; }
+ 
+    public Instruction(OpCode opCode, object? operand = null,
+                       string? name = null, object? extra = null)
     {
-        OpCode = opCode;
+        OpCode  = opCode;
         Operand = operand;
-        Name = name;
-        Extra = extra;
+        Name    = name;
+        Extra   = extra;
     }
     
     public override string ToString()
@@ -186,18 +188,18 @@ public sealed class RuntimeException : Exception
 
 public sealed class Compiler
 {
-    private readonly List<Instruction> _code = [];
+    private readonly List<Instruction>  _code   = [];
     private readonly List<CompileError> _errors = [];
-    
+ 
     private readonly Dictionary<string, ClassMeta>              _classes   = new();
     private readonly Dictionary<string, List<VarDecl>>         _structs   = new();
     private readonly Dictionary<string, Dictionary<string,int>> _enums     = new();
     private readonly Dictionary<string, InterfaceDecl>          _interfaces= new();
-    
+ 
     private readonly Dictionary<string,(int ParamCount, bool Registered)> _externals = new();
-    
+ 
     private readonly Stack<Dictionary<string, string>> _typeScopes = new();
-    
+ 
     private string? _currentClass;
     
     public void RegisterExternal(string name, int paramCount)
@@ -235,7 +237,7 @@ public sealed class Compiler
         _code.Add(new Instruction(op, operand, name, extra));
         return _code.Count - 1;
     }
-    
+ 
     private void Patch(int idx, int target) => _code[idx].Operand = target;
  
     private int Ip => _code.Count;
@@ -292,12 +294,11 @@ public sealed class Compiler
             case ReturnStmt r:  EmitReturn(r);     break;
             case ExprStmt es:
                 EmitExpr(es.Expr);
-                if (es.Expr is not CallExpr && es.Expr is not AssignExpr)
-                    Emit(OpCode.Pop);
+                Emit(OpCode.Pop);
                 break;
         }
     }
-    
+ 
     private void EmitVarDecl(VarDecl v, string? ownerClass = null)
     {
         if (v.Init is not null)
@@ -312,7 +313,7 @@ public sealed class Compiler
         Emit(OpCode.Declare, name: v.Name);
         DeclareVarType(v.Name, TypeRefToString(v.Type));
     }
-    
+ 
     private void EmitDefaultValue(TypeRef t)
     {
         switch (t.Name)
@@ -338,7 +339,7 @@ public sealed class Compiler
                 break;
         }
     }
-    
+
     private void EmitFuncDecl(FuncDecl f, string? ownerClass = null)
     {
         string fqn  = ownerClass is null ? f.Name : $"{ownerClass}.{f.Name}";
@@ -484,7 +485,7 @@ public sealed class Compiler
         PopTypeScope();
         Emit(OpCode.ExitScope);
     }
-    
+ 
     private void EmitForeach(ForeachStmt s)
     {
         Emit(OpCode.EnterScope);
@@ -529,7 +530,7 @@ public sealed class Compiler
         PopTypeScope();
         Emit(OpCode.ExitScope);
     }
-    
+ 
     private void EmitSwitch(SwitchStmt s)
     {
         Emit(OpCode.EnterScope);
@@ -576,7 +577,7 @@ public sealed class Compiler
         PopTypeScope();
         Emit(OpCode.ExitScope);
     }
-    
+ 
     private void EmitReturn(ReturnStmt r)
     {
         if (r.Value is not null)
@@ -608,9 +609,10 @@ public sealed class Compiler
             case SuperExpr s: EmitSuper(s);   break;
         }
     }
-    
+ 
     private void EmitName(NameExpr n)
     {
+        if (n.Name == "this") { Emit(OpCode.PushThis); return; }
         Emit(OpCode.Load, name: n.Name);
     }
  
@@ -638,7 +640,7 @@ public sealed class Compiler
             Patch(end, Ip);
             return;
         }
- 
+        
         if (b.Left is IntLit li && b.Right is IntLit ri)
         {
             int? folded = b.Op switch
@@ -687,31 +689,33 @@ public sealed class Compiler
         {
             case NameExpr n:
                 EmitExpr(a.Value);
+                Emit(OpCode.Dup);
                 Emit(OpCode.Store, name: n.Name);
-                Emit(OpCode.Load,  name: n.Name);
                 break;
  
             case MemberExpr m:
+                EmitExpr(a.Value);
+                Emit(OpCode.Dup);
                 EmitExpr(m.Object);
-                EmitExpr(a.Value);
+                Emit(OpCode.Swap);
                 Emit(OpCode.StoreField, name: m.Member);
-                EmitExpr(a.Value);
                 break;
  
             case IndexExpr i:
                 EmitExpr(i.Object);
                 EmitExpr(i.Index);
                 EmitExpr(a.Value);
+                Emit(OpCode.Dup);
                 Emit(OpCode.ArrayStore);
-                EmitExpr(a.Value);
                 break;
  
             default:
                 Error("Invalid assignment target", a.Span.Start);
+                Emit(OpCode.Push, Value.Null);
                 break;
         }
     }
-    
+ 
     private void EmitCall(CallExpr c)
     {
         if (c.Callee is NameExpr ne)
@@ -729,6 +733,16 @@ public sealed class Compiler
             {
                 EmitCreateObject(ne.Name);
                 EmitConstructorCall(ne.Name, c.Args, c.Span.Start);
+                return;
+            }
+
+            if (_currentClass is not null &&
+                _classes.TryGetValue(_currentClass, out var classMeta) &&
+                classMeta.Methods.Any(m => m.Name == ne.Name))
+            {
+                Emit(OpCode.PushThis);
+                foreach (var a in c.Args) EmitExpr(a);
+                Emit(OpCode.CallMethod, c.Args.Count, name: ne.Name);
                 return;
             }
  
@@ -777,7 +791,7 @@ public sealed class Compiler
  
         Error("Unsupported call expression form", c.Span.Start);
     }
-    
+ 
     private void EmitMember(MemberExpr m)
     {
         if (m.Object is NameExpr oe && _enums.TryGetValue(oe.Name, out var enumVals))
@@ -798,7 +812,7 @@ public sealed class Compiler
         EmitExpr(m.Object);
         Emit(OpCode.LoadField, name: m.Member);
     }
-    
+ 
     private void EmitIndex(IndexExpr i)
     {
         EmitExpr(i.Object);
@@ -828,8 +842,7 @@ public sealed class Compiler
     {
         var allFields = GetAllClassFields(className);
         Emit(OpCode.CreateObject, name: className, extra: allFields);
- 
-        // Run field initializers from base → derived
+        
         EmitFieldInitializers(className);
     }
  
@@ -966,7 +979,7 @@ public sealed class Compiler
     {
         if (c.Args.Count != expected)
             Error($"'{(c.Callee as NameExpr)?.Name}' expects {expected} argument(s), got {c.Args.Count}",
-                c.Span.Start);
+                  c.Span.Start);
     }
     
     private List<string> GetAllClassFields(string className)
