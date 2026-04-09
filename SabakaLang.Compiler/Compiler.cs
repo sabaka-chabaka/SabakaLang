@@ -78,6 +78,35 @@ public sealed class Instruction
     }
 }
 
+internal sealed class ClassMeta
+{
+    public string  Name       { get; }
+    public string? Base       { get; }
+    public List<string>         Fields  { get; } = [];
+    public List<VarDecl>        FieldDecls { get; } = [];
+    public List<FuncDecl>       Methods { get; } = [];
+    public List<string>         Interfaces { get; } = [];
+    public ClassMeta(string name, string? @base) { Name = name; Base = @base; }
+}
+
+public readonly record struct CompileError(string Message, Position Position)
+{
+    public override string ToString() => $"[{Position.Line}:{Position.Column}] {Message}";
+}
+
+public sealed class CompileResult
+{
+    public IReadOnlyList<Instruction>  Code   { get; }
+    public IReadOnlyList<CompileError> Errors { get; }
+    public bool HasErrors => Errors.Count > 0;
+ 
+    public CompileResult(IReadOnlyList<Instruction> code, IReadOnlyList<CompileError> errors)
+    {
+        Code   = code;
+        Errors = errors;
+    }
+}
+
 public sealed class Compiler
 {
     
