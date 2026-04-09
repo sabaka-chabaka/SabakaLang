@@ -33,5 +33,41 @@ public class CompilerTests
         => Assert.False(r.HasErrors,
             string.Join("\n", r.Errors.Select(e => e.ToString())));
 
+    [Fact]
+    public void IntLiteral_EmitsPush()
+    {
+        var code = Code("42");
+        var push = code.OfType<Instruction>().First(i => i.OpCode == OpCode.Push);
+        
+        Assert.Equal(Value.FromInt(42), push.Operand);
+    }
     
+    [Fact]
+    public void FloatLiteral_EmitsPush()
+    {
+        var code = Code("3.14");
+        var pushes = All(code, OpCode.Push).ToList();
+        Assert.Contains(pushes, p => p.Operand is Value v && v.Type == SabakaType.Float);
+    }
+
+    [Fact]
+    public void StringLiteral_EmitsPush()
+    {
+        var code = Code("\"hello\"");
+        Assert.Contains(All(code, OpCode.Push), p => p.Operand is Value v && v.Type == SabakaType.String && v.String == "hello");
+    }
+
+    [Fact]
+    public void BoolTrue_EmitsPushTrue()
+    {
+        var code = Code("true");
+        Assert.Contains(All(code, OpCode.Push), p => p.Operand is Value v && v.Type == SabakaType.Bool && v.Bool == true);
+    }
+    
+    [Fact]
+    public void BoolFalse_EmitsPushFalse()
+    {
+        var code = Code("false");
+        Assert.Contains(All(code, OpCode.Push), p => p.Operand is Value v && v.Type == SabakaType.Bool && v.Bool == false);
+    }
 }
