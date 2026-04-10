@@ -68,7 +68,7 @@ public enum TokenType
     ColonColon,
     Super,
     Interface,
-    This,
+    Null,
     
     Switch,
     Case,
@@ -138,7 +138,7 @@ public sealed class Lexer
         ["new"]       = TokenType.New,
         ["override"]  = TokenType.Override,
         ["super"]     = TokenType.Super,
-        ["this"]      = TokenType.This,
+        ["null"]      = TokenType.Null,
         ["switch"]    = TokenType.Switch,
         ["case"]      = TokenType.Case,
         ["default"]   = TokenType.Default,
