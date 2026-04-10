@@ -639,6 +639,7 @@ public sealed class Compiler
             case FloatLit  x: Emit(OpCode.Push, Value.FromFloat(x.Value));  break;
             case StringLit x: Emit(OpCode.Push, Value.FromString(x.Value)); break;
             case BoolLit   x: Emit(OpCode.Push, Value.FromBool(x.Value));   break;
+            case NullLit   : Emit(OpCode.Push, Value.Null);                 break;
  
             case NameExpr n:  EmitName(n);    break;
             case BinaryExpr b:EmitBinary(b);  break;

@@ -450,6 +450,7 @@ public sealed class Binder
             case FloatLit:
             case StringLit:
             case BoolLit:
+            case NullLit:
                 break;
 
             case NameExpr n:

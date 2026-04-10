@@ -13,6 +13,7 @@ public record IntLit (int Value, Span Span) : IExpr;
 public record FloatLit (double Value, Span Span) : IExpr;
 public record StringLit (string Value, Span Span) : IExpr;
 public record BoolLit (bool Value, Span Span) : IExpr;
+public record NullLit(Span Span) : IExpr;
 
 public record NameExpr(string Name, Span Span) : IExpr;
 public record BinaryExpr(IExpr Left, TokenType Op, IExpr Right, Span Span) : IExpr;
@@ -665,7 +666,13 @@ public sealed class Parser
             return new StringLit(Advance().Value, SpanFrom(start));
         if (Check(TokenType.True))  { Advance(); return new BoolLit(true,  SpanFrom(start)); }
         if (Check(TokenType.False)) { Advance(); return new BoolLit(false, SpanFrom(start)); }
- 
+
+        if (Check(TokenType.Null))
+        {
+            Advance();
+            return new NullLit(SpanFrom(start));
+        }
+        
         if (Check(TokenType.Identifier))
             return new NameExpr(Advance().Value, SpanFrom(start));
  
