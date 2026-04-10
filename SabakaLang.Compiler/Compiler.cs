@@ -100,14 +100,17 @@ public readonly record struct CompileError(string Message, Position Position)
 
 public sealed class CompileResult
 {
-    public IReadOnlyList<Instruction>  Code   { get; }
-    public IReadOnlyList<CompileError> Errors { get; }
+    public IReadOnlyList<Instruction>  Code    { get; }
+    public IReadOnlyList<CompileError> Errors  { get; }
+    public SymbolTable                 Symbols { get; }
     public bool HasErrors => Errors.Count > 0;
  
-    public CompileResult(IReadOnlyList<Instruction> code, IReadOnlyList<CompileError> errors)
+    public CompileResult(IReadOnlyList<Instruction> code, IReadOnlyList<CompileError> errors,
+                         SymbolTable? symbols = null)
     {
-        Code   = code;
-        Errors = errors;
+        Code    = code;
+        Errors  = errors;
+        Symbols = symbols ?? new SymbolTable();
     }
 }
 
@@ -201,20 +204,26 @@ public sealed class Compiler
     private readonly Stack<Dictionary<string, string>> _typeScopes = new();
  
     private string? _currentClass;
+
+    private SymbolTable _symbolTable = new();
     
     public void RegisterExternal(string name, int paramCount)
         => _externals[name] = (paramCount, true);
- 
-    public CompileResult Compile(IReadOnlyList<IStmt> statements)
+
+    public CompileResult Compile(IReadOnlyList<IStmt> statements, BindResult bindResult)
     {
+        _symbolTable = bindResult.Symbols;
+
+        foreach (var be in bindResult.Errors)
+            _errors.Add(new CompileError(be.Message, be.Position));
+
         PushTypeScope();
- 
+
         foreach (var s in statements) HoistTopLevel(s);
- 
         foreach (var s in statements) EmitStmt(s);
- 
+
         PopTypeScope();
-        return new CompileResult(_code, _errors);
+        return new CompileResult(_code, _errors, _symbolTable);
     }
     
     private void PushTypeScope() => _typeScopes.Push(new Dictionary<string, string>());
@@ -232,6 +241,40 @@ public sealed class Compiler
         return null;
     }
     
+    private bool IsKnownType(string name) =>
+        _classes.ContainsKey(name) ||
+        _structs.ContainsKey(name) ||
+        _enums.ContainsKey(name)   ||
+        _symbolTable.Lookup(name).Any(s =>
+            s.Kind is SymbolKind.Class or SymbolKind.Struct or SymbolKind.Enum);
+
+    private bool IsKnownClass(string name) =>
+        _classes.ContainsKey(name) ||
+        _symbolTable.Lookup(name).Any(s => s.Kind == SymbolKind.Class);
+
+    private bool IsKnownEnum(string name) =>
+        _enums.ContainsKey(name) ||
+        _symbolTable.Lookup(name).Any(s => s.Kind == SymbolKind.Enum);
+
+    private bool TryGetEnumValue(string enumName, string member, out int value)
+    {
+        if (_enums.TryGetValue(enumName, out var dict) && dict.TryGetValue(member, out value))
+            return true;
+
+        var members = _symbolTable.MembersOf(enumName)
+                                  .Where(s => s.Kind == SymbolKind.EnumMember)
+                                  .ToList();
+        var idx = members.FindIndex(s => s.Name == member);
+        if (idx >= 0) { value = idx; return true; }
+
+        value = 0;
+        return false;
+    }
+
+    private bool IsMethodOf(string className, string funcName) =>
+        (_classes.TryGetValue(className, out var m) && m.Methods.Any(mm => mm.Name == funcName)) ||
+        _symbolTable.MembersOf(className).Any(s => s.Name == funcName && s.Kind == SymbolKind.Method);
+
     private int Emit(OpCode op, object? operand = null, string? name = null, object? extra = null)
     {
         _code.Add(new Instruction(op, operand, name, extra));
@@ -721,36 +764,34 @@ public sealed class Compiler
         if (c.Callee is NameExpr ne)
         {
             if (TryEmitBuiltin(ne.Name, c)) return;
- 
+
             if (_externals.TryGetValue(ne.Name, out var ext))
             {
                 foreach (var a in c.Args) EmitExpr(a);
                 Emit(OpCode.CallExternal, c.Args.Count, name: ne.Name);
                 return;
             }
- 
-            if (_classes.TryGetValue(ne.Name, out _))
+
+            if (IsKnownClass(ne.Name))
             {
                 EmitCreateObject(ne.Name);
                 EmitConstructorCall(ne.Name, c.Args, c.Span.Start);
                 return;
             }
 
-            if (_currentClass is not null &&
-                _classes.TryGetValue(_currentClass, out var classMeta) &&
-                classMeta.Methods.Any(m => m.Name == ne.Name))
+            if (_currentClass is not null && IsMethodOf(_currentClass, ne.Name))
             {
                 Emit(OpCode.PushThis);
                 foreach (var a in c.Args) EmitExpr(a);
                 Emit(OpCode.CallMethod, c.Args.Count, name: ne.Name);
                 return;
             }
- 
+
             foreach (var a in c.Args) EmitExpr(a);
             Emit(OpCode.Call, c.Args.Count, name: ne.Name);
             return;
         }
- 
+
         if (c.Callee is MemberExpr me)
         {
             if (me.Object is SuperExpr)
@@ -771,7 +812,7 @@ public sealed class Compiler
                 Emit(OpCode.CallMethod, c.Args.Count, name: me.Member, extra: baseClass);
                 return;
             }
- 
+
             if (me.Object is NameExpr modName)
             {
                 string extKey = $"{modName.Name}.{me.Member}";
@@ -782,33 +823,33 @@ public sealed class Compiler
                     return;
                 }
             }
- 
+
             EmitExpr(me.Object);
             foreach (var a in c.Args) EmitExpr(a);
             Emit(OpCode.CallMethod, c.Args.Count, name: me.Member);
             return;
         }
- 
+
         Error("Unsupported call expression form", c.Span.Start);
     }
  
     private void EmitMember(MemberExpr m)
     {
-        if (m.Object is NameExpr oe && _enums.TryGetValue(oe.Name, out var enumVals))
+        if (m.Object is NameExpr oe && IsKnownEnum(oe.Name))
         {
-            if (!enumVals.TryGetValue(m.Member, out var enumVal))
+            if (!TryGetEnumValue(oe.Name, m.Member, out var enumVal))
                 Error($"Unknown enum member '{m.Member}' in '{oe.Name}'", m.Span.Start);
             Emit(OpCode.Push, Value.FromInt(enumVal));
             return;
         }
- 
+
         if (m.Member == "length")
         {
             EmitExpr(m.Object);
             Emit(OpCode.ArrayLength);
             return;
         }
- 
+
         EmitExpr(m.Object);
         Emit(OpCode.LoadField, name: m.Member);
     }
