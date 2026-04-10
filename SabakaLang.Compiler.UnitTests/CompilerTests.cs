@@ -861,4 +861,17 @@ public class CompilerTests
         Assert.NotEmpty(r.Symbols.Lookup("increment"));
         Assert.NotEmpty(r.Symbols.Lookup("Timer"));
     }
+    
+    [Fact]
+    public void ReturnStmt_NullLiteral()
+    {
+        var code = Code("int f() { return null; }");
+
+        Assert.Contains(code, i =>
+            i.OpCode == OpCode.Push &&
+            i.Operand is Value v &&
+            v.IsNull);
+
+        Assert.Contains(code, i => i.OpCode == OpCode.Return);
+    }
 }

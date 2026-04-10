@@ -55,6 +55,13 @@ public class ParserTests
         var lit = Assert.IsType<BoolLit>(stmt.Expr);
         Assert.False(lit.Value);
     }
+
+    [Fact]
+    public void NullLiteral_Parsed()
+    {
+        var stmt = AssertSingle<ExprStmt>(Parse("null;"));
+        Assert.IsType<NullLit>(stmt.Expr);
+    }
     
     [Fact]
     public void BinaryExpr_Addition_Parsed()
@@ -321,6 +328,15 @@ public class ParserTests
     {
         var decl = AssertSingle<VarDecl>(Parse("protected int x;"));
         Assert.Equal(AccessMod.Protected, decl.Access);
+    }
+    
+    [Fact]
+    public void FuncDecl_Return_Null()
+    {
+        var func = AssertSingle<FuncDecl>(Parse("void f() { return null; }"));
+
+        var ret = Assert.IsType<ReturnStmt>(func.Body[0]);
+        Assert.IsType<NullLit>(ret.Value);
     }
     
     [Fact]
@@ -974,5 +990,13 @@ public class ParserTests
         Assert.False(result.HasErrors, string.Join("\n", result.Errors.Select(e => e.Message)));
         Assert.Equal(3, result.Statements.Count);
         Assert.All(result.Statements, s => Assert.IsType<ClassDecl>(s));
+    }
+    
+    [Fact]
+    public void Compare_With_Null()
+    {
+        var stmt = AssertSingle<ExprStmt>(Parse("a == null;"));
+        var bin = Assert.IsType<BinaryExpr>(stmt.Expr);
+        Assert.IsType<NullLit>(bin.Right);
     }
 }

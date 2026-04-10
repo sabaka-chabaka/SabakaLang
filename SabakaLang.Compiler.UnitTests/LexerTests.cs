@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace SabakaLang.Compiler.UnitTests;
 
 public class LexerTests
@@ -53,6 +55,7 @@ public class LexerTests
     [InlineData("int",    TokenType.IntKeyword)]
     [InlineData("true",   TokenType.True)]
     [InlineData("false",  TokenType.False)]
+    [InlineData("null",   TokenType.Null)]
     public void Keywords_RecognizedCorrectly(string source, TokenType expected)
     {
         var tokens = Tokenize(source);
