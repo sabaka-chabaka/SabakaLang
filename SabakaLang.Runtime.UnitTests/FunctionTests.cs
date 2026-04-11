@@ -47,7 +47,7 @@ public sealed class FunctionTests : Utilities
             print(sign(0));
             print(sign(7));
             """;
-        Assert.Equal(["neg\r", "zero\r", "pos"], Lines(src));
+        Assert.Equal(["neg", "zero", "pos"], Lines(src));
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public sealed class FunctionTests : Utilities
             print(isEven(4));
             print(isOdd(7));
             """;
-        Assert.Equal(["true\r", "true"], Lines(src));
+        Assert.Equal(["true", "true"], Lines(src));
     }
 
     [Fact]

@@ -53,7 +53,7 @@ public sealed class ScopeTests : Utilities
             }
             print(x);
             """);
-        Assert.Equal(["20\r", "10"], lines);
+        Assert.Equal(["20", "10"], lines);
     }
 
     [Fact]
@@ -174,7 +174,7 @@ public sealed class ControlFlowTests : Utilities
                 print(w);
             }
             """);
-        Assert.Equal(["a\r", "b\r", "c"], lines);
+        Assert.Equal(["a", "b", "c"], lines);
     }
     
     [Fact]

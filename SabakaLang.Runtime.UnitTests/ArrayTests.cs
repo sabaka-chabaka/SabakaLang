@@ -89,7 +89,7 @@ public class ArrayTests : Utilities
                   print(r[0]);
                   print(r[2]);
                   """;
-        Assert.Equal(["7\r", "9"], Lines(src));
+        Assert.Equal(["7", "9"], Lines(src));
     }
     
     [Fact]
