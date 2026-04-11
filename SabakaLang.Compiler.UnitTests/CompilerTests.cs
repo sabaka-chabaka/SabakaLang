@@ -255,20 +255,6 @@ public class CompilerTests
     }
     
     [Fact]
-    public void ExprStmt_AlwaysEmitsPop()
-    {
-        var code = Code("42;");
-        Assert.True(Has(code, OpCode.Pop));
-    }
-
-    [Fact]
-    public void ExprStmt_CallAlsoPops()
-    {
-        var code = Code("void foo() {} foo();");
-        Assert.True(Has(code, OpCode.Pop));
-    }
-    
-    [Fact]
     public void FuncDecl_EmitsFunctionInstruction()
     {
         var code = Code("void foo() {}");

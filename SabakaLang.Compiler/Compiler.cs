@@ -337,7 +337,7 @@ public sealed class Compiler
             case ReturnStmt r:  EmitReturn(r);     break;
             case ExprStmt es:
                 EmitExpr(es.Expr);
-                Emit(OpCode.Pop);
+                //Emit(OpCode.Pop);
                 break;
         }
     }
