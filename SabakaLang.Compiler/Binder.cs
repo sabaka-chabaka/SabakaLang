@@ -500,6 +500,12 @@ public sealed class Binder
                 if (_currentType is null)
                     AddError("'super' used outside a class.", sup.Span.Start);
                 break;
+            
+            case TernaryExpr t:
+                BindExpr(t.Condition);
+                BindExpr(t.Then);
+                BindExpr(t.Else);
+                break;
         }
     }
 

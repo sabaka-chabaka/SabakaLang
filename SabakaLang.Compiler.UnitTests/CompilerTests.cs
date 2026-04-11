@@ -873,4 +873,13 @@ public class CompilerTests
     {
         AssertNoErrors(Compile("int x = 0; x -= 1;")); 
     }
+    
+    [Fact]
+    public void Ternary_CompilesCorrect()
+    {
+        var code = Compile("true ? 1 : 2").Code;
+
+        Assert.Contains(code, i => i.OpCode == OpCode.JumpIfFalse);
+        Assert.Contains(code, i => i.OpCode == OpCode.Jump);
+    }
 }

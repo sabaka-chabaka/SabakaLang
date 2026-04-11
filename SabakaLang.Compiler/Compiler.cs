@@ -651,6 +651,7 @@ public sealed class Compiler
             case ArrayExpr a: EmitArrayLit(a);break;
             case NewExpr n:   EmitNew(n);     break;
             case SuperExpr s: EmitSuper(s);   break;
+            case TernaryExpr t: EmitTernary(t); break;
         }
     }
  
@@ -877,6 +878,22 @@ public sealed class Compiler
     {
         if (_currentClass is null) Error("'super' outside class", s.Span.Start);
         Emit(OpCode.PushThis);
+    }
+    
+    private void EmitTernary(TernaryExpr t)
+    {
+        EmitExpr(t.Condition);
+
+        int jmpFalse = Emit(OpCode.JumpIfFalse, 0);
+
+        EmitExpr(t.Then);
+        int jmpEnd = Emit(OpCode.Jump, 0);
+
+        Patch(jmpFalse, Ip);
+
+        EmitExpr(t.Else);
+
+        Patch(jmpEnd, Ip);
     }
     
     private void EmitCreateObject(string className)

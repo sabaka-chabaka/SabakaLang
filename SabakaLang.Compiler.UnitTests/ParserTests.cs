@@ -1054,4 +1054,49 @@ public class ParserTests
         var bin = Assert.IsType<BinaryExpr>(stmt.Expr);
         Assert.IsType<NullLit>(bin.Right);
     }
+
+    [Fact]
+    public void TernaryExpr_Parsed()
+    {
+        var result = Parse("a ? b : c");
+
+        Assert.False(result.HasErrors);
+        var expr = Assert.IsType<ExprStmt>(result.Statements[0]).Expr;
+
+        var ternary = Assert.IsType<TernaryExpr>(expr);
+
+        Assert.IsType<NameExpr>(ternary.Condition);
+        Assert.IsType<NameExpr>(ternary.Then);
+        Assert.IsType<NameExpr>(ternary.Else);
+    }
+    
+    [Fact]
+    public void Parse_Ternary_Precedence()
+    {
+        var result = Parse("a || b ? c : d");
+
+        Assert.False(result.HasErrors);
+
+        var expr = Assert.IsType<ExprStmt>(result.Statements[0]).Expr;
+        var ternary = Assert.IsType<TernaryExpr>(expr);
+
+        var condition = Assert.IsType<BinaryExpr>(ternary.Condition);
+        Assert.Equal(TokenType.OrOr, condition.Op);
+    }
+    
+    [Fact]
+    public void Parse_Ternary_RightAssociative()
+    {
+        var result = Parse("a ? b : c ? d : e");
+
+        Assert.False(result.HasErrors);
+
+        var expr = Assert.IsType<ExprStmt>(result.Statements[0]).Expr;
+        var t1 = Assert.IsType<TernaryExpr>(expr);
+
+        Assert.IsType<NameExpr>(t1.Condition);
+        Assert.IsType<NameExpr>(t1.Then);
+
+        var t2 = Assert.IsType<TernaryExpr>(t1.Else);
+    }
 }

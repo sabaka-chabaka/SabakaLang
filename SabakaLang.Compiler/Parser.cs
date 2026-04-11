@@ -25,6 +25,7 @@ public record ArrayExpr(List<IExpr> Elements, Span Span) : IExpr;
 public record NewExpr(string TypeName, List<string> TypeArgs, List<IExpr> Args, Span Span) : IExpr;
 public record SuperExpr(Span Span) : IExpr;
 public record AssignExpr(IExpr Target, IExpr Value, Span Span) : IExpr;
+public record TernaryExpr(IExpr Condition, IExpr Then, IExpr Else, Span Span) : IExpr;
 
 public record ExprStmt(IExpr Expr, Span Span) : IStmt;
 public record ReturnStmt(IExpr? Value, Span Span) : IStmt;
@@ -509,7 +510,7 @@ public sealed class Parser
     private IExpr ParseAssign()
     {
         var start = Current.Start;
-        var left = ParseLogicalOr();
+        var left = ParseTernary();
 
         if (Check(TokenType.Equal))
         {
@@ -551,6 +552,23 @@ public sealed class Parser
         }
 
         return left;
+    }
+    
+    private IExpr ParseTernary()
+    {
+        var start = Current.Start;
+        var condition = ParseLogicalOr();
+
+        if (Match(TokenType.Question))
+        {
+            var thenExpr = ParseExpr();
+            Expect(TokenType.Colon);
+            var elseExpr = ParseTernary();
+
+            return new TernaryExpr(condition, thenExpr, elseExpr, SpanFrom(start));
+        }
+
+        return condition;
     }
 
     private IExpr ParseLogicalOr()
