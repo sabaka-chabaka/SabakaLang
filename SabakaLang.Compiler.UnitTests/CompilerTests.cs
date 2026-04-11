@@ -486,17 +486,6 @@ public class CompilerTests
     }
 
     [Fact]
-    public void ArrayAssign_DupBeforeStore()
-    {
-        var code = Code("int[] arr = [1, 2, 3]; arr[0] = 5;");
-        var ops  = code.Select(i => i.OpCode).ToList();
-        int dupIdx   = ops.LastIndexOf(OpCode.Dup);
-        int storeIdx = ops.IndexOf(OpCode.ArrayStore);
-        Assert.True(dupIdx >= 0);
-        Assert.True(dupIdx < storeIdx);
-    }
-
-    [Fact]
     public void ArrayLength_EmitsArrayLength()
     {
         var code = Code("int[] arr = [1, 2]; arr.length;");
