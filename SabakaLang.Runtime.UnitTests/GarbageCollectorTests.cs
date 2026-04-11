@@ -31,44 +31,56 @@ public class GarbageCollectorTests
     [Fact]
     public void LiveCount_EqualsAllocatedWhenAllReachable()
     {
-        var gc   = MakeGc();
-        var objs = Enumerable.Range(0, 10).Select(_ => gc.Alloc("X")).ToList();
- 
-        var list = objs;
+        var roots = new List<SabakaObject>();
+        var gc = new GarbageCollector(1000, () => roots);
+    
+        for (int i = 0; i < 10; i++)
+        {
+            roots.Add(gc.Alloc("X"));
+        }
+
         gc.Collect();
- 
+
         Assert.Equal(10, gc.LiveCount);
     }
     
     [Fact]
     public void Collect_RemovesUnreachableObjects()
     {
-        var live = MakeObj("Live");
-        var gc = new GarbageCollector(1000, () => [live]);
- 
+        var roots = new List<SabakaObject>();
+        var gc = new GarbageCollector(1000, () => roots);
+
+        var live = gc.Alloc("Live");
+        roots.Add(live);
+
         gc.Alloc("Dead1");
         gc.Alloc("Dead2");
         gc.Alloc("Dead3");
- 
+
         gc.Collect();
- 
+
         Assert.Equal(1, gc.LiveCount);
     }
-    
+
     [Fact]
     public void Collect_KeepsReachableObjects()
     {
-        var a = MakeObj("A");
-        var b = MakeObj("B");
-        var gc = new GarbageCollector(1000, () => [a, b]);
- 
+        var roots = new List<SabakaObject>();
+        var gc = new GarbageCollector(1000, () => roots);
+
+        var a = gc.Alloc("A");
+        var b = gc.Alloc("B");
+
+        roots.Add(a);
+        roots.Add(b);
+
         gc.Alloc("Unreachable");
- 
+
         gc.Collect();
- 
+        
         Assert.Equal(2, gc.LiveCount);
     }
-    
+
     [Fact]
     public void Collect_UpdatesTotalCollected()
     {
