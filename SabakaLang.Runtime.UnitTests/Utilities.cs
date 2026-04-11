@@ -13,7 +13,10 @@ public class Utilities
     }
  
     protected static string[] Lines(string source, string? stdin = null)
-        => Output(source, stdin).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        => Output(source, stdin)
+            .Replace("\r", "")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
  
     protected static void RunError(string source, string fragment)
     {
