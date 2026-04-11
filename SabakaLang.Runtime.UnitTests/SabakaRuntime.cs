@@ -50,13 +50,26 @@ public sealed class SabakaRuntime
             return new CompileResult([], errs);
         }
 
-        var bind  = new Binder().Bind(parse.Statements);
+        var binder = new Binder();
+        
+        var externalSymbols = _externalArities.Select(kvp => 
+            new Symbol(
+                name: kvp.Key, 
+                kind: SymbolKind.Function,
+                type: "dynamic",
+                span: new Span(default, default),
+                parameters: new string(',', kvp.Value) 
+            )
+        );
+
+        binder.AddGlobalSymbols(externalSymbols);
+        
         var comp  = new Compiler.Compiler();
 
         foreach (var (name, arity) in _externalArities)
             comp.RegisterExternal(name, arity);
 
-        return comp.Compile(parse.Statements, bind);
+        return comp.Compile(parse.Statements, binder.Bind(parse.Statements));
     }
     
     public string RunAndCapture(string source, string? stdinText = null, int gcThreshold = 512)
