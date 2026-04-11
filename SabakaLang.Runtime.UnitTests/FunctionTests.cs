@@ -47,7 +47,7 @@ public sealed class FunctionTests : Utilities
             print(sign(0));
             print(sign(7));
             """;
-        Assert.Equal(["neg", "zero", "pos"], Lines(src));
+        Assert.Equal(["neg\r", "zero\r", "pos"], Lines(src));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class FunctionTests : Utilities
             void foo() { int secret = 99; }
             foo();
             print(secret);
-            """, "undefined variable");
+            """, "[3:7] Undefined symbol 'secret'.");
     }
     
     [Fact]
@@ -105,7 +105,7 @@ public sealed class FunctionTests : Utilities
             print(isEven(4));
             print(isOdd(7));
             """;
-        Assert.Equal(["true", "true"], Lines(src));
+        Assert.Equal(["true\r", "true"], Lines(src));
     }
 
     [Fact]

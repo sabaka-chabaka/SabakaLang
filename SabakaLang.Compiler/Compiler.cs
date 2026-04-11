@@ -749,7 +749,6 @@ public sealed class Compiler
                 EmitExpr(i.Object);
                 EmitExpr(i.Index);
                 EmitExpr(a.Value);
-                Emit(OpCode.Dup);
                 Emit(OpCode.ArrayStore);
                 break;
  

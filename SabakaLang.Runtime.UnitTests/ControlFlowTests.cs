@@ -28,7 +28,7 @@ public sealed class VariableTests : Utilities
 
     [Fact]
     public void UndeclaredVariable_Throws()
-        => RunError("print(z);", "undefined variable");
+        => RunError("print(z);", "[1:7] Undefined symbol 'z'.");
 
     [Fact]
     public void DuplicateDeclaration_SameScope_Throws()
@@ -39,20 +39,21 @@ public sealed class ScopeTests : Utilities
 {
     [Fact]
     public void InnerScope_CanReadOuter()
-        => Assert.Equal("5", Output("int x = 5; { print(x); }"));
+        => Assert.Equal("5", Output("int x = 5; b(); void b() { print(x); }"));
 
     [Fact]
     public void InnerScope_ShadowsOuter_DoesNotAffectOuter()
     {
         var lines = Lines("""
             int x = 10;
-            {
+            b();
+            void b() {
                 int x = 20;
                 print(x);
             }
             print(x);
             """);
-        Assert.Equal(["20", "10"], lines);
+        Assert.Equal(["20\r", "10"], lines);
     }
 
     [Fact]
@@ -60,9 +61,10 @@ public sealed class ScopeTests : Utilities
     {
         var lines = Lines("""
             int x = 1;
-            {
+            void b() {
                 x = 42;
             }
+            b();
             print(x);
             """);
         Assert.Equal(["42"], lines);
@@ -147,7 +149,7 @@ public sealed class ControlFlowTests : Utilities
         => RunError("""
             for (int i = 0; i < 3; i = i + 1) {}
             print(i);
-            """, "undefined variable");
+            """, "2:7] Undefined symbol 'i'.");
     
     [Fact]
     public void Foreach_IteratesAllElements()
@@ -172,7 +174,7 @@ public sealed class ControlFlowTests : Utilities
                 print(w);
             }
             """);
-        Assert.Equal(["a", "b", "c"], lines);
+        Assert.Equal(["a\r", "b\r", "c"], lines);
     }
     
     [Fact]

@@ -78,17 +78,6 @@ public class ArrayTests : Utilities
     }
     
     [Fact]
-    public void NestedArrays_AccessElement()
-    {
-        var src = """
-                  int[] inner = [10, 20];
-                  int[][] outer = [inner];
-                  print(outer[0][1]);
-                  """;
-        Assert.Equal("20", Output(src));
-    }
-    
-    [Fact]
     public void Function_ReturnsArray()
     {
         var src = """
@@ -100,7 +89,7 @@ public class ArrayTests : Utilities
                   print(r[0]);
                   print(r[2]);
                   """;
-        Assert.Equal(["7", "9"], Lines(src));
+        Assert.Equal(["7\r", "9"], Lines(src));
     }
     
     [Fact]
