@@ -849,4 +849,28 @@ public class CompilerTests
 
         Assert.Contains(code, i => i.OpCode == OpCode.Return);
     }
+
+    [Fact]
+    public void Increment_CompilesClean()
+    {
+        AssertNoErrors(Compile("int x = 0; x++;")); 
+    }
+    
+    [Fact]
+    public void Decrement_CompilesClean()
+    {
+        AssertNoErrors(Compile("int x = 0; x--;")); 
+    }
+
+    [Fact] 
+    public void AssignPlus_CompilesClean()
+    {
+        AssertNoErrors(Compile("int x = 0; x += 1;")); 
+    }
+    
+    [Fact] 
+    public void AssignMinus_CompilesClean()
+    {
+        AssertNoErrors(Compile("int x = 0; x -= 1;")); 
+    }
 }

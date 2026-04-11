@@ -510,17 +510,46 @@ public sealed class Parser
     {
         var start = Current.Start;
         var left = ParseLogicalOr();
- 
+
         if (Check(TokenType.Equal))
         {
             Advance();
             var right = ParseAssign();
+
             if (left is NameExpr or MemberExpr or IndexExpr)
                 return new AssignExpr(left, right, SpanFrom(start));
+
             AddError("Invalid assignment target", start);
             return left;
         }
- 
+
+        if (Check(TokenType.PlusEqual) ||
+            Check(TokenType.MinusEqual) ||
+            Check(TokenType.StarEqual))
+        {
+            var op = Current.Type;
+            Advance();
+
+            var right = ParseAssign();
+
+            if (left is NameExpr or MemberExpr or IndexExpr)
+            {
+                var binaryOp = op switch
+                {
+                    TokenType.PlusEqual => TokenType.Plus,
+                    TokenType.MinusEqual => TokenType.Minus,
+                    TokenType.StarEqual => TokenType.Star,
+                    _ => throw new Exception("Unexpected compound operator")
+                };
+
+                var value = new BinaryExpr(left, binaryOp, right, SpanFrom(start));
+                return new AssignExpr(left, value, SpanFrom(start));
+            }
+
+            AddError("Invalid assignment target", start);
+            return left;
+        }
+
         return left;
     }
 
@@ -622,6 +651,28 @@ public sealed class Parser
  
         while (true)
         {
+            if (Check(TokenType.PlusPlus) || Check(TokenType.MinusMinus))
+            {
+                var op = Current.Type;
+                Advance();
+
+                if (expr is NameExpr or MemberExpr or IndexExpr)
+                {
+                    var one = new IntLit(1, SpanFrom(start));
+
+                    var binaryOp = op == TokenType.PlusPlus
+                        ? TokenType.Plus
+                        : TokenType.Minus;
+
+                    var value = new BinaryExpr(expr, binaryOp, one, SpanFrom(start));
+
+                    expr = new AssignExpr(expr, value, SpanFrom(start));
+                    continue;
+                }
+
+                AddError("Invalid increment target", start);
+                continue;
+            }
             if (Check(TokenType.LParen))
             {
                 Advance();

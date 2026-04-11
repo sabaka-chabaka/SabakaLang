@@ -85,6 +85,11 @@ public class LexerTests
     [InlineData("&&", TokenType.AndAnd)]
     [InlineData("||", TokenType.OrOr)]
     [InlineData("::", TokenType.ColonColon)]
+    [InlineData("+=",  TokenType.PlusEqual)]
+    [InlineData("-=",  TokenType.MinusEqual)]
+    [InlineData("*=",  TokenType.StarEqual)]
+    [InlineData("++",   TokenType.PlusPlus)]
+    [InlineData("--",   TokenType.MinusMinus)]
     public void Operators_RecognizedCorrectly(string source, TokenType expected)
     {
         var tokens = Tokenize(source);

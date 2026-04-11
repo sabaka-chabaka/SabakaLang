@@ -12,6 +12,12 @@ public enum TokenType
     Slash, 
     Percent,
     
+    PlusEqual,
+    MinusEqual,
+    StarEqual,
+    PlusPlus,
+    MinusMinus,
+    
     LParen,
     RParen,
     
@@ -185,9 +191,9 @@ public sealed class Lexer
 
         return ch switch
         {
-            '+' => Consume(TokenType.Plus,      "+", start),
-            '-' => Consume(TokenType.Minus,     "-", start),
-            '*' => Consume(TokenType.Star,      "*", start),
+            '+' => ReadTriple('+', TokenType.PlusPlus, '=', TokenType.PlusEqual, TokenType.Plus, start),
+            '-' => ReadTriple('-', TokenType.MinusMinus, '=', TokenType.MinusEqual, TokenType.Minus, start),
+            '*' => ReadDouble('=', TokenType.StarEqual, TokenType.Star, start),
             '%' => Consume(TokenType.Percent,   "%", start),
             '(' => Consume(TokenType.LParen,    "(", start),
             ')' => Consume(TokenType.RParen,    ")", start),
@@ -385,6 +391,34 @@ public sealed class Lexer
         return new Position(line, col, _offset - 1);
     }
  
+    private Token ReadTriple(
+        char second,
+        TokenType doubleType,
+        char third,
+        TokenType assignType,
+        TokenType singleType,
+        Position start)
+    {
+        Advance();
+
+        if (!IsAtEnd())
+        {
+            if (Current() == second)
+            {
+                Advance();
+                return new Token(doubleType, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+            }
+
+            if (Current() == third)
+            {
+                Advance();
+                return new Token(assignType, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+            }
+        }
+
+        return new Token(singleType, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+    }
+    
     private Token MakeToken(TokenType type, string value) =>
         new(type, value, CurrentPosition(), CurrentPosition());
     

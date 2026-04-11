@@ -214,14 +214,6 @@ public class ParserTests
         var un = Assert.IsType<UnaryExpr>(stmt.Expr);
         Assert.Equal(TokenType.Bang, un.Op);
     }
- 
-    [Fact]
-    public void UnaryExpr_DoubleNegate_Parsed()
-    {
-        var stmt = AssertSingle<ExprStmt>(Parse("--x;"));
-        var outer = Assert.IsType<UnaryExpr>(stmt.Expr);
-        Assert.IsType<UnaryExpr>(outer.Operand);
-    }
     
     [Fact]
     public void AssignExpr_SimpleVar_Parsed()
@@ -247,6 +239,69 @@ public class ParserTests
         var stmt = AssertSingle<ExprStmt>(Parse("arr[0] = 99;"));
         var assign = Assert.IsType<AssignExpr>(stmt.Expr);
         Assert.IsType<IndexExpr>(assign.Target);
+    }
+    
+    [Fact]
+    public void AssignExpr_PlusEqual_Parsed()
+    {
+        var stmt = AssertSingle<ExprStmt>(Parse("a += 5;"));
+        var assign = Assert.IsType<AssignExpr>(stmt.Expr);
+
+        var target = Assert.IsType<NameExpr>(assign.Target);
+        Assert.Equal("a", target.Name);
+
+        var bin = Assert.IsType<BinaryExpr>(assign.Value);
+        Assert.Equal(TokenType.Plus, bin.Op);
+
+        Assert.IsType<NameExpr>(bin.Left);
+        var right = Assert.IsType<IntLit>(bin.Right);
+        Assert.Equal(5, right.Value);
+    }
+
+    [Fact]
+    public void AssignExpr_MinusEqual_Parsed()
+    {
+        var stmt = AssertSingle<ExprStmt>(Parse("a -= 3;"));
+        var assign = Assert.IsType<AssignExpr>(stmt.Expr);
+
+        var bin = Assert.IsType<BinaryExpr>(assign.Value);
+        Assert.Equal(TokenType.Minus, bin.Op);
+    }
+
+    [Fact]
+    public void AssignExpr_StarEqual_Parsed()
+    {
+        var stmt = AssertSingle<ExprStmt>(Parse("a *= 2;"));
+        var assign = Assert.IsType<AssignExpr>(stmt.Expr);
+
+        var bin = Assert.IsType<BinaryExpr>(assign.Value);
+        Assert.Equal(TokenType.Star, bin.Op);
+    }
+    
+    [Fact]
+    public void PostfixIncrement_Parsed()
+    {
+        var stmt = AssertSingle<ExprStmt>(Parse("a++;"));
+        var assign = Assert.IsType<AssignExpr>(stmt.Expr);
+
+        var target = Assert.IsType<NameExpr>(assign.Target);
+        Assert.Equal("a", target.Name);
+
+        var bin = Assert.IsType<BinaryExpr>(assign.Value);
+        Assert.Equal(TokenType.Plus, bin.Op);
+
+        var right = Assert.IsType<IntLit>(bin.Right);
+        Assert.Equal(1, right.Value);
+    }
+
+    [Fact]
+    public void PostfixDecrement_Parsed()
+    {
+        var stmt = AssertSingle<ExprStmt>(Parse("a--;"));
+        var assign = Assert.IsType<AssignExpr>(stmt.Expr);
+
+        var bin = Assert.IsType<BinaryExpr>(assign.Value);
+        Assert.Equal(TokenType.Minus, bin.Op);
     }
     
     [Fact]
