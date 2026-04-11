@@ -86,3 +86,57 @@ public class ArithmeticTests : Utilities
     public void StringConcat_FloatToString()
         => Assert.Equal("pi=3.14", Output("print(\"pi=\" + 3.14);"));
 }
+
+public sealed class LogicTests : Utilities
+{
+    [Theory]
+    [InlineData("1 == 1",  "true")]
+    [InlineData("1 == 2",  "false")]
+    [InlineData("1 != 2",  "true")]
+    [InlineData("1 != 1",  "false")]
+    [InlineData("2 > 1",   "true")]
+    [InlineData("1 > 2",   "false")]
+    [InlineData("1 < 2",   "true")]
+    [InlineData("2 < 1",   "false")]
+    [InlineData("2 >= 2",  "true")]
+    [InlineData("2 >= 3",  "false")]
+    [InlineData("2 <= 2",  "true")]
+    [InlineData("3 <= 2",  "false")]
+    public void Comparison_IsCorrect(string expr, string expected)
+        => Assert.Equal(expected, Output($"print({expr});"));
+    
+    [Theory]
+    [InlineData("true && true",   "true")]
+    [InlineData("true && false",  "false")]
+    [InlineData("false && true",  "false")]
+    [InlineData("false || true",  "true")]
+    [InlineData("false || false", "false")]
+    [InlineData("!true",          "false")]
+    [InlineData("!false",         "true")]
+    public void BoolOp_IsCorrect(string expr, string expected)
+        => Assert.Equal(expected, Output($"print({expr});"));
+    
+    [Fact]
+    public void And_ShortCircuit_DoesNotEvalRight_WhenLeftFalse()
+    {
+        RunOk("bool b = false && (1/0 == 0);");
+    }
+    
+    [Fact]
+    public void Or_ShortCircuit_DoesNotEvalRight_WhenLeftTrue()
+    {
+        RunOk("bool b = true || (1/0 == 0);");
+    }
+    
+    [Fact]
+    public void StringEquality_SameContent_IsTrue()
+        => Assert.Equal("true", Output("print(\"abc\" == \"abc\");"));
+ 
+    [Fact]
+    public void StringEquality_DiffContent_IsFalse()
+        => Assert.Equal("false", Output("print(\"abc\" == \"xyz\");"));
+    
+    [Fact]
+    public void NullEquality_NullEqualsNull()
+        => Assert.Equal("true", Output("print(null == null);"));
+}
