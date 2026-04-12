@@ -49,6 +49,7 @@ public enum TokenType
     IntKeyword,
     FloatKeyword,
     StringLiteral,
+    InterpolatedStringLiteral,
     StringKeyword,
 
     Return,
@@ -189,6 +190,7 @@ public sealed class Lexer
         if (char.IsDigit(ch)) return ReadNumber(start);
         if (char.IsLetter(ch) || ch == '_') return ReadIdentifier(start);
         if (ch == '"') return ReadString(start);
+        if (ch == '$' && _offset + 1 < _source.Length && _source[_offset + 1] == '"') return ReadInterpolatedString(start);
 
         return ch switch
         {
@@ -295,6 +297,67 @@ public sealed class Lexer
             Advance();
  
         return new Token(TokenType.StringLiteral, sb.ToString(), start, PreviousPosition());
+    }
+
+    private Token ReadInterpolatedString(Position start)
+    {
+        Advance();
+        Advance();
+        var sb = new StringBuilder();
+        int depth = 0;
+
+        while (!IsAtEnd())
+        {
+            var c = Current();
+            
+            if (depth == 0 && c == '"')
+            {
+                Advance();
+                break;
+            }
+
+            if (c == '{')
+            {
+                depth++;
+                sb.Append(c);
+                Advance();
+                continue;
+            }
+            
+            if (c == '}')
+            {
+                depth--;
+                sb.Append(c);
+                Advance();
+                continue;
+            }
+            
+            if (depth == 0 && c == '\\')
+            {
+                Advance();
+                var escaped = Current() switch
+                {
+                    '"'  => '"',
+                    '\\' => '\\',
+                    'n'  => '\n',
+                    'r'  => '\r',
+                    't'  => '\t',
+                    '0'  => '\0',
+                    var x => x
+                };
+                sb.Append(escaped);
+                Advance();
+                continue;
+            }
+ 
+            sb.Append(c);
+            Advance();
+        }
+
+        if (IsAtEnd() && depth > 0)
+            AddError("Unterminated interpolated string", start);
+        
+        return new Token(TokenType.InterpolatedStringLiteral, sb.ToString(), start, PreviousPosition());
     }
     
     private Token ReadSlashOrComment(Position start)

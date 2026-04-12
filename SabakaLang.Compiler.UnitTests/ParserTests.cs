@@ -1099,4 +1099,70 @@ public class ParserTests
 
         var t2 = Assert.IsType<TernaryExpr>(t1.Else);
     }
+    
+    [Fact]
+    public void InterpolatedString_NoHoles_ParsedAsSingleStringLit()
+    {
+        var result = Parse("$\"hello world\";");
+ 
+        Assert.False(result.HasErrors, string.Join("\n", result.Errors.Select(e => e.Message)));
+        var stmt = Assert.IsType<ExprStmt>(result.Statements[0]);
+        var interp = Assert.IsType<InterpolatedStringExpr>(stmt.Expr);
+        var part = Assert.Single(interp.Parts);
+        Assert.Equal("hello world", Assert.IsType<StringLit>(part).Value);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_SingleVar_HasTwoParts()
+    {
+        var result = Parse("$\"name is {name}\";");
+ 
+        Assert.False(result.HasErrors, string.Join("\n", result.Errors.Select(e => e.Message)));
+        var stmt = Assert.IsType<ExprStmt>(result.Statements[0]);
+        var interp = Assert.IsType<InterpolatedStringExpr>(stmt.Expr);
+ 
+        Assert.Equal(2, interp.Parts.Count);
+        Assert.Equal("name is ", Assert.IsType<StringLit>(interp.Parts[0]).Value);
+        Assert.Equal("name", Assert.IsType<NameExpr>(interp.Parts[1]).Name);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_MultipleHoles_HasCorrectParts()
+    {
+        var result = Parse("$\"{a} and {b}\";");
+ 
+        Assert.False(result.HasErrors, string.Join("\n", result.Errors.Select(e => e.Message)));
+        var interp = Assert.IsType<InterpolatedStringExpr>(Assert.IsType<ExprStmt>(result.Statements[0]).Expr);
+ 
+        Assert.Equal(3, interp.Parts.Count);
+        Assert.IsType<NameExpr>(interp.Parts[0]);   // a
+        Assert.Equal(" and ", Assert.IsType<StringLit>(interp.Parts[1]).Value);
+        Assert.IsType<NameExpr>(interp.Parts[2]);   // b
+    }
+ 
+    [Fact]
+    public void InterpolatedString_ExpressionInHole_ParsedCorrectly()
+    {
+        var result = Parse("$\"val: {x + 1}\";");
+ 
+        Assert.False(result.HasErrors, string.Join("\n", result.Errors.Select(e => e.Message)));
+        var interp = Assert.IsType<InterpolatedStringExpr>(Assert.IsType<ExprStmt>(result.Statements[0]).Expr);
+ 
+        Assert.Equal(2, interp.Parts.Count);
+        Assert.Equal("val: ", Assert.IsType<StringLit>(interp.Parts[0]).Value);
+        var bin = Assert.IsType<BinaryExpr>(interp.Parts[1]);
+        Assert.Equal(TokenType.Plus, bin.Op);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_OnlyHole_HasSingleExprPart()
+    {
+        var result = Parse("$\"{x}\";");
+ 
+        Assert.False(result.HasErrors, string.Join("\n", result.Errors.Select(e => e.Message)));
+        var interp = Assert.IsType<InterpolatedStringExpr>(Assert.IsType<ExprStmt>(result.Statements[0]).Expr);
+ 
+        var part = Assert.Single(interp.Parts);
+        Assert.Equal("x", Assert.IsType<NameExpr>(part).Name);
+    }
 }

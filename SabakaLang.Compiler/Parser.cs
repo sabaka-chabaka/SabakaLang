@@ -26,6 +26,7 @@ public record NewExpr(string TypeName, List<string> TypeArgs, List<IExpr> Args, 
 public record SuperExpr(Span Span) : IExpr;
 public record AssignExpr(IExpr Target, IExpr Value, Span Span) : IExpr;
 public record TernaryExpr(IExpr Condition, IExpr Then, IExpr Else, Span Span) : IExpr;
+public record InterpolatedStringExpr(List<IExpr> Parts, Span Span) : IExpr;
 
 public record ExprStmt(IExpr Expr, Span Span) : IStmt;
 public record ReturnStmt(IExpr? Value, Span Span) : IStmt;
@@ -733,6 +734,8 @@ public sealed class Parser
         }
         if (Check(TokenType.StringLiteral))
             return new StringLit(Advance().Value, SpanFrom(start));
+        if (Check(TokenType.InterpolatedStringLiteral))
+            return ParseInterpolatedString(start);
         if (Check(TokenType.True))  { Advance(); return new BoolLit(true,  SpanFrom(start)); }
         if (Check(TokenType.False)) { Advance(); return new BoolLit(false, SpanFrom(start)); }
 
@@ -795,6 +798,64 @@ public sealed class Parser
         args.Add(ParseExpr());
         while (Match(TokenType.Comma)) args.Add(ParseExpr());
         return args;
+    }
+
+    private InterpolatedStringExpr ParseInterpolatedString(Position start)
+    {
+        var raw = Advance().Value;
+        var parts = new List<IExpr>();
+        var i = 0;
+
+        while (i <= raw.Length)
+        {
+            int braceOpen = raw.IndexOf('{', i);
+ 
+            if (braceOpen < 0)
+            {
+                var tail = raw.Substring(i);
+                if (tail.Length > 0 || parts.Count == 0)
+                    parts.Add(new StringLit(tail, SpanFrom(start)));
+                break;
+            }
+ 
+            if (braceOpen > i)
+            {
+                var literal = raw.Substring(i, braceOpen - i);
+                parts.Add(new StringLit(literal, SpanFrom(start)));
+            }
+ 
+            int depth = 1;
+            int j = braceOpen + 1;
+            while (j < raw.Length && depth > 0)
+            {
+                if (raw[j] == '{') depth++;
+                else if (raw[j] == '}') depth--;
+                if (depth > 0) j++;
+            }
+ 
+            if (depth != 0)
+            {
+                AddError("Unmatched '{' in interpolated string", start);
+                break;
+            }
+ 
+            var exprSource = raw.Substring(braceOpen + 1, j - braceOpen - 1);
+            var subLexer  = new Lexer(exprSource).Tokenize();
+            var subParser = new Parser(subLexer);
+            var subResult = subParser.Parse();
+ 
+            foreach (var err in subResult.Errors)
+                AddError($"In interpolated expression: {err.Message}", start);
+ 
+            if (subResult.Statements.Count == 1 && subResult.Statements[0] is ExprStmt es)
+                parts.Add(es.Expr);
+            else
+                AddError("Expected a single expression inside interpolation braces", start);
+ 
+            i = j + 1;
+        }
+        
+        return new InterpolatedStringExpr(parts, SpanFrom(start));
     }
     
     private List<Param> ParseParams()

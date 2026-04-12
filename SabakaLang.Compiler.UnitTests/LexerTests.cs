@@ -176,4 +176,50 @@ public class LexerTests
         Assert.Equal(TokenType.Comment, tokens[0].Type);
         Assert.Equal(TokenType.IntKeyword, tokens[1].Type);
     }
+    
+    [Fact]
+    public void InterpolatedString_SimpleVar_EmitsToken()
+    {
+        var tokens = Tokenize("$\"hello {name}\"");
+ 
+        Assert.Equal(TokenType.InterpolatedStringLiteral, tokens[0].Type);
+        Assert.Equal("hello {name}", tokens[0].Value);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_NoHoles_EmitsToken()
+    {
+        var tokens = Tokenize("$\"just text\"");
+ 
+        Assert.Equal(TokenType.InterpolatedStringLiteral, tokens[0].Type);
+        Assert.Equal("just text", tokens[0].Value);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_MultipleHoles_PreservesRawContent()
+    {
+        var tokens = Tokenize("$\"{a} and {b}\"");
+ 
+        Assert.Equal(TokenType.InterpolatedStringLiteral, tokens[0].Type);
+        Assert.Equal("{a} and {b}", tokens[0].Value);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_ExpressionHole_PreservesExpression()
+    {
+        var tokens = Tokenize("$\"result: {x + 1}\"");
+ 
+        Assert.Equal(TokenType.InterpolatedStringLiteral, tokens[0].Type);
+        Assert.Equal("result: {x + 1}", tokens[0].Value);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_FollowedBySemicolon_TokenizedCorrectly()
+    {
+        var tokens = Tokenize("$\"{x}\";");
+ 
+        Assert.Equal(TokenType.InterpolatedStringLiteral, tokens[0].Type);
+        Assert.Equal(TokenType.Semicolon, tokens[1].Type);
+        Assert.Equal(TokenType.EOF, tokens[2].Type);
+    }
 }
