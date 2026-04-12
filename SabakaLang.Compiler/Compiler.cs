@@ -652,6 +652,7 @@ public sealed class Compiler
             case NewExpr n:   EmitNew(n);     break;
             case SuperExpr s: EmitSuper(s);   break;
             case TernaryExpr t: EmitTernary(t); break;
+            case InterpolatedStringExpr interp: EmitInterpolatedString(interp); break;
         }
     }
  
@@ -880,6 +881,31 @@ public sealed class Compiler
         Emit(OpCode.PushThis);
     }
     
+
+    private void EmitInterpolatedString(InterpolatedStringExpr interp)
+    {
+        if (interp.Parts.Count == 0)
+        {
+            Emit(OpCode.Push, Value.FromString(""));
+            return;
+        }
+
+        EmitExpr(interp.Parts[0]);
+
+        if (interp.Parts[0] is not StringLit)
+        {
+            Emit(OpCode.Push, Value.FromString(""));
+            Emit(OpCode.Swap);
+            Emit(OpCode.Add);
+        }
+
+        for (int i = 1; i < interp.Parts.Count; i++)
+        {
+            EmitExpr(interp.Parts[i]);
+            Emit(OpCode.Add);
+        }
+    }
+
     private void EmitTernary(TernaryExpr t)
     {
         EmitExpr(t.Condition);

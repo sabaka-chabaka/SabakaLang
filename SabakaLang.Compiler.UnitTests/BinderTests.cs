@@ -478,4 +478,58 @@ public class BinderTests
         var r = Bind(src);
         AssertNoErrors(r);
     }
+    
+    [Fact]
+    public void InterpolatedString_ResolvedVar_NoError()
+    {
+        const string src = """
+                           string name = "kitty";
+                           $"name is {name}";
+                           """;
+        var r = Bind(src);
+        AssertNoErrors(r);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_UndeclaredVar_ReportsError()
+    {
+        const string src = """
+                           $"hello {ghost}";
+                           """;
+        var r = BindNoThrow(src);
+        Assert.True(r.HasErrors);
+        Assert.Contains(r.Errors, e => e.Message.Contains("ghost"));
+    }
+ 
+    [Fact]
+    public void InterpolatedString_ExpressionWithVars_NoError()
+    {
+        const string src = """
+                           int x = 1;
+                           int y = 2;
+                           $"sum is {x + y}";
+                           """;
+        var r = Bind(src);
+        AssertNoErrors(r);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_NoHoles_NoError()
+    {
+        const string src = """$"just text";""";
+        var r = Bind(src);
+        AssertNoErrors(r);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_MultipleHoles_AllResolved_NoError()
+    {
+        const string src = """
+                           string a = "foo";
+                           string b = "bar";
+                           $"{a} and {b}";
+                           """;
+        var r = Bind(src);
+        AssertNoErrors(r);
+    }
 }

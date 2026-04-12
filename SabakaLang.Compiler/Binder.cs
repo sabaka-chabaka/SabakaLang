@@ -506,6 +506,10 @@ public sealed class Binder
                 BindExpr(t.Then);
                 BindExpr(t.Else);
                 break;
+            
+            case InterpolatedStringExpr interp:
+                foreach (var part in interp.Parts) BindExpr(part);
+                break;
         }
     }
 

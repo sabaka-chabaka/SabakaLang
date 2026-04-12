@@ -882,4 +882,143 @@ public class CompilerTests
         Assert.Contains(code, i => i.OpCode == OpCode.JumpIfFalse);
         Assert.Contains(code, i => i.OpCode == OpCode.Jump);
     }
+    
+    [Fact]
+    public void InterpolatedString_NoHoles_EmitsSingleStringPush()
+    {
+        var code = Code("$\"hello world\";");
+ 
+        var pushes = All(code, OpCode.Push)
+            .Where(i => i.Operand is Value v && v.Type == SabakaType.String)
+            .ToList();
+ 
+        Assert.Single(pushes);
+        Assert.Equal("hello world", ((Value)pushes[0].Operand!).String);
+        Assert.DoesNotContain(code, i => i.OpCode == OpCode.Add);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_SingleVar_EmitsPushAndAdd()
+    {
+        var code = Code("""
+            string name = "kitty";
+            $"name is {name}";
+            """);
+ 
+        Assert.True(Has(code, OpCode.Add), "Expected at least one Add opcode");
+        Assert.Contains(All(code, OpCode.Push),
+            i => i.Operand is Value v && v.Type == SabakaType.String && v.String == "name is ");
+        Assert.Contains(code, i => i.OpCode == OpCode.Load && i.Name == "name");
+    }
+ 
+    [Fact]
+    public void InterpolatedString_TwoHoles_EmitsThreeAdds()
+    {
+        var code = Code("""
+            string a = "x";
+            string b = "y";
+            $"{a} and {b}";
+            """);
+ 
+        Assert.Equal(3, All(code, OpCode.Add).Count());
+    }
+ 
+    [Fact]
+    public void InterpolatedString_ThreeParts_EmitsTwoAdds()
+    {
+        var code = Code("""
+            string name = "kitty";
+            $"hi {name}!";
+            """);
+ 
+        Assert.Equal(2, All(code, OpCode.Add).Count());
+ 
+        var strings = All(code, OpCode.Push)
+            .Where(i => i.Operand is Value v && v.Type == SabakaType.String)
+            .Select(i => ((Value)i.Operand!).String)
+            .ToList();
+ 
+        Assert.Contains("hi ", strings);
+        Assert.Contains("!", strings);
+    }
+ 
+    [Fact]
+    public void InterpolatedString_OnlyHole_FirstPartForcedToString()
+    {
+        var code = Code("""
+            int x = 42;
+            $"{x}";
+            """);
+ 
+        Assert.True(Has(code, OpCode.Add));
+        Assert.Contains(code, i => i.OpCode == OpCode.Load && i.Name == "x");
+    }
+ 
+    [Fact]
+    public void InterpolatedString_ExpressionInHole_EmitsArithmetic()
+    {
+        var code = Code("""
+            int x = 3;
+            $"val: {x + 2}";
+            """);
+ 
+        Assert.True(All(code, OpCode.Add).Count() >= 2);
+        Assert.Contains(All(code, OpCode.Push),
+            i => i.Operand is Value v && v.Type == SabakaType.String && v.String == "val: ");
+    }
+ 
+    [Fact]
+    public void InterpolatedString_CompilesWithNoErrors()
+    {
+        AssertNoErrors(Compile("""
+            string name = "kitty";
+            string msg = $"name is {name}";
+            """));
+    }
+ 
+    [Fact]
+    public void InterpolatedString_MultipleHoles_CompilesWithNoErrors()
+    {
+        AssertNoErrors(Compile("""
+            int a = 1;
+            int b = 2;
+            $"a={a}, b={b}";
+            """));
+    }
+ 
+    [Fact]
+    public void InterpolatedString_InFunction_CompilesWithNoErrors()
+    {
+        AssertNoErrors(Compile("""
+            void greet(string name) {
+                string msg = $"hello {name}";
+                print(msg);
+            }
+            """));
+    }
+ 
+    [Fact]
+    public void InterpolatedString_AssignedToVar_EmitsDeclare()
+    {
+        var code = Code("""
+            string name = "kitty";
+            string msg = $"name is {name}";
+            """);
+ 
+        var declares = All(code, OpCode.Declare).ToList();
+        Assert.Contains(declares, i => i.Name == "msg");
+    }
+ 
+    [Fact]
+    public void InterpolatedString_NHoles_EmitsNMinusOneAdds()
+    {
+        var code = Code("""
+            string a = "x";
+            string b = "y";
+            string c = "z";
+            $"{a}{b}{c}";
+            """);
+ 
+        Assert.True(All(code, OpCode.Add).Count() >= 2);
+    }
 }
