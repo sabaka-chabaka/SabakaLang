@@ -3,7 +3,7 @@ using SabakaLang.Runtime;
 
 namespace SabakaLang.Cli;
 
-public class Program
+public static class Program
 {
     public static void Main(string[] args)
     {
@@ -14,8 +14,7 @@ public class Program
         {
             default:
                 throw new Exception($"Unknown command '{args[0]}'");
-                break;
-            
+
             case "run":
                 var src = File.ReadAllText(args[1]);
 
