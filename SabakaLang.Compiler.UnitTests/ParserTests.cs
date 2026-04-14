@@ -1165,4 +1165,35 @@ public class ParserTests
         var part = Assert.Single(interp.Parts);
         Assert.Equal("x", Assert.IsType<NameExpr>(part).Name);
     }
+    
+    [Fact]
+    public void Is_Simple()
+    {
+        var result = Parse("x is int;");
+
+        Assert.False(result.HasErrors);
+        Assert.Single(result.Statements);
+
+        var exprStmt = Assert.IsType<ExprStmt>(result.Statements[0]);
+        var bin = Assert.IsType<BinaryExpr>(exprStmt.Expr);
+
+        Assert.Equal(TokenType.Is, bin.Op);
+        Assert.IsType<NameExpr>(bin.Left);
+        Assert.IsType<NameExpr>(bin.Right);
+    }
+    
+    [Fact]
+    public void Is_With_Identifier()
+    {
+        var result = Parse("x is Type");
+
+        Assert.False(result.HasErrors);
+
+        var expr = Assert.IsType<ExprStmt>(result.Statements[0]).Expr;
+        var bin = Assert.IsType<BinaryExpr>(expr);
+
+        Assert.Equal(TokenType.Is, bin.Op);
+        Assert.Equal("x", ((NameExpr)bin.Left).Name);
+        Assert.Equal("Type", ((NameExpr)bin.Right).Name);
+    }
 }

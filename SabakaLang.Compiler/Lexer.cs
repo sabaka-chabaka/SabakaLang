@@ -76,6 +76,7 @@ public enum TokenType
     Super,
     Interface,
     Null,
+    Is,
     
     Switch,
     Case,
@@ -147,6 +148,7 @@ public sealed class Lexer
         ["override"]  = TokenType.Override,
         ["super"]     = TokenType.Super,
         ["null"]      = TokenType.Null,
+        ["is"]        = TokenType.Is,
         ["switch"]    = TokenType.Switch,
         ["case"]      = TokenType.Case,
         ["default"]   = TokenType.Default,

@@ -601,14 +601,56 @@ public sealed class Parser
     private IExpr ParseEquality()
     {
         var start = Current.Start;
-        var left = ParseComparison();
+        var left = ParseIs();
+
         while (Check(TokenType.EqualEqual) || Check(TokenType.NotEqual))
         {
             var op = Advance().Type;
-            var right = ParseComparison();
+            var right = ParseIs();
             left = new BinaryExpr(left, op, right, SpanFrom(start));
         }
+
         return left;
+    }
+
+    private IExpr ParseIs()
+    {
+        var start = Current.Start;
+        var left = ParseComparison();
+
+        while (Check(TokenType.Is))
+        {
+            Advance();
+
+            var right = ParseTypeAsExpression();
+
+            left = new BinaryExpr(left, TokenType.Is, right, SpanFrom(start));
+        }
+
+        return left;
+    }
+    
+    private IExpr ParseTypeAsExpression()
+    {
+        var start = Current.Start;
+
+        if (IsBuiltinType(Current.Type) || Current.Type == TokenType.Identifier)
+        {
+            var name = Current.Type switch
+            {
+                TokenType.IntKeyword => "int",
+                TokenType.FloatKeyword => "float",
+                TokenType.BoolKeyword => "bool",
+                TokenType.StringKeyword => "string",
+                _ => Current.Value
+            };
+
+            Advance();
+            return new NameExpr(name, SpanFrom(start));
+        }
+
+        AddError($"Expected type after 'is', got {Current.Type}", start);
+        return new NameExpr("?", SpanFrom(start));
     }
  
     private IExpr ParseComparison()

@@ -56,6 +56,7 @@ public class LexerTests
     [InlineData("true",   TokenType.True)]
     [InlineData("false",  TokenType.False)]
     [InlineData("null",   TokenType.Null)]
+    [InlineData("is", TokenType.Is)]
     public void Keywords_RecognizedCorrectly(string source, TokenType expected)
     {
         var tokens = Tokenize(source);
