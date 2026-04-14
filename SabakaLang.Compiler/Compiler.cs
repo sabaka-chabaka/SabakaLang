@@ -30,6 +30,8 @@ public enum OpCode
     Call,
     Return,
     
+    Is,
+    
     CreateObject,
     CallMethod,
     LoadField,
@@ -684,6 +686,21 @@ public sealed class Compiler
             Patch(jmp, Ip);
             Emit(OpCode.Push, Value.FromBool(true));
             Patch(end, Ip);
+            return;
+        }
+        
+        if (b.Op == TokenType.Is)
+        {
+            EmitExpr(b.Left);
+    
+            if (b.Right is NameExpr typeName)
+            {
+                Emit(OpCode.Is, name: typeName.Name);
+                return;
+            }
+
+            Error("'is' requires a type name on the right side", b.Span.Start);
+            Emit(OpCode.Push, Value.FromBool(false));
             return;
         }
         

@@ -1021,4 +1021,16 @@ public class CompilerTests
  
         Assert.True(All(code, OpCode.Add).Count() >= 2);
     }
+    
+    [Fact]
+    public void Is_Operator_ReturnsTrue_ForSameType()
+    {
+        var code = Compile("class Player {} Player x = new Player(); bool y = x is Player;");
+
+        Assert.Contains(code.Code, i =>
+            i.OpCode == OpCode.Is &&
+            (string)i.Name == "Player");
+
+        Assert.False(code.HasErrors);
+    }
 }
