@@ -29,6 +29,10 @@ public class Program
                 vm.Execute(result.Code.ToList());
                 
                 break;
+            
+            case "version":
+                Console.WriteLine("0.1");
+                break;
         }
     }
 }
