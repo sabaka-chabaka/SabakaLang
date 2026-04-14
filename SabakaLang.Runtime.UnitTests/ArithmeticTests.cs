@@ -139,4 +139,8 @@ public sealed class LogicTests : Utilities
     [Fact]
     public void NullEquality_NullEqualsNull()
         => Assert.Equal("true", Output("print(null == null);"));
+
+    [Fact]
+    public void Ternary_PrintsTrue()
+        => Assert.Equal("1", Output("print(true ? 1 : 0);"));
 }
