@@ -692,13 +692,16 @@ public sealed class Compiler
         if (b.Op == TokenType.Is)
         {
             EmitExpr(b.Left);
+            string? typeName = null;
             switch (b.Right)
             {
                 case NameExpr n:
+                    typeName = n.Name;
                     Emit(OpCode.Push, Value.FromString(n.Name));
                     break;
 
                 case StringLit s:
+                    typeName = s.Value;
                     Emit(OpCode.Push, Value.FromString(s.Value));
                     break;
 
@@ -707,7 +710,7 @@ public sealed class Compiler
                     Emit(OpCode.Push, Value.FromString("unknown"));
                     break;
             }
-            Emit(OpCode.Is);
+            Emit(OpCode.Is, name: typeName);
             return;
         }
         

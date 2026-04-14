@@ -1029,7 +1029,7 @@ public class CompilerTests
 
         Assert.Contains(code.Code, i =>
             i.OpCode == OpCode.Is &&
-            (string)i.Name == "Player");
+            i.Name == "Player");
 
         Assert.False(code.HasErrors);
     }
