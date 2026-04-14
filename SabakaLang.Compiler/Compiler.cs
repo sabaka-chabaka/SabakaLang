@@ -692,15 +692,22 @@ public sealed class Compiler
         if (b.Op == TokenType.Is)
         {
             EmitExpr(b.Left);
-    
-            if (b.Right is NameExpr typeName)
+            switch (b.Right)
             {
-                Emit(OpCode.Is, name: typeName.Name);
-                return;
-            }
+                case NameExpr n:
+                    Emit(OpCode.Push, Value.FromString(n.Name));
+                    break;
 
-            Error("'is' requires a type name on the right side", b.Span.Start);
-            Emit(OpCode.Push, Value.FromBool(false));
+                case StringLit s:
+                    Emit(OpCode.Push, Value.FromString(s.Value));
+                    break;
+
+                default:
+                    Error("Invalid type in 'is' expression", default);
+                    Emit(OpCode.Push, Value.FromString("unknown"));
+                    break;
+            }
+            Emit(OpCode.Is);
             return;
         }
         

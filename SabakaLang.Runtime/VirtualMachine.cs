@@ -117,6 +117,37 @@ public sealed class VirtualMachine
                         Push(next);
                         break;
                     }
+
+                    case OpCode.Is:
+                    {
+                        RequireStack(2, "Is");
+
+                        var type = Pop();
+                        var value = Pop();
+
+                        if (type.Type != SabakaType.String)
+                            throw new RuntimeException("is: type must be string");
+
+                        bool result = type.String switch
+                        {
+                            "int"    => value.Type == SabakaType.Int,
+                            "float"  => value.Type == SabakaType.Float,
+                            "bool"   => value.Type == SabakaType.Bool,
+                            "string" => value.Type == SabakaType.String,
+                            "array"  => value.Type == SabakaType.Array,
+                            "object" => value.Type == SabakaType.Object,
+                            "null"   => value.Type == SabakaType.Null,
+
+                            _ when _functions.ContainsKey(type.String) =>
+                                value.Type == SabakaType.Object &&
+                                value.Object?.ClassName == type.String,
+
+                            _ => throw new RuntimeException($"Unknown type in 'is': {type.String}")
+                        };
+
+                        Push(Value.FromBool(result));
+                        break;
+                    }
  
                     case OpCode.Add:
                         RequireStack(2, "Add");

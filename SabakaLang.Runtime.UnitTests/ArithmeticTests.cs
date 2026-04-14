@@ -143,4 +143,11 @@ public sealed class LogicTests : Utilities
     [Fact]
     public void Ternary_PrintsTrue()
         => Assert.Equal("1", Output("print(true ? 1 : 0);"));
+
+    [Fact]
+    public void Is_WorkCorrect()
+    {
+        Assert.Equal("true", Output("print(1 is int);"));
+        Assert.Equal("false", Output("print(1 is string);"));
+    }
 }
