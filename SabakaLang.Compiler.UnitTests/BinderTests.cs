@@ -532,4 +532,12 @@ public class BinderTests
         var r = Bind(src);
         AssertNoErrors(r);
     }
+
+    [Fact]
+    public void IsOperator_NoError()
+    {
+        const string src = "int x = 1; x is int;";
+        var r = Bind(src);
+        AssertNoErrors(r);
+    }
 }
