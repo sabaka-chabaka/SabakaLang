@@ -7,7 +7,7 @@ public static class Program
 {
     public static void Main(string[] args)
     {
-        if (args.Length < 2)
+        if (args.Length < 1)
             throw new ArgumentException("Usage: sabaka <command> <args>");
 
         switch (args[0])
