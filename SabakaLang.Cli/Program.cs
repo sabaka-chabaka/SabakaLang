@@ -32,6 +32,10 @@ public static class Program
             case "version":
                 Console.WriteLine("0.1");
                 break;
+            
+            case "pack":
+                new Packer().Pack(args[1].Trim(), args[2].Trim());
+                break;
         }
     }
 }
