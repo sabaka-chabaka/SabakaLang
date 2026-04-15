@@ -268,4 +268,10 @@ public class ClassTests : Utilities
                   """;
         Assert.Equal("hello!", Output(src));
     }
+
+    [Fact]
+    public void Class_ToString_MethodCalled()
+    {
+        Assert.Equal("Dog { name: 0 }", Output("class Dog{string name;} print(new Dog().toString());"));
+    }
 }

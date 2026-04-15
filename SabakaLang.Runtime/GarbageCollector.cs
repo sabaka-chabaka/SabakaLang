@@ -7,14 +7,16 @@ public sealed class GarbageCollector
     public int Threshold { get; }
 
     private readonly Func<IEnumerable<SabakaObject>> _rootProvider;
-    private readonly List<WeakReference<SabakaObject>> _heap = [];
+
+    private readonly HashSet<SabakaObject> _heap =
+        new(ReferenceEqualityComparer.Instance);
 
     private int _allocCount;
-    
+
     public int TotalAllocated { get; private set; }
     public int TotalCollected { get; private set; }
     public int CollectionRuns { get; private set; }
-    
+
     public GarbageCollector(int threshold, Func<IEnumerable<SabakaObject>> rootProvider)
     {
         if (threshold < 1) throw new ArgumentOutOfRangeException(nameof(threshold));
@@ -25,7 +27,7 @@ public sealed class GarbageCollector
     public SabakaObject Alloc(string className)
     {
         var obj = new SabakaObject(className);
-        _heap.Add(new WeakReference<SabakaObject>(obj));
+        _heap.Add(obj);
 
         TotalAllocated++;
         _allocCount++;
@@ -44,27 +46,20 @@ public sealed class GarbageCollector
         CollectionRuns++;
 
         var alive = new HashSet<SabakaObject>(ReferenceEqualityComparer.Instance);
+        foreach (var root in _rootProvider())
+            Mark(root, alive);
 
-        foreach (var root in _rootProvider()) Mark(root, alive);
-        
         int before = _heap.Count;
-        _heap.RemoveAll(wr =>
-        {
-            if (!wr.TryGetTarget(out var obj)) return true;
-            return !alive.Contains(obj);
-        });
+        var dead = _heap
+            .Where(o => !alive.Contains(o))
+            .ToList();
+        foreach (var o in dead)
+            _heap.Remove(o);
+
         TotalCollected += before - _heap.Count;
     }
 
-    public int LiveCount
-    {
-        get
-        {
-            int count = 0;
-            foreach (var wr in _heap) if (wr.TryGetTarget(out _)) count++;
-            return count;
-        }
-    }
+    public int LiveCount => _heap.Count;
 
     public static void Mark(SabakaObject obj, HashSet<SabakaObject> visited)
     {
@@ -72,15 +67,11 @@ public sealed class GarbageCollector
 
         foreach (var kv in obj.Fields)
         {
-            if (kv.Value.Type == SabakaType.Object && kv.Value.Object is {} child)
-            {
+            if (kv.Value.Type == SabakaType.Object && kv.Value.Object is { } child)
                 Mark(child, visited);
-            }
 
-            if (kv.Value.Type == SabakaType.Array && kv.Value.Array is {} arr)
-            {
+            if (kv.Value.Type == SabakaType.Array && kv.Value.Array is { } arr)
                 MarkArray(arr, visited);
-            }
         }
     }
 
@@ -88,8 +79,8 @@ public sealed class GarbageCollector
     {
         foreach (var v in arr)
         {
-            if (v.Type == SabakaType.Object && v.Object is { } obj) Mark(obj, visited);
-            if (v.Type == SabakaType.Array && v.Array is { } nested) MarkArray(nested, visited);
+            if (v.Type == SabakaType.Object && v.Object is { } obj)    Mark(obj, visited);
+            if (v.Type == SabakaType.Array  && v.Array  is { } nested) MarkArray(nested, visited);
         }
     }
 }

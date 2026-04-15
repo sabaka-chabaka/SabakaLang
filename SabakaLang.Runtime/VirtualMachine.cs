@@ -398,7 +398,26 @@ public sealed class VirtualMachine
                             Push(extMethod(args));
                             break;
                         }
- 
+
+                        if (instr.Name! == "toString" && args.Length == 0)
+                        {
+                            if (!TryResolveMethod(startClass, "toString", out var toStringFunc))
+                            {
+                                Push(Value.FromString(obj.Object!.ToString()));
+                                break;
+                            }
+                            _callStack.Push(ip + 1);
+                            _scopeDepth.Push(_scopes.Count);
+                            _stackDepth.Push(_stack.Count);
+                            _thisStack.Push(obj);
+                            _isMethod.Push(true);
+
+                            EnterScope();
+                            BindParams(toStringFunc, args);
+                            ip = toStringFunc.Address;
+                            continue;
+                        }
+
                         var func = ResolveMethod(startClass, instr.Name!);
  
                         _callStack.Push(ip + 1);
@@ -752,7 +771,23 @@ public sealed class VirtualMachine
  
         throw new RuntimeException($"Undefined method '{methodName}' in class '{className}'");
     }
-    
+
+    private bool TryResolveMethod(string className, string methodName,
+                                   out FunctionInfo result)
+    {
+        string fqn = $"{className}.{methodName}";
+        if (_functions.TryGetValue(fqn, out var f)) { result = f; return true; }
+
+        if (_inheritance.TryGetValue(className, out var baseName))
+        {
+            string next = methodName == className ? baseName : methodName;
+            return TryResolveMethod(baseName, next, out result);
+        }
+
+        result = default!;
+        return false;
+    }
+
     private void ExecAdd()
     {
         var b = Pop(); var a = Pop();
