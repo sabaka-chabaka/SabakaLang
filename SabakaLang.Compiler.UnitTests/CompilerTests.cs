@@ -519,7 +519,7 @@ public class CompilerTests
     public void Print_DoesNotEmitCall()
     {
         var code = Code("print(\"hi\");");
-        Assert.False(code.Any(i => i.OpCode == OpCode.Call && i.Name == "print"));
+        Assert.DoesNotContain(code, i => i.OpCode == OpCode.Call && i.Name == "print");
     }
     
     [Fact]
