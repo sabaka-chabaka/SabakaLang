@@ -150,4 +150,18 @@ public sealed class LogicTests : Utilities
         Assert.Equal("true", Output("print(1 is int);"));
         Assert.Equal("false", Output("print(1 is string);"));
     }
+
+    [Fact]
+    public void Is_WorkCorrect_Inheritance()
+    {
+        var src = @"
+class Animal {}
+class Dog : Animal {}
+
+Dog d = new Dog();
+
+print(d is Animal);
+";
+        Assert.Equal("true", Output(src));
+    }
 }
