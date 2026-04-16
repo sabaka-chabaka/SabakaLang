@@ -465,9 +465,11 @@ public sealed class VirtualMachine
                             throw new RuntimeException($"ArrayLoad: not an array (got {arr.Type})");
  
                         if (idx.Int < 0 || idx.Int >= arr.Array!.Count)
-                            throw new RuntimeException($"ArrayLoad: index {idx.Int} out of bounds (size {arr.Array.Count})");
- 
-                        Push(arr.Array[idx.Int]);
+                            if (arr.Array != null)
+                                throw new RuntimeException(
+                                    $"ArrayLoad: index {idx.Int} out of bounds (size {arr.Array.Count})");
+
+                        if (arr.Array != null) Push(arr.Array[idx.Int]);
                         break;
                     }
  

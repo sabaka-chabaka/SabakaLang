@@ -53,10 +53,6 @@ public sealed class FunctionTests : Utilities
     [Fact]
     public void Function_LocalVarDoesNotLeakToOuter()
     {
-        var src = """
-            void foo() { int secret = 99; }
-            foo();
-            """;
         RunError("""
             void foo() { int secret = 99; }
             foo();
