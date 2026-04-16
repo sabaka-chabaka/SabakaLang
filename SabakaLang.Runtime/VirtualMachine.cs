@@ -138,9 +138,9 @@ public sealed class VirtualMachine
                             "object" => value.Type == SabakaType.Object,
                             "null"   => value.Type == SabakaType.Null,
 
-                            _ when _functions.ContainsKey(type.String) =>
-                                value.Type == SabakaType.Object &&
-                                value.Object?.ClassName == type.String,
+                            _ when value.Type == SabakaType.Object && value.Object?.ClassName == type.String => true,
+
+                            _ when _inheritance[value.Object?.ClassName] == type.String => true,
 
                             _ => throw new RuntimeException($"Unknown type in 'is': {type.String}")
                         };
