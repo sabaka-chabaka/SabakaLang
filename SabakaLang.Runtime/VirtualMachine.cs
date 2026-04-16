@@ -138,10 +138,7 @@ public sealed class VirtualMachine
                             "object" => value.Type == SabakaType.Object,
                             "null"   => value.Type == SabakaType.Null,
 
-                            _ when value.Type == SabakaType.Object && value.Object?.ClassName == type.String => true,
-
-                            _ when _inheritance[value.Object?.ClassName] == type.String => true,
-
+                            _ when IsSubclassOf(value.Object?.ClassName!, type.String) => true,
                             _ => throw new RuntimeException($"Unknown type in 'is': {type.String}")
                         };
 
@@ -923,6 +920,13 @@ public sealed class VirtualMachine
  
         foreach (var v in _thisStack)
             if (v.Type == SabakaType.Object && v.Object != null) yield return v.Object;
+    }
+
+    private bool IsSubclassOf(string className, string baseName)
+    {
+        if (!_inheritance.TryGetValue(className, out var directBase)) return false;
+        if (directBase == baseName) return true;
+        return IsSubclassOf(directBase, baseName);
     }
 }
 

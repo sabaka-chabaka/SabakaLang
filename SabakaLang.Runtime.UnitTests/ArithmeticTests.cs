@@ -164,4 +164,19 @@ print(d is Animal);
 ";
         Assert.Equal("true", Output(src));
     }
+    
+    [Fact]
+    public void Is_WorkCorrect_DoubleInheritance()
+    {
+        var src = @"
+class Animal {}
+class Dog : Animal {}
+class Rex : Dog {}
+
+Rex d = new Rex();
+
+print(d is Animal);
+";
+        Assert.Equal("true", Output(src));
+    }
 }
