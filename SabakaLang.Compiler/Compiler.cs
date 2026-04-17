@@ -59,22 +59,17 @@ public enum OpCode
     CallExternal
 }
 
-public sealed class Instruction
+public sealed class Instruction(
+    OpCode opCode,
+    object? operand = null,
+    string? name = null,
+    object? extra = null)
 {
-    public OpCode  OpCode  { get; }
-    public object? Operand { get; set; }
-    public string? Name    { get; }
-    public object? Extra   { get; }
- 
-    public Instruction(OpCode opCode, object? operand = null,
-                       string? name = null, object? extra = null)
-    {
-        OpCode  = opCode;
-        Operand = operand;
-        Name    = name;
-        Extra   = extra;
-    }
-    
+    public OpCode  OpCode  { get; } = opCode;
+    public object? Operand { get; set; } = operand;
+    public string? Name    { get; } = name;
+    public object? Extra   { get; } = extra;
+
     public override string ToString()
     {
         var parts = new List<string> { OpCode.ToString() };
@@ -84,15 +79,16 @@ public sealed class Instruction
     }
 }
 
-internal sealed class ClassMeta
+internal sealed class ClassMeta(string name, string? @base)
 {
-    public string  Name       { get; }
-    public string? Base       { get; }
+    public string  Name       { get; } = name;
+    public string? Base       { get; } = @base;
     public List<string>         Fields  { get; } = [];
     public List<VarDecl>        FieldDecls { get; } = [];
     public List<FuncDecl>       Methods { get; } = [];
-    public List<string>         Interfaces { get; } = [];
-    public ClassMeta(string name, string? @base) { Name = name; Base = @base; }
+
+    // ReSharper disable once CollectionNeverQueried.Global
+    public readonly List<string> Interfaces = [];
 }
 
 public readonly record struct CompileError(string Message, Position Position)
@@ -100,20 +96,15 @@ public readonly record struct CompileError(string Message, Position Position)
     public override string ToString() => $"[{Position.Line}:{Position.Column}] {Message}";
 }
 
-public sealed class CompileResult
+public sealed class CompileResult(
+    IReadOnlyList<Instruction> code,
+    IReadOnlyList<CompileError> errors,
+    SymbolTable? symbols = null)
 {
-    public IReadOnlyList<Instruction>  Code    { get; }
-    public IReadOnlyList<CompileError> Errors  { get; }
-    public SymbolTable                 Symbols { get; }
+    public IReadOnlyList<Instruction>  Code    { get; } = code;
+    public IReadOnlyList<CompileError> Errors  { get; } = errors;
+    public SymbolTable                 Symbols { get; } = symbols ?? new SymbolTable();
     public bool HasErrors => Errors.Count > 0;
- 
-    public CompileResult(IReadOnlyList<Instruction> code, IReadOnlyList<CompileError> errors,
-                         SymbolTable? symbols = null)
-    {
-        Code    = code;
-        Errors  = errors;
-        Symbols = symbols ?? new SymbolTable();
-    }
 }
 
 public enum SabakaType { Null, Int, Float, Bool, String, Array, Object }
@@ -141,7 +132,7 @@ public readonly struct Value
     public static Value FromInt(int v)           => new(SabakaType.Int,   i: v);
     public static Value FromFloat(double v)      => new(SabakaType.Float, f: v);
     public static Value FromBool(bool v)         => new(SabakaType.Bool,  b: v);
-    public static Value FromString(string v)     => new(SabakaType.String, s: v ?? "");
+    public static Value FromString(string? v)     => new(SabakaType.String, s: v ?? "");
     public static Value FromArray(List<Value> v) => new(SabakaType.Array,  arr: v);
     public static Value FromObject(SabakaObject v) => new(SabakaType.Object, obj: v);
  
@@ -168,13 +159,11 @@ public readonly struct Value
     };
 }
 
-public sealed class SabakaObject
+public sealed class SabakaObject(string className)
 {
-    public string ClassName { get; }
+    public string ClassName { get; } = className;
     public Dictionary<string, Value> Fields { get; } = new();
- 
-    public SabakaObject(string className) => ClassName = className;
- 
+
     public SabakaObject Clone()
     {
         var c = new SabakaObject(ClassName);
@@ -186,10 +175,7 @@ public sealed class SabakaObject
         $"{ClassName} {{ {string.Join(", ", Fields.Select(kv => $"{kv.Key}: {kv.Value}"))} }}";
 }
  
-public sealed class RuntimeException : Exception
-{
-    public RuntimeException(string msg) : base(msg) { }
-}
+public sealed class RuntimeException(string msg) : Exception(msg);
 
 public sealed class Compiler
 {
@@ -235,20 +221,6 @@ public sealed class Compiler
     {
         if (_typeScopes.Count > 0) _typeScopes.Peek()[name] = type;
     }
- 
-    private string? GetVarType(string name)
-    {
-        foreach (var scope in _typeScopes)
-            if (scope.TryGetValue(name, out var t)) return t;
-        return null;
-    }
-    
-    private bool IsKnownType(string name) =>
-        _classes.ContainsKey(name) ||
-        _structs.ContainsKey(name) ||
-        _enums.ContainsKey(name)   ||
-        _symbolTable.Lookup(name).Any(s =>
-            s.Kind is SymbolKind.Class or SymbolKind.Struct or SymbolKind.Enum);
 
     private bool IsKnownClass(string name) =>
         _classes.ContainsKey(name) ||
@@ -293,7 +265,7 @@ public sealed class Compiler
     {
         switch (stmt)
         {
-            case FuncDecl f:
+            case FuncDecl:
                 break;
  
             case ClassDecl c:
@@ -329,7 +301,7 @@ public sealed class Compiler
             case FuncDecl f:    EmitFuncDecl(f);  break;
             case ClassDecl c:   EmitClassDecl(c); break;
             case InterfaceDecl: break;
-            case StructDecl s:  EmitStructDecl(s); break;
+            case StructDecl:  EmitStructDecl(); break;
             case EnumDecl:      break;
             case IfStmt ifs:    EmitIf(ifs);       break;
             case WhileStmt w:   EmitWhile(w);      break;
@@ -344,7 +316,7 @@ public sealed class Compiler
         }
     }
  
-    private void EmitVarDecl(VarDecl v, string? ownerClass = null)
+    private void EmitVarDecl(VarDecl v)
     {
         if (v.Init is not null)
         {
@@ -391,7 +363,7 @@ public sealed class Compiler
         var paramNames = f.Params.Select(p => p.Name).ToList();
         
         int funcIdx = Emit(OpCode.Function, operand: 0, name: fqn, extra: paramNames);
-        int bodyStart = Ip;
+        int unused = Ip;
  
         PushTypeScope();
  
@@ -419,13 +391,13 @@ public sealed class Compiler
     {
         if (!_classes.TryGetValue(c.Name, out var meta)) return;
  
-        foreach (var iface in c.Interfaces)
+        foreach (var inter in c.Interfaces)
         {
-            if (!_interfaces.TryGetValue(iface, out var id)) continue;
+            if (!_interfaces.TryGetValue(inter, out var id)) continue;
             foreach (var m in id.Methods)
             {
-                if (!meta.Methods.Any(cm => cm.Name == m.Name))
-                    Error($"Class '{c.Name}' does not implement '{iface}.{m.Name}'", c.Span.Start);
+                if (meta.Methods.All(cm => cm.Name != m.Name))
+                    Error($"Class '{c.Name}' does not implement '{inter}.{m.Name}'", c.Span.Start);
             }
         }
  
@@ -435,7 +407,7 @@ public sealed class Compiler
         var savedClass = _currentClass;
         _currentClass = c.Name;
  
-        var allFields = GetAllClassFields(c.Name);
+        GetAllClassFields(c.Name);
  
         foreach (var m in c.Methods)
             EmitFuncDecl(m, ownerClass: c.Name);
@@ -443,7 +415,7 @@ public sealed class Compiler
         _currentClass = savedClass;
     }
  
-    private void EmitStructDecl(StructDecl s)
+    private void EmitStructDecl()
     {
     }
     
@@ -714,15 +686,15 @@ public sealed class Compiler
             return;
         }
         
-        if (b.Left is IntLit li && b.Right is IntLit ri)
+        if (b is { Left: IntLit li, Right: IntLit ri })
         {
             int? folded = b.Op switch
             {
                 TokenType.Plus    => li.Value + ri.Value,
                 TokenType.Minus   => li.Value - ri.Value,
                 TokenType.Star    => li.Value * ri.Value,
-                TokenType.Slash   => ri.Value != 0 ? li.Value / ri.Value : (int?)null,
-                TokenType.Percent => ri.Value != 0 ? li.Value % ri.Value : (int?)null,
+                TokenType.Slash   => ri.Value != 0 ? li.Value / ri.Value : null,
+                TokenType.Percent => ri.Value != 0 ? li.Value % ri.Value : null,
                 _ => null
             };
             if (folded.HasValue) { Emit(OpCode.Push, Value.FromInt(folded.Value)); return; }
@@ -794,7 +766,7 @@ public sealed class Compiler
         {
             if (TryEmitBuiltin(ne.Name, c)) return;
 
-            if (_externals.TryGetValue(ne.Name, out var ext))
+            if (_externals.TryGetValue(ne.Name, out _))
             {
                 foreach (var a in c.Args) EmitExpr(a);
                 Emit(OpCode.CallExternal, c.Args.Count, name: ne.Name);
