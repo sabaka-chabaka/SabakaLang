@@ -17,29 +17,22 @@ public enum SymbolKind
     Module,
 }
 
-public sealed class Symbol
+public sealed class Symbol(
+    string name,
+    SymbolKind kind,
+    string type,
+    Span span,
+    string? parentName = null,
+    string? parameters = null,
+    IReadOnlyList<string>? typeParams = null)
 {
-    public string     Name        { get; }
-    public SymbolKind Kind        { get; }
-    public string     Type        { get; }
-    public Span       Span        { get; }
-    public string?    ParentName  { get; }
-    public string?    Parameters  { get; }
-    public IReadOnlyList<string> TypeParams { get; }
-
-    public Symbol(
-        string name, SymbolKind kind, string type, Span span,
-        string? parentName = null, string? parameters = null,
-        IReadOnlyList<string>? typeParams = null)
-    {
-        Name       = name;
-        Kind       = kind;
-        Type       = type;
-        Span       = span;
-        ParentName = parentName;
-        Parameters = parameters;
-        TypeParams = typeParams ?? [];
-    }
+    public string     Name        { get; } = name;
+    public SymbolKind Kind        { get; } = kind;
+    public string     Type        { get; } = type;
+    public Span       Span        { get; } = span;
+    public string?    ParentName  { get; } = parentName;
+    public string?    Parameters  { get; } = parameters;
+    public IReadOnlyList<string> TypeParams { get; } = typeParams ?? [];
 
     public override string ToString() =>
         ParentName is null
@@ -47,18 +40,15 @@ public sealed class Symbol
             : $"{Kind} {ParentName}.{Name} : {Type}";
 }
 
-public sealed class Scope
+public sealed class Scope(Scope? parent = null)
 {
-    public Scope? Parent { get; }
+    private Scope? Parent { get; } = parent;
     private readonly Dictionary<string, Symbol> _symbols = new();
     public IEnumerable<Symbol> LocalSymbols => _symbols.Values;
 
-    public Scope(Scope? parent = null) => Parent = parent;
-
     public bool Declare(Symbol symbol)
     {
-        if (_symbols.ContainsKey(symbol.Name)) return false;
-        _symbols[symbol.Name] = symbol;
+        if (!_symbols.TryAdd(symbol.Name, symbol)) return false;
         return true;
     }
 
@@ -105,17 +95,11 @@ public readonly record struct BindError(string Message, Position Position)
     public override string ToString() => $"[{Position.Line}:{Position.Column}] {Message}";
 }
 
-public sealed class BindResult
+public sealed class BindResult(SymbolTable symbols, IReadOnlyList<BindError> errors)
 {
-    public SymbolTable              Symbols   { get; }
-    public IReadOnlyList<BindError> Errors    { get; }
+    public SymbolTable              Symbols   { get; } = symbols;
+    public IReadOnlyList<BindError> Errors    { get; } = errors;
     public bool                     HasErrors => Errors.Count > 0;
-
-    public BindResult(SymbolTable symbols, IReadOnlyList<BindError> errors)
-    {
-        Symbols = symbols;
-        Errors  = errors;
-    }
 }
 
 public sealed class Binder
@@ -125,9 +109,9 @@ public sealed class Binder
     private readonly SymbolTable         _table  = new();
     private readonly List<BindError>     _errors = [];
 
-    private string? _currentType = null;
+    private string? _currentType;
 
-    private string? _currentReturn = null;
+    private string? _currentReturn;
     private static readonly HashSet<string> BuiltinTypes =
         ["int", "float", "bool", "string", "void"];
     
@@ -296,9 +280,9 @@ public sealed class Binder
         if (c.Base is not null && _scope.Resolve(c.Base) is null)
             AddError($"Unknown base class '{c.Base}'.", c.Span.Start);
 
-        foreach (var iface in c.Interfaces)
-            if (_scope.Resolve(iface) is null)
-                AddError($"Unknown interface '{iface}'.", c.Span.Start);
+        foreach (var inter in c.Interfaces)
+            if (_scope.Resolve(inter) is null)
+                AddError($"Unknown interface '{inter}'.", c.Span.Start);
 
         var savedType = _currentType;
         _currentType  = c.Name;
