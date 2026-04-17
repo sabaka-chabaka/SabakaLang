@@ -1,12 +1,13 @@
 using System.Text;
 using SabakaLang.Compiler;
+// ReSharper disable CompareOfFloatsByEqualityOperator
 
 namespace SabakaLang.Runtime;
 
 public sealed class VirtualMachine
 {
-    public readonly TextReader _input;
-    public readonly TextWriter _output;
+    private readonly TextReader _input;
+    private readonly TextWriter _output;
     private readonly IReadOnlyDictionary<string, Func<Value[], Value>> _externals;
     
     private readonly Stack<Value>                          _stack      = new();
@@ -24,7 +25,7 @@ public sealed class VirtualMachine
  
     private readonly GarbageCollector _gc;
  
-    private static readonly HttpClient _http = new();
+    private static readonly HttpClient Http = new();
     
     public VirtualMachine(
         TextReader?  input     = null,
@@ -35,7 +36,7 @@ public sealed class VirtualMachine
         _input     = input     ?? Console.In;
         _output    = output    ?? Console.Out;
         _externals = externals ?? new Dictionary<string, Func<Value[], Value>>();
-        _gc        = new GarbageCollector(gcThreshold, () => CollectRoots());
+        _gc        = new GarbageCollector(gcThreshold, CollectRoots);
     }
     
     public void Execute(List<Instruction> instructions)
@@ -598,7 +599,7 @@ public sealed class VirtualMachine
                     case OpCode.HttpGet:
                     {
                         var url = Pop().String;
-                        Push(Value.FromString(_http.GetStringAsync(url).GetAwaiter().GetResult()));
+                        Push(Value.FromString(Http.GetStringAsync(url).GetAwaiter().GetResult()));
                         break;
                     }
  
@@ -606,7 +607,7 @@ public sealed class VirtualMachine
                     {
                         var body = Pop().String;
                         var url  = Pop().String;
-                        var resp = _http.PostAsync(url, new StringContent(body, Encoding.UTF8, "text/plain"))
+                        var resp = Http.PostAsync(url, new StringContent(body, Encoding.UTF8, "text/plain"))
                                         .GetAwaiter().GetResult();
                         Push(Value.FromString(resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()));
                         break;
@@ -616,7 +617,7 @@ public sealed class VirtualMachine
                     {
                         var json = Pop().String;
                         var url  = Pop().String;
-                        var resp = _http.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"))
+                        var resp = Http.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"))
                                         .GetAwaiter().GetResult();
                         Push(Value.FromString(resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()));
                         break;
@@ -626,7 +627,7 @@ public sealed class VirtualMachine
                     {
                         var s = Pop().String;
                         if (string.IsNullOrEmpty(s)) throw new RuntimeException("ord: empty string");
-                        Push(Value.FromInt((int)s[0]));
+                        Push(Value.FromInt(s[0]));
                         break;
                     }
  
@@ -667,7 +668,7 @@ public sealed class VirtualMachine
         }
     }
 
-    public void Push(Value v) => _stack.Push(v);
+    private void Push(Value v) => _stack.Push(v);
 
     private Value Pop()
     {
@@ -739,7 +740,7 @@ public sealed class VirtualMachine
     
     private Value GetField(Value obj, string name)
     {
-        if (obj.Type == SabakaType.Object && obj.Object != null)
+        if (obj is { Type: SabakaType.Object, Object: not null })
         {
             if (obj.Object.Fields.TryGetValue(name, out var v)) return v;
             return Value.FromInt(0);
@@ -749,7 +750,7 @@ public sealed class VirtualMachine
  
     private void SetField(Value obj, string name, Value val)
     {
-        if (obj.Type == SabakaType.Object && obj.Object != null)
+        if (obj is { Type: SabakaType.Object, Object: not null })
         {
             obj.Object.Fields[name] = val;
             return;
@@ -783,7 +784,7 @@ public sealed class VirtualMachine
             return TryResolveMethod(baseName, next, out result);
         }
 
-        result = default!;
+        result = null!;
         return false;
     }
 
@@ -876,14 +877,14 @@ public sealed class VirtualMachine
     private static int UnwrapInt(object? o) => o switch
     {
         int i   => i,
-        Value v when v.Type == SabakaType.Int => v.Int,
+        Value { Type: SabakaType.Int } v => v.Int,
         _ => 0
     };
  
     private static string UnwrapString(object? o) => o switch
     {
         string s => s,
-        Value v when v.Type == SabakaType.String => v.String,
+        Value { Type: SabakaType.String } v => v.String,
         _ => o?.ToString() ?? ""
     };
  
@@ -913,15 +914,15 @@ public sealed class VirtualMachine
     private IEnumerable<SabakaObject> CollectRoots()
     {
         foreach (var v in _stack)
-            if (v.Type == SabakaType.Object && v.Object != null) yield return v.Object;
+            if (v is { Type: SabakaType.Object, Object: not null }) yield return v.Object;
  
         foreach (var scope in _scopes)
         foreach (var kv in scope)
-            if (kv.Value.Type == SabakaType.Object && kv.Value.Object != null)
+            if (kv.Value is { Type: SabakaType.Object, Object: not null })
                 yield return kv.Value.Object;
  
         foreach (var v in _thisStack)
-            if (v.Type == SabakaType.Object && v.Object != null) yield return v.Object;
+            if (v is { Type: SabakaType.Object, Object: not null }) yield return v.Object;
     }
 
     private bool IsSubclassOf(string className, string baseName)
@@ -932,14 +933,8 @@ public sealed class VirtualMachine
     }
 }
 
-public sealed class FunctionInfo
+public sealed class FunctionInfo(int address, List<string> parameters)
 {
-    public int           Address    { get; }
-    public List<string>  Parameters { get; }
- 
-    public FunctionInfo(int address, List<string> parameters)
-    {
-        Address    = address;
-        Parameters = parameters;
-    }
+    public int           Address    { get; } = address;
+    public List<string>  Parameters { get; } = parameters;
 }
