@@ -77,6 +77,9 @@ jobs:
           /p:ThresholdType=line \
           /p:ThresholdStat=total
           
+      - name: Debug - List Files
+        run: find ./coverage -name "coverage.cobertura.xml"    
+          
       - name: Generate report
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
