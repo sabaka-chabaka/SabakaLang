@@ -79,11 +79,11 @@ jobs:
           
       - name: Generate report
         uses: irongut/CodeCoverageSummary@v1.3.0
-          with:
-            filename: coverage/**/coverage.cobertura.xml
-            badge: true
-            format: markdown
-            output: both
+        with:
+          filename: coverage/**/coverage.cobertura.xml
+          badge: true
+          format: markdown
+          output: both
             
       - name: Write Summary to Commit
           run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
