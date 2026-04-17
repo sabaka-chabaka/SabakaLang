@@ -91,7 +91,7 @@ public enum TokenType
     
     Import,
     
-    EOF
+    Eof
 }
 
 public readonly record struct Position(int Line, int Column, int Offset);
@@ -103,25 +103,18 @@ public readonly record struct Token(TokenType Type, string Value, Position Start
 
 public readonly record struct LexerError(string Message, Position Position);
 
-public sealed class LexerResult
+public sealed class LexerResult(IReadOnlyList<Token> tokens, IReadOnlyList<LexerError> errors)
 {
-    public IReadOnlyList<Token> Tokens { get; }
-    public IReadOnlyList<LexerError> Errors { get; }
+    public IReadOnlyList<Token> Tokens { get; } = tokens;
+    public IReadOnlyList<LexerError> Errors { get; } = errors;
     public bool HasErrors => Errors.Count > 0;
-    
-    public LexerResult(IReadOnlyList<Token> tokens, IReadOnlyList<LexerError> errors)
-    {
-        Tokens = tokens;
-        Errors = errors;
-    }
 }
 
-public sealed class Lexer
+public sealed class Lexer(string source)
 {
-    private readonly string _source;
     private int _offset;
-    private int _line;
-    private int _column;
+    private int _line = 1;
+    private int _column = 1;
     private List<LexerError> _errors = [];
 
     private static readonly Dictionary<string, TokenType> Keywords = new()
@@ -158,14 +151,6 @@ public sealed class Lexer
         ["import"]    = TokenType.Import
     };
 
-    public Lexer(string source)
-    {
-        _source = source;
-        _offset = 0;
-        _line = 1;
-        _column = 1;
-    }
-
     public LexerResult Tokenize()
     {
         _errors = [];
@@ -180,7 +165,7 @@ public sealed class Lexer
             if (token.HasValue) tokens.Add(token.Value);
         }
         
-        tokens.Add(MakeToken(TokenType.EOF, ""));
+        tokens.Add(MakeToken(TokenType.Eof, ""));
         return new LexerResult(tokens, _errors);
     }
 
@@ -192,7 +177,7 @@ public sealed class Lexer
         if (char.IsDigit(ch)) return ReadNumber(start);
         if (char.IsLetter(ch) || ch == '_') return ReadIdentifier(start);
         if (ch == '"') return ReadString(start);
-        if (ch == '$' && _offset + 1 < _source.Length && _source[_offset + 1] == '"') return ReadInterpolatedString(start);
+        if (ch == '$' && _offset + 1 < source.Length && source[_offset + 1] == '"') return ReadInterpolatedString(start);
 
         return ch switch
         {
@@ -390,13 +375,13 @@ public sealed class Lexer
         if (!IsAtEnd() && Current() == next)
         {
             Advance();
-            return new Token(doubleType, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+            return new Token(doubleType, source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
         }
  
         if (singleType.HasValue)
-            return new Token(singleType.Value, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+            return new Token(singleType.Value, source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
  
-        AddError($"Expected '{next}' after '{_source[start.Offset]}'", start);
+        AddError($"Expected '{next}' after '{source[start.Offset]}'", start);
         return null;
     }
     
@@ -414,13 +399,13 @@ public sealed class Lexer
         return null;
     }
     
-    private char Current() => _offset < _source.Length ? _source[_offset] : '\0';
+    private char Current() => _offset < source.Length ? source[_offset] : '\0';
  
     private void Advance()
     {
-        if (_offset >= _source.Length) return;
+        if (_offset >= source.Length) return;
  
-        if (_source[_offset] == '\n')
+        if (source[_offset] == '\n')
         {
             _line++;
             _column = 1;
@@ -438,7 +423,7 @@ public sealed class Lexer
             Advance();
     }
  
-    private bool IsAtEnd() => _offset >= _source.Length;
+    private bool IsAtEnd() => _offset >= source.Length;
  
     private Position CurrentPosition() => new(_line, _column, _offset);
     
@@ -473,17 +458,17 @@ public sealed class Lexer
             if (Current() == second)
             {
                 Advance();
-                return new Token(doubleType, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+                return new Token(doubleType, source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
             }
 
             if (Current() == third)
             {
                 Advance();
-                return new Token(assignType, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+                return new Token(assignType, source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
             }
         }
 
-        return new Token(singleType, _source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+        return new Token(singleType, source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
     }
     
     private Token MakeToken(TokenType type, string value) =>

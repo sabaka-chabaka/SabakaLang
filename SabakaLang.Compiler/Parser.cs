@@ -123,7 +123,7 @@ public sealed class Parser
         return t;
     }
     
-    private bool IsAtEnd() => Current.Type == TokenType.EOF;
+    private bool IsAtEnd() => Current.Type == TokenType.Eof;
     
     private bool Check(TokenType type) => Current.Type == type;
     private bool Match(TokenType type)
@@ -247,7 +247,7 @@ public sealed class Parser
             var t = Peek(offset).Type;
             if (t == TokenType.Less) depth++;
             else if (t == TokenType.Greater) depth--;
-            else if (t is TokenType.Semicolon or TokenType.EOF) break;
+            else if (t is TokenType.Semicolon or TokenType.Eof) break;
             offset++;
         }
         return offset;

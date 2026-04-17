@@ -150,7 +150,7 @@ public class LexerTests
         var tokens = Tokenize("");
         
         Assert.Single(tokens);
-        Assert.Equal(TokenType.EOF, tokens[0].Type);
+        Assert.Equal(TokenType.Eof, tokens[0].Type);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class LexerTests
     {
         var tokens = Tokenize("int x = 42;");
         
-        Assert.Equal(TokenType.EOF, tokens.Last().Type);
+        Assert.Equal(TokenType.Eof, tokens.Last().Type);
     }
 
     [Fact]
@@ -221,6 +221,6 @@ public class LexerTests
  
         Assert.Equal(TokenType.InterpolatedStringLiteral, tokens[0].Type);
         Assert.Equal(TokenType.Semicolon, tokens[1].Type);
-        Assert.Equal(TokenType.EOF, tokens[2].Type);
+        Assert.Equal(TokenType.Eof, tokens[2].Type);
     }
 }
