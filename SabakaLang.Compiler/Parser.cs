@@ -72,17 +72,11 @@ public enum AccessMod { Public, Private, Protected }
 
 public record ParseError(string Message, Position Position);
 
-public sealed class ParseResult
+public sealed class ParseResult(IReadOnlyList<IStmt> statements, IReadOnlyList<ParseError> errors)
 {
-    public IReadOnlyList<IStmt> Statements { get; }
-    public IReadOnlyList<ParseError> Errors { get; }
+    public IReadOnlyList<IStmt> Statements { get; } = statements;
+    public IReadOnlyList<ParseError> Errors { get; } = errors;
     public bool HasErrors => Errors.Count > 0;
-    
-    public ParseResult(IReadOnlyList<IStmt> statements, IReadOnlyList<ParseError> errors)
-    {
-        Statements = statements;
-        Errors = errors;
-    }
 }
 
 public sealed class Parser
@@ -108,7 +102,6 @@ public sealed class Parser
     }
 
     private Token Current => Peek(0);
-    private Token Next => Peek(1);
 
     private Token Peek(int offset = 1)
     {
@@ -394,14 +387,14 @@ public sealed class Parser
         var path = Expect(TokenType.StringLiteral).Value;
         var names = new List<string>();
         string? alias = null;
-        if (Current.Type == TokenType.Identifier && Current.Value == "from")
+        if (Current is { Type: TokenType.Identifier, Value: "from" })
         {
             Advance();
             names.Add(Expect(TokenType.Identifier).Value);
             while (Match(TokenType.Comma))
                 names.Add(Expect(TokenType.Identifier).Value);
         }
-        if (Current.Type == TokenType.Identifier && Current.Value == "as")
+        if (Current is { Type: TokenType.Identifier, Value: "as" })
         {
             Advance();
             alias = Expect(TokenType.Identifier).Value;
@@ -549,7 +542,6 @@ public sealed class Parser
             }
 
             AddError("Invalid assignment target", start);
-            return left;
         }
 
         return left;
@@ -889,7 +881,7 @@ public sealed class Parser
             foreach (var err in subResult.Errors)
                 AddError($"In interpolated expression: {err.Message}", start);
  
-            if (subResult.Statements.Count == 1 && subResult.Statements[0] is ExprStmt es)
+            if (subResult.Statements is [ExprStmt es])
                 parts.Add(es.Expr);
             else
                 AddError("Expected a single expression inside interpolation braces", start);
@@ -926,7 +918,7 @@ public sealed class Parser
         Advance();
         var typeArgs = TryParseTypeArgs();
         bool isArray = false;
-        if (Check(TokenType.LBracket) && Peek(1).Type == TokenType.RBracket)
+        if (Check(TokenType.LBracket) && Peek().Type == TokenType.RBracket)
         {
             Advance(); Advance();
             isArray = true;
