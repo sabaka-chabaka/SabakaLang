@@ -80,13 +80,17 @@ jobs:
       - name: Debug - List Files
         run: find ./coverage -name "coverage.cobertura.xml"    
           
-      - name: Generate report
-        uses: irongut/CodeCoverageSummary@v1.3.0
-        with:
-          filename: coverage/**/coverage.cobertura.xml
-          badge: true
-          format: markdown
-          output: both
+      - name: Merge Reports & Create Summary
+          uses: danielpalme/ReportGenerator-GitHub-Action@5.2.4
+          with:
+            reports: 'coverage/**/*.xml'
+            targetdir: 'merged_coverage'
+            reporttypes: 'MarkdownSummary'
             
       - name: Write Summary to Commit
-        run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
+          run: |
+            if [ -f "merged_coverage/Summary.md" ]; then
+              cat merged_coverage/Summary.md >> $GITHUB_STEP_SUMMARY
+            else
+              echo "## ❌ Summary don't exists" >> $GITHUB_STEP_SUMMARY
+            fi
