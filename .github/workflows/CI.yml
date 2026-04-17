@@ -112,14 +112,11 @@ jobs:
       - name: Install sabaka-chabaka/NugetSpy
         run: dotnet tool install --global sabaka-chabaka.NugetSpy --version 1.0.5
         
-      - name: Run NugetSpy and check versions
-        run: nuget-spy
-        
-      - name: Generate Summary
+      - name: Run NugetSpy and write summary
         if: always()
         run: |
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "### NuGet Spy Analysis Results" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          sabaka-chabaka.NuGetSpy >> $GITHUB_STEP_SUMMARY
+          nuget-spy >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
