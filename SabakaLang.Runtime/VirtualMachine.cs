@@ -498,7 +498,7 @@ public sealed class VirtualMachine
                         RequireStack(1, "ArrayLength");
                         var v = Pop();
                         Push(v.Type == SabakaType.String
-                            ? Value.FromInt(v.String?.Length ?? 0)
+                            ? Value.FromInt(v.String.Length)
                             : Value.FromInt(v.Array?.Count  ?? 0));
                         break;
                     }
