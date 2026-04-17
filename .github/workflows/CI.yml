@@ -118,6 +118,7 @@ jobs:
       - name: Generate Summary
         if: always()
         run: |
+          echo "---" >> $GITHUB_STEP_SUMMARY
           echo "### NuGet Spy Analysis Results" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           sabaka-chabaka.NuGetSpy >> $GITHUB_STEP_SUMMARY
