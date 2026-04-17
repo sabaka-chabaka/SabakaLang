@@ -110,7 +110,7 @@ jobs:
         run: dotnet restore
         
       - name: Install sabaka-chabaka/NugetSpy
-        run: dotnet tool install -g SabakaChabaka.NugetSpy
+        run: dotnet tool install --global sabaka-chabaka.NugetSpy --version 1.0.5
         
       - name: Run NugetSpy and check versions
         run: nuget-spy
