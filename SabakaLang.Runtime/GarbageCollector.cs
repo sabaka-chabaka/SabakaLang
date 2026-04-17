@@ -4,7 +4,7 @@ namespace SabakaLang.Runtime;
 
 public sealed class GarbageCollector
 {
-    public int Threshold { get; }
+    private int Threshold { get; }
 
     private readonly Func<IEnumerable<SabakaObject>> _rootProvider;
 
@@ -61,26 +61,26 @@ public sealed class GarbageCollector
 
     public int LiveCount => _heap.Count;
 
-    public static void Mark(SabakaObject obj, HashSet<SabakaObject> visited)
+    private static void Mark(SabakaObject obj, HashSet<SabakaObject> visited)
     {
         if (!visited.Add(obj)) return;
 
         foreach (var kv in obj.Fields)
         {
-            if (kv.Value.Type == SabakaType.Object && kv.Value.Object is { } child)
+            if (kv.Value is { Type: SabakaType.Object, Object: { } child })
                 Mark(child, visited);
 
-            if (kv.Value.Type == SabakaType.Array && kv.Value.Array is { } arr)
+            if (kv.Value is { Type: SabakaType.Array, Array: { } arr })
                 MarkArray(arr, visited);
         }
     }
 
-    public static void MarkArray(List<Value> arr, HashSet<SabakaObject> visited)
+    private static void MarkArray(List<Value> arr, HashSet<SabakaObject> visited)
     {
         foreach (var v in arr)
         {
-            if (v.Type == SabakaType.Object && v.Object is { } obj)    Mark(obj, visited);
-            if (v.Type == SabakaType.Array  && v.Array  is { } nested) MarkArray(nested, visited);
+            if (v is { Type: SabakaType.Object, Object: { } obj })    Mark(obj, visited);
+            if (v is { Type: SabakaType.Array, Array: { } nested }) MarkArray(nested, visited);
         }
     }
 }
