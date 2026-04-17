@@ -51,5 +51,39 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true
         
+  cover:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
         
-  
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+
+      - name: Cover
+        run: |
+          dotnet test --no-build --configuration Release \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./coverage \
+          /p:Threshold=50 \
+          /p:ThresholdType=line \
+          /p:ThresholdStat=total
+          
+      - name: Generate report
+        uses: irongut/CodeCoverageSummary@v1.3.0
+          with:
+            filename: coverage/**/coverage.cobertura.xml
+            badge: true
+            format: markdown
+            output: both
+            
+      - name: Write Summary to Commit
+          run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
