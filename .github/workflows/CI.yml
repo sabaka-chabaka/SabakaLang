@@ -114,3 +114,11 @@ jobs:
         
       - name: Run NugetSpy and check versions
         run: nuget-spy
+        
+      - name: Generate Summary
+        if: always()
+        run: |
+          echo "### NuGet Spy Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          sabaka-chabaka.NuGetSpy >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
