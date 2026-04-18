@@ -634,14 +634,18 @@ public sealed class Compiler
     private void EmitCoalesce(CoalesceExpr c)
     {
         EmitExpr(c.Left);
+
         Emit(OpCode.Dup);
 
-        int jumpIfNotNull = Emit(OpCode.JumpIfTrue, 0);
-        
+        Emit(OpCode.Push, Value.Null);
+        Emit(OpCode.NotEqual);
+
+        int jmp = Emit(OpCode.JumpIfTrue, 0);
+
         Emit(OpCode.Pop);
         EmitExpr(c.Right);
-        
-        Patch(jumpIfNotNull, Ip);
+
+        Patch(jmp, Ip);
     }
  
     private void EmitName(NameExpr n)

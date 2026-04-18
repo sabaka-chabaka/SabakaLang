@@ -1033,4 +1033,19 @@ public class CompilerTests
 
         Assert.False(code.HasErrors);
     }
+    
+    [Fact]
+    public void Coalesce_EmitsCorrectPattern()
+    {
+        var code = Compile("var y = null; y ?? 42;");
+
+        var ops = code.Code.Select(i => i.OpCode).ToList();
+
+        Assert.Contains(OpCode.Dup, ops);
+        Assert.Contains(OpCode.NotEqual, ops);
+        Assert.Contains(OpCode.JumpIfTrue, ops);
+        Assert.Contains(OpCode.Pop, ops);
+
+        Assert.False(code.HasErrors);
+    }
 }

@@ -540,4 +540,10 @@ public class BinderTests
         var r = Bind(src);
         AssertNoErrors(r);
     }
+    
+    [Fact]
+    public void CoalesceOperator_NoError()
+    {
+        var r = Bind("int x = null; int y = 5; x ?? y;");
+    }
 }
