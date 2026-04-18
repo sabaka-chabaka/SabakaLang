@@ -2,6 +2,7 @@
   <Project Path="SabakaLang.Cli/SabakaLang.Cli.csproj" />
   <Project Path="SabakaLang.Compiler.UnitTests/SabakaLang.Compiler.UnitTests.csproj" />
   <Project Path="SabakaLang.Compiler/SabakaLang.Compiler.csproj" />
+  <Project Path="SabakaLang.Runner/SabakaLang.Runner.csproj" />
   <Project Path="SabakaLang.Runtime.UnitTests/SabakaLang.Runtime.UnitTests.csproj" />
   <Project Path="SabakaLang.Runtime/SabakaLang.Runtime.csproj" />
 </Solution>
