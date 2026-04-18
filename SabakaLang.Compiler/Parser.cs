@@ -29,6 +29,7 @@ public record TernaryExpr(IExpr Condition, IExpr Then, IExpr Else, Span Span) : 
 public record InterpolatedStringExpr(List<IExpr> Parts, Span Span) : IExpr;
 
 public record CoalesceExpr(IExpr Left, IExpr Right, Span Span) : IExpr;
+public record IsExpr(IExpr Left, TypeRef Right, Span Span) : IExpr;
 
 public record ExprStmt(IExpr Expr, Span Span) : IStmt;
 public record ReturnStmt(IExpr? Value, Span Span) : IStmt;
@@ -630,35 +631,12 @@ public sealed class Parser
         {
             Advance();
 
-            var right = ParseTypeAsExpression();
+            var right = ParseTypeRef();
 
-            left = new BinaryExpr(left, TokenType.Is, right, SpanFrom(start));
+            left = new IsExpr(left, right, SpanFrom(start));
         }
 
         return left;
-    }
-    
-    private IExpr ParseTypeAsExpression()
-    {
-        var start = Current.Start;
-
-        if (IsBuiltinType(Current.Type) || Current.Type == TokenType.Identifier)
-        {
-            var name = Current.Type switch
-            {
-                TokenType.IntKeyword => "int",
-                TokenType.FloatKeyword => "float",
-                TokenType.BoolKeyword => "bool",
-                TokenType.StringKeyword => "string",
-                _ => Current.Value
-            };
-
-            Advance();
-            return new NameExpr(name, SpanFrom(start));
-        }
-
-        AddError($"Expected type after 'is', got {Current.Type}", start);
-        return new NameExpr("?", SpanFrom(start));
     }
  
     private IExpr ParseComparison()

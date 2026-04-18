@@ -616,6 +616,7 @@ public sealed class Compiler
             case NullLit   : Emit(OpCode.Push, Value.Null);                 break;
  
             case NameExpr n:  EmitName(n);    break;
+            case IsExpr ise: EmitIs(ise); break;
             case BinaryExpr b:EmitBinary(b);  break;
             case UnaryExpr u: EmitUnary(u);   break;
             case AssignExpr a:EmitAssign(a);  break;
@@ -654,6 +655,14 @@ public sealed class Compiler
         Emit(OpCode.Load, name: n.Name);
     }
  
+    private void EmitIs(IsExpr i)
+    {
+        EmitExpr(i.Left);
+        var typeName = TypeRefToString(i.Right);
+        Emit(OpCode.Push, Value.FromString(typeName));
+        Emit(OpCode.Is, name: typeName);
+    }
+
     private void EmitBinary(BinaryExpr b)
     {
         if (b.Op == TokenType.AndAnd)
@@ -679,30 +688,6 @@ public sealed class Compiler
             return;
         }
         
-        if (b.Op == TokenType.Is)
-        {
-            EmitExpr(b.Left);
-            string? typeName = null;
-            switch (b.Right)
-            {
-                case NameExpr n:
-                    typeName = n.Name;
-                    Emit(OpCode.Push, Value.FromString(n.Name));
-                    break;
-
-                case StringLit s:
-                    typeName = s.Value;
-                    Emit(OpCode.Push, Value.FromString(s.Value));
-                    break;
-
-                default:
-                    Error("Invalid type in 'is' expression", default);
-                    Emit(OpCode.Push, Value.FromString("unknown"));
-                    break;
-            }
-            Emit(OpCode.Is, name: typeName);
-            return;
-        }
         
         if (b is { Left: IntLit li, Right: IntLit ri })
         {
@@ -888,7 +873,12 @@ public sealed class Compiler
  
     private void EmitNew(NewExpr n)
     {
-        EmitCreateObject(n.TypeName);
+        var typeName = n.TypeName;
+        if (n.TypeArgs.Count > 0)
+        {
+            typeName += "<" + string.Join(", ", n.TypeArgs) + ">";
+        }
+        EmitCreateObject(typeName, n.TypeName);
         EmitConstructorCall(n.TypeName, n.Args, n.Span.Start);
     }
  
@@ -941,10 +931,15 @@ public sealed class Compiler
     
     private void EmitCreateObject(string className)
     {
-        var allFields = GetAllClassFields(className);
-        Emit(OpCode.CreateObject, name: className, extra: allFields);
+        EmitCreateObject(className, className);
+    }
+
+    private void EmitCreateObject(string instanceClassName, string metaClassName)
+    {
+        var allFields = GetAllClassFields(metaClassName);
+        Emit(OpCode.CreateObject, name: instanceClassName, extra: allFields);
         
-        EmitFieldInitializers(className);
+        EmitFieldInitializers(metaClassName);
     }
  
     private void EmitFieldInitializers(string className)

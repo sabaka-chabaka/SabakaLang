@@ -442,23 +442,15 @@ public sealed class Binder
                     AddError($"Undefined symbol '{n.Name}'.", n.Span.Start);
                 break;
             
-            case BinaryExpr { Op: TokenType.Is } bis:
+            case IsExpr isExpr:
             {
-                BindExpr(bis.Left);
-
-                if (bis.Right is NameExpr n)
+                BindExpr(isExpr.Left);
+                var typeName = isExpr.Right.Name;
+                if (!BuiltinTypes.Contains(typeName) &&
+                    _scope.Resolve(typeName) is null)
                 {
-                    if (!BuiltinTypes.Contains(n.Name) &&
-                        _scope.Resolve(n.Name) is null)
-                    {
-                        AddError($"Unknown type '{n.Name}'.", n.Span.Start);
-                    }
+                    AddError($"Unknown type '{typeName}'.", isExpr.Span.Start);
                 }
-                else
-                {
-                    BindExpr(bis.Right);
-                }
-
                 break;
             }
 

@@ -181,6 +181,19 @@ print(d is Animal);
     }
     
     [Fact]
+    public void Is_WorkCorrect_Generics()
+    {
+        var src = @"
+class Animal<T> {}
+
+Animal<string> s = new Animal<string>();
+
+print(s is Animal<string>);
+";
+        Assert.Equal("true", Output(src));
+    }
+    
+    [Fact]
     public void Coalesce_ReturnsRight_WhenLeftIsNull()
     {
         var result = Output("var y = null; print(y ?? 42);");

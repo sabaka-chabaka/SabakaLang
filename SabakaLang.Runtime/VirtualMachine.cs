@@ -139,8 +139,8 @@ public sealed class VirtualMachine
                             "object" => value.Type == SabakaType.Object,
                             "null"   => value.Type == SabakaType.Null,
 
-                            _ when IsSubclassOf(value.Object?.ClassName!, type.String) => true,
-                            _ => throw new RuntimeException($"Unknown type in 'is': {type.String}")
+                            _ when value.Type == SabakaType.Object && value.Object != null && (value.Object.ClassName == type.String || IsSubclassOf(value.Object.ClassName, type.String)) => true,
+                            _ => false
                         };
 
                         Push(Value.FromBool(result));
