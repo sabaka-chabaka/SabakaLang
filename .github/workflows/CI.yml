@@ -149,7 +149,7 @@ jobs:
           path: ./publish-cli/
             
       - name: Upload Runner Artifact
-          uses: actions/upload-artifact@v4
-          with:
-            name: SabakaLang-Runner
-            path: ./publish-runner/      
+        uses: actions/upload-artifact@v4
+        with:
+          name: SabakaLang-Runner
+          path: ./publish-runner/      
