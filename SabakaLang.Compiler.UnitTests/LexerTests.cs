@@ -92,6 +92,7 @@ public class LexerTests
     [InlineData("++", TokenType.PlusPlus)]
     [InlineData("--", TokenType.MinusMinus)]
     [InlineData("?",  TokenType.Question)]
+    [InlineData("??", TokenType.QuestionQuestion)]
     public void Operators_RecognizedCorrectly(string source, TokenType expected)
     {
         var tokens = Tokenize(source);

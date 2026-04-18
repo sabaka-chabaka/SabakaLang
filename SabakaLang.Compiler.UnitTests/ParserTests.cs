@@ -1196,4 +1196,17 @@ public class ParserTests
         Assert.Equal("x", ((NameExpr)bin.Left).Name);
         Assert.Equal("Type", ((NameExpr)bin.Right).Name);
     }
+
+    [Fact]
+    public void Coalesce_Parsed()
+    {
+        var result = Parse("x ?? y");
+        
+        Assert.False(result.HasErrors);
+        var expr = Assert.IsType<ExprStmt>(result.Statements[0]).Expr;
+        var coalesce = Assert.IsType<CoalesceExpr>(expr);
+        
+        Assert.Equal("x", ((NameExpr)coalesce.Left).Name);
+        Assert.Equal("y", ((NameExpr)coalesce.Right).Name);
+    }
 }
