@@ -514,6 +514,11 @@ public sealed class Binder
             case InterpolatedStringExpr interp:
                 foreach (var part in interp.Parts) BindExpr(part);
                 break;
+            
+            case CoalesceExpr c:
+                BindExpr(c.Left);
+                BindExpr(c.Right);
+                break;
         }
     }
 
