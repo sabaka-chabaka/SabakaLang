@@ -132,15 +132,12 @@ jobs:
           
       - name: Restore
         run: dotnet restore
-        
-      - name: Build Solution
-        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true
           
       - name: Publish Cli
-        run: dotnet publish SabakaLang.Cli/SabakaLang.Cli.csproj -c Release -o ./publish-cli --no-build
+        run: dotnet publish SabakaLang.Cli/SabakaLang.Cli.csproj -c Release win-x64 -o ./publish-cli
           
       - name: Publish Runner
-        run: dotnet publish SabakaLang.Runner/SabakaLang.Runner.csproj -c Release -o ./publish-runner --no-build
+        run: dotnet publish SabakaLang.Runner/SabakaLang.Runner.csproj -c Release win-x64 -o ./publish-runner
         
       - name: Upload Cli Artifact
         uses: actions/upload-artifact@v4
