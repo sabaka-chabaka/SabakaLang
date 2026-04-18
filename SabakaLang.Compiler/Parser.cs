@@ -28,6 +28,8 @@ public record AssignExpr(IExpr Target, IExpr Value, Span Span) : IExpr;
 public record TernaryExpr(IExpr Condition, IExpr Then, IExpr Else, Span Span) : IExpr;
 public record InterpolatedStringExpr(List<IExpr> Parts, Span Span) : IExpr;
 
+public record CoalesceExpr(IExpr Left, IExpr Right, Span Span) : IExpr;
+
 public record ExprStmt(IExpr Expr, Span Span) : IStmt;
 public record ReturnStmt(IExpr? Value, Span Span) : IStmt;
 public record IfStmt(IExpr Condition, List<IStmt> Then, List<IStmt>? Else, Span Span) : IStmt;
@@ -550,7 +552,7 @@ public sealed class Parser
     private IExpr ParseTernary()
     {
         var start = Current.Start;
-        var condition = ParseLogicalOr();
+        var condition = ParseCoalesce();
 
         if (Match(TokenType.Question))
         {
@@ -562,6 +564,20 @@ public sealed class Parser
         }
 
         return condition;
+    }
+
+    private IExpr ParseCoalesce()
+    {
+        var start = Current.Start;
+        var left = ParseLogicalOr();
+
+        while (Match(TokenType.QuestionQuestion))
+        {
+            var rigth = ParseCoalesce();
+            left = new CoalesceExpr(left, rigth, SpanFrom(start));
+        }
+
+        return left;
     }
 
     private IExpr ParseLogicalOr()

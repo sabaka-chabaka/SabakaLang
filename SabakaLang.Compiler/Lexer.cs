@@ -84,6 +84,7 @@ public enum TokenType
     
     Comment,
     Question,
+    QuestionQuestion,
     
     Public,
     Private,
@@ -194,7 +195,7 @@ public sealed class Lexer(string source)
             ';' => Consume(TokenType.Semicolon, ";", start),
             ',' => Consume(TokenType.Comma,     ",", start),
             '.' => Consume(TokenType.Dot,       ".", start),
-            '?' => Consume(TokenType.Question,  "?", start),
+            '?' => ReadDouble('?', TokenType.QuestionQuestion, TokenType.Question, start),
  
             '/' => ReadSlashOrComment(start),
             '=' => ReadDouble('=', TokenType.EqualEqual, TokenType.Equal, start),
