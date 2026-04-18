@@ -179,4 +179,18 @@ print(d is Animal);
 ";
         Assert.Equal("true", Output(src));
     }
+    
+    [Fact]
+    public void Coalesce_ReturnsRight_WhenLeftIsNull()
+    {
+        var result = Output("var y = null; print(y ?? 42);");
+        Assert.Equal("42", result);
+    }
+
+    [Fact]
+    public void Coalesce_ReturnsLeft_WhenNotNull()
+    {
+        var result = Output("var y = 10; print(y ?? 42);");
+        Assert.Equal("10", result);
+    }
 }
