@@ -758,7 +758,7 @@ public sealed class Compiler
  
             default:
                 Error("Invalid assignment target", a.Span.Start);
-                Emit(OpCode.Push, Value.Null);
+                Emit(OpCode.Push, Value.Null); // RE-ADDED
                 break;
         }
     }

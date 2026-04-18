@@ -219,9 +219,52 @@ public class LexerTests
     public void InterpolatedString_FollowedBySemicolon_TokenizedCorrectly()
     {
         var tokens = Tokenize("$\"{x}\";");
- 
+
         Assert.Equal(TokenType.InterpolatedStringLiteral, tokens[0].Type);
         Assert.Equal(TokenType.Semicolon, tokens[1].Type);
         Assert.Equal(TokenType.Eof, tokens[2].Type);
+    }
+
+    [Fact]
+    public void Lexer_MultipleDots_InNumber_Error()
+    {
+        var lexer = new Lexer("1.2.3");
+        var result = lexer.Tokenize();
+        Assert.True(result.HasErrors);
+        Assert.Contains("multiple dots", result.Errors[0].Message);
+    }
+
+    [Fact]
+    public void Lexer_Unterminated_InterpolatedString_Error()
+    {
+        var lexer = new Lexer("$\"hello {x}");
+        var result = lexer.Tokenize();
+        Assert.True(result.HasErrors);
+        Assert.Contains("Unterminated interpolated string", result.Errors[0].Message);
+    }
+
+    [Fact]
+    public void Lexer_InterpolatedString_Escapes()
+    {
+        var tokens = Tokenize("$\"\\\\\\n\\r\\t\\0\\\"\"");
+        Assert.Equal(TokenType.InterpolatedStringLiteral, tokens[0].Type);
+        Assert.Equal("\\\n\r\t\0\"", tokens[0].Value);
+    }
+
+    [Fact]
+    public void Lexer_DoubleOperator_MissingSecondChar_Error()
+    {
+        var lexer = new Lexer("& ");
+        var result = lexer.Tokenize();
+        Assert.True(result.HasErrors);
+        Assert.Contains("Expected '&'", result.Errors[0].Message);
+    }
+
+    [Fact]
+    public void Lexer_Token_ToString_Literal()
+    {
+        var tokens = Tokenize("123 1.23");
+        Assert.Contains("IntLiteral(123)", tokens[0].ToString());
+        Assert.Contains("FloatLiteral(1.23)", tokens[1].ToString());
     }
 }

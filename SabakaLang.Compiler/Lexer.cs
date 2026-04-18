@@ -342,7 +342,7 @@ public sealed class Lexer(string source)
             Advance();
         }
 
-        if (IsAtEnd() && depth > 0)
+        if (IsAtEnd())
             AddError("Unterminated interpolated string", start);
         
         return new Token(TokenType.InterpolatedStringLiteral, sb.ToString(), start, PreviousPosition());
