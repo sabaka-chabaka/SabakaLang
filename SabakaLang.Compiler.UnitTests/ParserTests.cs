@@ -1175,11 +1175,10 @@ public class ParserTests
         Assert.Single(result.Statements);
 
         var exprStmt = Assert.IsType<ExprStmt>(result.Statements[0]);
-        var bin = Assert.IsType<BinaryExpr>(exprStmt.Expr);
+        var isExpr = Assert.IsType<IsExpr>(exprStmt.Expr);
 
-        Assert.Equal(TokenType.Is, bin.Op);
-        Assert.IsType<NameExpr>(bin.Left);
-        Assert.IsType<NameExpr>(bin.Right);
+        Assert.IsType<NameExpr>(isExpr.Left);
+        Assert.Equal("int", isExpr.Right.Name);
     }
     
     [Fact]
@@ -1190,11 +1189,10 @@ public class ParserTests
         Assert.False(result.HasErrors);
 
         var expr = Assert.IsType<ExprStmt>(result.Statements[0]).Expr;
-        var bin = Assert.IsType<BinaryExpr>(expr);
+        var isExpr = Assert.IsType<IsExpr>(expr);
 
-        Assert.Equal(TokenType.Is, bin.Op);
-        Assert.Equal("x", ((NameExpr)bin.Left).Name);
-        Assert.Equal("Type", ((NameExpr)bin.Right).Name);
+        Assert.Equal("x", ((NameExpr)isExpr.Left).Name);
+        Assert.Equal("Type", isExpr.Right.Name);
     }
 
     [Fact]
