@@ -627,7 +627,21 @@ public sealed class Compiler
             case SuperExpr s: EmitSuper(s);   break;
             case TernaryExpr t: EmitTernary(t); break;
             case InterpolatedStringExpr interp: EmitInterpolatedString(interp); break;
+            case CoalesceExpr c: EmitCoalesce(c); break;
         }
+    }
+
+    private void EmitCoalesce(CoalesceExpr c)
+    {
+        EmitExpr(c.Left);
+        Emit(OpCode.Dup);
+
+        int jumpIfNotNull = Emit(OpCode.JumpIfTrue, 0);
+        
+        Emit(OpCode.Pop);
+        EmitExpr(c.Right);
+        
+        Patch(jumpIfNotNull, Ip);
     }
  
     private void EmitName(NameExpr n)
