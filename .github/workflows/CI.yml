@@ -134,10 +134,10 @@ jobs:
         run: dotnet restore
           
       - name: Publish Cli
-        run: dotnet publish SabakaLang.Cli/SabakaLang.Cli.csproj -c Release -r win-x64  -o ./publish-cli
+        run: dotnet publish SabakaLang.Cli/SabakaLang.Cli.csproj -c Release -r win-x64  -o ./publish-cli --no-restore
           
       - name: Publish Runner
-        run: dotnet publish SabakaLang.Runner/SabakaLang.Runner.csproj -c Release -r win-x64 -o ./publish-runner
+        run: dotnet publish SabakaLang.Runner/SabakaLang.Runner.csproj -c Release -r win-x64 -o ./publish-runner --no-restore
         
       - name: Upload Cli Artifact
         uses: actions/upload-artifact@v4
