@@ -19,7 +19,7 @@ jobs:
           dotnet-version: 10.0.x
           
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=false
+        run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
         
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true
@@ -46,7 +46,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=false
+        run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
 
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true
@@ -63,7 +63,7 @@ jobs:
           dotnet-version: 10.0.x
           
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=false
+        run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
 
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true
@@ -131,7 +131,7 @@ jobs:
           dotnet-version: 10.0.x
           
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=false
+        run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
           
       - name: Publish Cli
         run: dotnet publish SabakaLang.Cli/SabakaLang.Cli.csproj -c Release -r win-x64  -o ./publish-cli --no-restore
