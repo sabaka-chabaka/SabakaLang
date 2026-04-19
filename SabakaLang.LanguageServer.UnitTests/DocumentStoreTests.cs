@@ -123,13 +123,14 @@ public class DocumentStoreTests
     }
 
     [Fact]
-    public void Analyze_IsThreadSafe()
+    public async Task Analyze_IsThreadSafe()
     {
         var store = NewStore();
         var tasks = Enumerable.Range(0, 20).Select(i =>
             Task.Run(() => store.Analyze($"file:///test{i}.sabaka", $"int x{i} = {i};")));
 
-        var action = async () => await Task.WhenAll(tasks);
-        action.Should().NotThrowAsync();
+        Func<Task> act = () => Task.WhenAll(tasks);
+    
+        await act.Should().NotThrowAsync();
     }
 }

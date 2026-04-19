@@ -149,7 +149,7 @@ public class DocumentSymbolTests
         var result = await handler.Handle(Params(uri), CancellationToken.None);
 
         var calcSym = result!.Select(s => s.DocumentSymbol!).First(s => s.Name == "Calc");
-        var addMethod = calcSym.Children.First(c => c.Name == "add");
+        var addMethod = calcSym.Children!.First(c => c.Name == "add");
         addMethod.Detail.Should().Contain("int");
     }
 }
