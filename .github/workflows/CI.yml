@@ -22,7 +22,7 @@ jobs:
         run: dotnet workload restore
           
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
+        run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
         
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
@@ -52,7 +52,7 @@ jobs:
         run: dotnet workload restore
 
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
+        run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
 
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
@@ -72,7 +72,7 @@ jobs:
         run: dotnet workload restore
           
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
+        run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
 
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
@@ -143,7 +143,7 @@ jobs:
         run: dotnet workload restore
           
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
+        run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
           
       - name: Publish Cli
         run: dotnet publish SabakaLang.Cli/SabakaLang.Cli.csproj -c Release -r win-x64  -o ./publish-cli --no-restore /p:EnableWindowsTargeting=true
@@ -153,9 +153,6 @@ jobs:
         
       - name: Publish Language Server
         run: dotnet publish SabakaLang.LanguageServer/SabakaLang.LanguageServer.csproj -c Release -r win-x64 -o ./publish-lsp --no-restore /p:EnableWindowsTargeting=true
-
-      - name: Publish Studio
-        run: dotnet publish SabakaLang.Studio/SabakaLang.Studio.csproj -c Release -r win-x64 -o ./publish-std --no-restore /p:EnableWindowsTargeting=true
         
       - name: Upload Cli Artifact
         uses: actions/upload-artifact@v4
@@ -173,10 +170,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SabakaLang-LanguageServer
-          path: ./publish-lsp/
-
-      - name: Upload Studio Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SabakaLang-Studio
-          path: ./publish-std/       
+          path: ./publish-lsp/    
