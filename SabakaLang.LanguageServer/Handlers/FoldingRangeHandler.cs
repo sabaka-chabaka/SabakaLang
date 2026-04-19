@@ -96,7 +96,7 @@ public sealed class FoldingRangeHandler(DocumentStore store) : FoldingRangeHandl
         }
     }
 
-    private static void AddFold(List<FoldingRange> ranges, Span span)
+    private static void AddFold(List<FoldingRange> ranges, Compiler.Span span)
     {
         var startLine = PositionHelper.ToLsp(span.Start).Line;
         var endLine   = PositionHelper.ToLsp(span.End).Line;

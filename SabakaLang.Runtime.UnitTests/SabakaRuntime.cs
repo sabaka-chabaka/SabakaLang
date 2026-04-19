@@ -57,7 +57,7 @@ public sealed class SabakaRuntime
                 name: kvp.Key, 
                 kind: SymbolKind.Function,
                 type: "dynamic",
-                span: new Span(default, default),
+                span: new Compiler.Span(default, default),
                 parameters: new string(',', kvp.Value) 
             )
         );
