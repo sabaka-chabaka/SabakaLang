@@ -139,6 +139,9 @@ jobs:
       - name: Publish Runner
         run: dotnet publish SabakaLang.Runner/SabakaLang.Runner.csproj -c Release -r win-x64 -o ./publish-runner --no-restore
         
+      - name: Publish Language Server
+        run: dotnet publish SabakaLang.LanguageServer/SabakaLang.LanguageServer.csproj -c Release -r win-x64 -o ./publish-lsp --no-restore
+        
       - name: Upload Cli Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -149,4 +152,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SabakaLang-Runner
-          path: ./publish-runner/      
+          path: ./publish-runner/
+
+      - name: Upload Language Server Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SabakaLang-LanguageServer
+          path: ./publish-lsp/          
