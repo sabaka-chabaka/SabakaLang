@@ -25,7 +25,7 @@ jobs:
         run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
         
       - name: Build
-        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
         
       - name: Test
         run: dotnet test --no-build --configuration Release --logger "trx;LogFileName=results.trx"
@@ -48,11 +48,14 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Restore Workloads
+        run: dotnet workload restore
+
       - name: Restore
         run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
         
   cover:
     runs-on: ubuntu-latest
@@ -72,7 +75,7 @@ jobs:
         run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
 
       - name: Cover
         run: |
@@ -143,16 +146,16 @@ jobs:
         run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
           
       - name: Publish Cli
-        run: dotnet publish SabakaLang.Cli/SabakaLang.Cli.csproj -c Release -r win-x64  -o ./publish-cli --no-restore
+        run: dotnet publish SabakaLang.Cli/SabakaLang.Cli.csproj -c Release -r win-x64  -o ./publish-cli --no-restore /p:EnableWindowsTargeting=true
           
       - name: Publish Runner
-        run: dotnet publish SabakaLang.Runner/SabakaLang.Runner.csproj -c Release -r win-x64 -o ./publish-runner --no-restore
+        run: dotnet publish SabakaLang.Runner/SabakaLang.Runner.csproj -c Release -r win-x64 -o ./publish-runner --no-restore /p:EnableWindowsTargeting=true
         
       - name: Publish Language Server
-        run: dotnet publish SabakaLang.LanguageServer/SabakaLang.LanguageServer.csproj -c Release -r win-x64 -o ./publish-lsp --no-restore
+        run: dotnet publish SabakaLang.LanguageServer/SabakaLang.LanguageServer.csproj -c Release -r win-x64 -o ./publish-lsp --no-restore /p:EnableWindowsTargeting=true
 
       - name: Publish Studio
-        run: dotnet publish SabakaLang.Studio/SabakaLang.Studio.csproj -c Release -r win-x64 -o ./publish-std --no-restore
+        run: dotnet publish SabakaLang.Studio/SabakaLang.Studio.csproj -c Release -r win-x64 -o ./publish-std --no-restore /p:EnableWindowsTargeting=true
         
       - name: Upload Cli Artifact
         uses: actions/upload-artifact@v4
