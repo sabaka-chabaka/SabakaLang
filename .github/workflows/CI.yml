@@ -18,6 +18,9 @@ jobs:
         with: 
           dotnet-version: 10.0.x
           
+      - name: Restore Workloads
+        run: dotnet workload restore
+          
       - name: Restore
         run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
         
@@ -61,6 +64,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
+      - name: Restore Workloads
+        run: dotnet workload restore
           
       - name: Restore
         run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
@@ -129,6 +135,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
+      - name: Restore Workloads
+        run: dotnet workload restore
           
       - name: Restore
         run: dotnet restore -r win-x64 -p:UseMaui=true -p:EnableWindowsTargeting=true
@@ -141,6 +150,9 @@ jobs:
         
       - name: Publish Language Server
         run: dotnet publish SabakaLang.LanguageServer/SabakaLang.LanguageServer.csproj -c Release -r win-x64 -o ./publish-lsp --no-restore
+
+      - name: Publish Studio
+        run: dotnet publish SabakaLang.Studio/SabakaLang.Studio.csproj -c Release -r win-x64 -o ./publish-std --no-restore
         
       - name: Upload Cli Artifact
         uses: actions/upload-artifact@v4
@@ -158,4 +170,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SabakaLang-LanguageServer
-          path: ./publish-lsp/          
+          path: ./publish-lsp/
+
+      - name: Upload Studio Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SabakaLang-Studio
+          path: ./publish-std/       
