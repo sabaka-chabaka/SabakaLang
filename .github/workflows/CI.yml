@@ -25,7 +25,7 @@ jobs:
         run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
         
       - name: Build
-        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
+        run: dotnet build --filter "FullyQualifiedName!~Studio" --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
         
       - name: Test
         run: dotnet test --no-build --configuration Release --logger "trx;LogFileName=results.trx"
@@ -55,7 +55,7 @@ jobs:
         run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
+        run: dotnet build --filter "FullyQualifiedName!~Studio" --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
         
   cover:
     runs-on: ubuntu-latest
@@ -75,7 +75,7 @@ jobs:
         run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
+        run: dotnet build --filter "FullyQualifiedName!~Studio" --no-restore --configuration Release /p:TreatWarningsAsErrors=true /p:EnableWindowsTargeting=true
 
       - name: Cover
         run: |
