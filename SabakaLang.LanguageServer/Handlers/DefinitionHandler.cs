@@ -1,6 +1,6 @@
 namespace SabakaLang.LanguageServer.Handlers;
 
-public sealed class CodeActionHandler
+public sealed class DefinitionHandler
 {
     
 }
