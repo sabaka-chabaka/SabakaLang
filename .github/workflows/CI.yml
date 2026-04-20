@@ -5,122 +5,104 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-    
-jobs: 
+
+jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
-        
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
-        with: 
+        with:
           dotnet-version: 10.0.x
-          
+
       - name: Restore Workloads
         run: dotnet workload restore
-          
+
       - name: Restore
         run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
-        
+
       - name: Build
         run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release /p:TreatWarningsAsErrors=true
-        
+
       - name: Test
-        run: dotnet test --no-build -c Release --os linux \
-             --property:TestingPlatformDotnetTestSupport=true \
-             --results-directory ./TestResults \
-             -- --report-trx
-  
-  
-  - name: Upload test results
+        run: |
+          dotnet test --no-build -c Release --os linux \
+          --property:TestingPlatformDotnetTestSupport=true \
+          --property:TestingPlatformCommandLineArguments="--report-trx --results-directory ./TestResults"
+
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: '**/*.trx'
-          
+          path: '**/TestResults/*.trx' 
+  
   build-check:
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
-        
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-
       - name: Restore Workloads
         run: dotnet workload restore
-
       - name: Restore
         run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
-
       - name: Build
         run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release /p:TreatWarningsAsErrors=true
 
-        
   cover:
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
-        
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-
       - name: Restore Workloads
         run: dotnet workload restore
-          
       - name: Restore
         run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
-
       - name: Build
         run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release /p:TreatWarningsAsErrors=true
 
-
       - name: Cover
-        run: dotnet test --no-build -c Release --os linux \
-             --property:TestingPlatformDotnetTestSupport=true \
-             --property:TestingPlatformCommandLineArguments="--report-trx --results-directory ./TestResults --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml"
-  
-  
-  - name: Debug - List Files
-        run: find ./coverage -name "coverage.cobertura.xml"    
-          
+        run: |
+          dotnet test --no-build -c Release --os linux \
+          --property:TestingPlatformDotnetTestSupport=true \
+          --property:TestingPlatformCommandLineArguments="--report-trx --results-directory ./TestResults --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml"
+
+      - name: Debug - List Files
+        run: find ./TestResults -name "coverage.cobertura.xml"
+
       - name: Merge Reports & Create Summary
         uses: danielpalme/ReportGenerator-GitHub-Action@5.2.4
         with:
-          reports: 'coverage/**/*.xml'
+          reports: '**/TestResults/coverage.cobertura.xml'
           targetdir: 'merged_coverage'
           reporttypes: 'MarkdownSummary'
-            
+
       - name: Write Summary to Commit
         run: |
           if [ -f "merged_coverage/Summary.md" ]; then
             cat merged_coverage/Summary.md >> $GITHUB_STEP_SUMMARY
           else
-            echo "## ❌ Summary don't exists" >> $GITHUB_STEP_SUMMARY
+            echo "## ❌ Summary doesn't exist" >> $GITHUB_STEP_SUMMARY
           fi
-          
+  
   versions-check:
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
-        
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-        
       - name: Install sabaka-chabaka/NugetSpy
         run: dotnet tool install --global sabaka-chabaka.NugetSpy --version 1.0.5
-        
       - name: Run NugetSpy and write summary
         if: always()
         run: |
@@ -129,48 +111,38 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           NO_COLOR=1 nuget-spy >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          
+  
   build-deploy:
     runs-on: ubuntu-latest
     needs: [build-and-test, build-check, cover, versions-check]
-    
     steps:
       - uses: actions/checkout@v4
-        
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-
       - name: Restore Workloads
         run: dotnet workload restore
-          
       - name: Restore
         run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
-          
       - name: Publish Cli
         run: dotnet publish SabakaLang.Cli/SabakaLang.Cli.csproj -c Release -r win-x64  -o ./publish-cli --no-restore /p:EnableWindowsTargeting=true
-          
       - name: Publish Runner
         run: dotnet publish SabakaLang.Runner/SabakaLang.Runner.csproj -c Release -r win-x64 -o ./publish-runner --no-restore /p:EnableWindowsTargeting=true
-        
       - name: Publish Language Server
         run: dotnet publish SabakaLang.LanguageServer/SabakaLang.LanguageServer.csproj -c Release -r win-x64 -o ./publish-lsp --no-restore /p:EnableWindowsTargeting=true
-        
       - name: Upload Cli Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SabakaLang-Cli
           path: ./publish-cli/
-            
       - name: Upload Runner Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SabakaLang-Runner
           path: ./publish-runner/
-
       - name: Upload Language Server Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SabakaLang-LanguageServer
-          path: ./publish-lsp/    
+          path: ./publish-lsp/
