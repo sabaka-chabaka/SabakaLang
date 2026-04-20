@@ -54,29 +54,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
       - name: Restore Workloads
         run: dotnet workload restore
+
       - name: Restore
         run: dotnet restore -r linux-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
+
       - name: Build
         run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release --os linux /p:TreatWarningsAsErrors=true
 
       - name: Cover
         run: |
           mkdir -p ./TestResults
-          find ./ -type f -name "*UnitTests.dll" -path "*/bin/Release/*" | while read -r test_dll; do
-            echo "Running coverage for: $test_dll"
-            dotnet exec "$test_dll" --coverage --coverage-output-format cobertura --coverage-output ./TestResults/coverage.cobertura.xml
+          find ./ -name "*UnitTests.csproj" | while read proj; do
+            echo "Running coverage for: $proj"
+            dotnet test "$proj" -c Release --no-build \
+              --collect:"XPlat Code Coverage" \
+              --results-directory ./TestResults
           done
-      
+
       - name: Merge Reports & Create Summary
         uses: danielpalme/ReportGenerator-GitHub-Action@5.2.4
         with:
-          reports: './TestResults/coverage.cobertura.xml'
+          reports: './TestResults/**/coverage.cobertura.xml'
           targetdir: 'merged_coverage'
           reporttypes: 'MarkdownSummary'
 
