@@ -32,7 +32,7 @@ jobs:
           # Ищем DLL тестовых проектов в папке Release
           find ./ -type f -name "*UnitTests.dll" -path "*/bin/Release/*" | while read -r test_dll; do
             echo "Running tests in: $test_dll"
-            dotnet exec "$test_dll" --report-trx --results-directory ./TestResults
+            dotnet exec "$test_dll"
           done
       
       - name: Upload test results
