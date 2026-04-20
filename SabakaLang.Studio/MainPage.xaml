@@ -5,14 +5,4 @@
              x:Class="SabakaLang.Studio.MainPage"
              Shell.NavBarIsVisible="False"
              Background="#191a1c">
-    
-    <GraphicsView x:Name="MainGraphicsView"
-                  HorizontalOptions="Fill"
-                  VerticalOptions="Fill"
-                  InputTransparent="False">
-        <GraphicsView.Drawable>
-            <elements:EditorDrawable x:Name="EditorPainter"/>
-        </GraphicsView.Drawable>
-    </GraphicsView>
-    
 </ContentPage>
