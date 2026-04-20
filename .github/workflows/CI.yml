@@ -71,9 +71,13 @@ jobs:
 
       - name: Cover
         run: |
+          export DOTNET_CLI_TEST_USE_MTP=1
+
           mkdir -p ./TestResults
+
           find ./ -name "*UnitTests.csproj" | while read proj; do
             echo "Running coverage for: $proj"
+
             dotnet test "$proj" -c Release --no-build \
               --collect:"XPlat Code Coverage" \
               --results-directory ./TestResults
