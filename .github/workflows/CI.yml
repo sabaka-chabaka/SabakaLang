@@ -73,13 +73,16 @@ jobs:
         run: |
           mkdir -p ./TestResults
 
-          find ./ -name "*UnitTests.csproj" | while read proj; do
-            echo "Running coverage for: $proj"
+          # Ищем DLL тестовых проектов в папке Release
+          find ./ -type f -name "*UnitTests.dll" -path "*/bin/Release/*" | while read -r test_dll; do
+            echo "Running coverage for: $test_dll"
+            proj_name=$(basename "$test_dll" .dll)
+            mkdir -p "./TestResults/$proj_name"
 
-            dotnet test --project "$proj" -c Release --no-build \
+            dotnet exec "$test_dll" \
               --coverage \
               --coverage-output-format cobertura \
-              --coverage-output ./TestResults
+              --coverage-output "./TestResults/$proj_name/coverage.cobertura.xml"
           done
 
       - name: Merge Reports & Create Summary
