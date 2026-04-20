@@ -29,12 +29,11 @@ jobs:
       - name: Test
         run: |
           mkdir -p ./TestResults
-          find ./ -type f -wholename "*/bin/Release/*UnitTests" -not -path "*/obj/*" -not -name "*.*" | while read -r test_bin; do
-            echo "Running tests in: $test_bin"
-            chmod +x "$test_bin"
-            "$test_bin" --report-trx --results-directory ./TestResults
+          # Ищем DLL тестовых проектов в папке Release
+          find ./ -type f -name "*UnitTests.dll" -path "*/bin/Release/*" | while read -r test_dll; do
+            echo "Running tests in: $test_dll"
+            dotnet exec "$test_dll" --report-trx --results-directory ./TestResults
           done
-      
       
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -76,10 +75,9 @@ jobs:
       - name: Cover
         run: |
           mkdir -p ./TestResults
-          find ./ -type f -wholename "*/bin/Release/*UnitTests" -not -path "*/obj/*" -not -name "*.*" | while read -r test_bin; do
-            echo "Running coverage for: $test_bin"
-            chmod +x "$test_bin"
-            "$test_bin" --coverage --coverage-output-format cobertura --coverage-output ./TestResults/coverage.cobertura.xml
+          find ./ -type f -name "*UnitTests.dll" -path "*/bin/Release/*" | while read -r test_dll; do
+            echo "Running coverage for: $test_dll"
+            dotnet exec "$test_dll" --coverage --coverage-output-format cobertura --coverage-output ./TestResults/coverage.cobertura.xml
           done
       
       - name: Merge Reports & Create Summary
