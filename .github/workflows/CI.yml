@@ -26,11 +26,10 @@ jobs:
         
       - name: Build
         run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release /p:TreatWarningsAsErrors=true
-
         
       - name: Test
-        run: dotnet test --no-build --configuration Release --logger "trx;LogFileName=results.trx"
-        
+        run: dotnet test --no-build -c Release --os linux --property:TestingPlatformDotnetTestSupport=true --report-trx --results-directory ./TestResults
+      
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -85,10 +84,11 @@ jobs:
           dotnet test --no-build --configuration Release \
           --collect:"XPlat Code Coverage" \
           --results-directory ./coverage \
-          /p:Threshold=50 \
-          /p:ThresholdType=line \
-          /p:ThresholdStat=total
-          
+          -p:TestingPlatformDotnetTestSupport=true \
+          -p:Threshold=50 \
+          -p:ThresholdType=line \
+          -p:ThresholdStat=total
+      
       - name: Debug - List Files
         run: find ./coverage -name "coverage.cobertura.xml"    
           
