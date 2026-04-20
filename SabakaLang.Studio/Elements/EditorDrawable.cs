@@ -2,24 +2,28 @@ namespace SabakaLang.Studio.Elements;
 
 public class EditorDrawable : IDrawable
 {
-    public string Text { get; set; } = "";
-    public float FontSize { get; set; } = 14;
+    public EditorEngine Engine { get; set; }
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
-        canvas.FillColor = Colors.Black;
+        canvas.FillColor = Color.FromArgb("#191A1CFF");
         canvas.FillRectangle(dirtyRect);
 
+        canvas.Font = new Microsoft.Maui.Graphics.Font("JetBrainsMono");
+        canvas.FontSize = 14;
         canvas.FontColor = Colors.White;
-        canvas.Font = new Microsoft.Maui.Graphics.Font("JetMonoRegular");
-        canvas.FontSize = FontSize;
 
-        var lines = Text.Split('\n');
-        float lineHeight = FontSize * 1.2f;
+        float lineHeight = 18f;
+        float charWidth = 8.4f;
 
-        for (int i = 0; i < lines.Length; i++)
+        for (int i = 0; i < Engine.Lines.Count; i++)
         {
-            canvas.DrawString(lines[i], 10, (i + 1) * lineHeight, HorizontalAlignment.Left);
+            canvas.DrawString(Engine.Lines[i].ToString(), 10, (i + 1) * lineHeight, HorizontalAlignment.Left);
         }
+
+        canvas.FillColor = Colors.Orange;
+        float cursorX = 10 + (Engine.CursorCol * charWidth);
+        float cursorY = (Engine.CursorRow * lineHeight) + 4;
+        canvas.FillRectangle(cursorX, cursorY, 2, lineHeight);
     }
 }
