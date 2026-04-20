@@ -6,6 +6,10 @@
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
+    <PropertyGroup>
+        
+        <TestingPlatform_EnableDotNetTestInfrastructure>true</TestingPlatform_EnableDotNetTestInfrastructure>
+    </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="coverlet.collector" Version="10.0.0">
