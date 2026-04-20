@@ -76,7 +76,7 @@ jobs:
           find ./ -name "*UnitTests.csproj" | while read proj; do
             echo "Running coverage for: $proj"
 
-            dotnet test "$proj" -c Release --no-build \
+            dotnet test --project "$proj" -c Release --no-build \
               --coverage \
               --coverage-output-format cobertura \
               --coverage-output ./TestResults
