@@ -6,6 +6,8 @@ public class EditorDrawable : IDrawable
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
+        if (Engine == null) return;
+        
         canvas.FillColor = Color.FromArgb("#191a1c");
         canvas.FillRectangle(dirtyRect);
 

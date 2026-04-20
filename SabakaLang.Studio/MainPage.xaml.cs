@@ -16,8 +16,12 @@ public partial class MainPage : ContentPage
     {
         base.OnHandlerChanged();
 
+        EditorPainter.Engine = engine;
+
         var platformWindow = (Microsoft.UI.Xaml.Window)Window!.Handler!.PlatformView!;
         var rootElement = platformWindow.Content as Microsoft.UI.Xaml.FrameworkElement;
+        
+        if (rootElement == null) return;
 
         rootElement.KeyDown += (s, e) => 
         {
@@ -45,14 +49,36 @@ public partial class MainPage : ContentPage
             MainGraphicsView.Invalidate(); 
         };
 
-        platformWindow.CoreWindow.CharacterReceived += (s, e) => 
+        if (platformWindow.Content is Microsoft.UI.Xaml.FrameworkElement element)
         {
-            char c = (char)e.KeyCode;
-            if (c >= 32) 
+            element.CharacterReceived += (s, e) =>
             {
-                engine.InsertChar(c);
-                MainGraphicsView.Invalidate();
+                if (e.Character >= 32)
+                {
+                    engine.InsertChar(e.Character);
+                    MainGraphicsView.Invalidate();
+                    e.Handled = true;
+                }
+            };
+        }
+
+        try
+        {
+            if (platformWindow.CoreWindow != null)
+            {
+                platformWindow.CoreWindow.CharacterReceived += (s, e) => 
+                {
+                    char c = (char)e.KeyCode;
+                    if (c >= 32) 
+                    {
+                        engine.InsertChar(c);
+                        MainGraphicsView.Invalidate();
+                    }
+                };
             }
-        };
+        }
+        catch
+        {
+        }
     }
 }
