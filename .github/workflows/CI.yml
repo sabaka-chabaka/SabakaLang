@@ -21,23 +21,22 @@ jobs:
         run: dotnet workload restore
 
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
+        run: dotnet restore -r linux-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
 
       - name: Build
-        run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+        run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release --os linux /p:TreatWarningsAsErrors=true
 
       - name: Test
         run: |
-          dotnet test --no-build -c Release --os linux \
-          --property:TestingPlatformDotnetTestSupport=true \
-          --property:TestingPlatformCommandLineArguments="--report-trx --results-directory ./TestResults"
+          mkdir -p ./TestResults
+          find . -name "*UnitTests" -type f -not -path "*/obj/*" | grep "bin/Release" | xargs -I {} {} --report-trx --results-directory ./TestResults
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: '**/TestResults/*.trx' 
+          path: './TestResults/*.trx'
   
   build-check:
     runs-on: ubuntu-latest
@@ -65,23 +64,19 @@ jobs:
       - name: Restore Workloads
         run: dotnet workload restore
       - name: Restore
-        run: dotnet restore -r win-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
+        run: dotnet restore -r linux-x64 -p:UseMaui=false -p:EnableWindowsTargeting=true
       - name: Build
-        run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+        run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release --os linux /p:TreatWarningsAsErrors=true
 
       - name: Cover
         run: |
-          dotnet test --no-build -c Release --os linux \
-          --property:TestingPlatformDotnetTestSupport=true \
-          --property:TestingPlatformCommandLineArguments="--report-trx --results-directory ./TestResults --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml"
-
-      - name: Debug - List Files
-        run: find ./TestResults -name "coverage.cobertura.xml"
+          mkdir -p ./TestResults
+          find . -name "*UnitTests" -type f -not -path "*/obj/*" | grep "bin/Release" | xargs -I {} {} --coverage --coverage-output-format cobertura --coverage-output ./TestResults/coverage.cobertura.xml
 
       - name: Merge Reports & Create Summary
         uses: danielpalme/ReportGenerator-GitHub-Action@5.2.4
         with:
-          reports: '**/TestResults/coverage.cobertura.xml'
+          reports: './TestResults/coverage.cobertura.xml'
           targetdir: 'merged_coverage'
           reporttypes: 'MarkdownSummary'
 
