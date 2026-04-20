@@ -8,7 +8,8 @@
     
     <GraphicsView x:Name="MainGraphicsView"
                   HorizontalOptions="Fill"
-                  VerticalOptions="Fill">
+                  VerticalOptions="Fill"
+                  InputTransparent="False">
         <GraphicsView.Drawable>
             <elements:EditorDrawable x:Name="EditorPainter"/>
         </GraphicsView.Drawable>
