@@ -6,7 +6,7 @@ public class EditorDrawable : IDrawable
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
-        canvas.FillColor = Color.FromArgb("#191A1CFF");
+        canvas.FillColor = Color.FromArgb("#191a1c");
         canvas.FillRectangle(dirtyRect);
 
         canvas.Font = new Microsoft.Maui.Graphics.Font("JetBrainsMono");

@@ -4,7 +4,7 @@
              xmlns:elements="using:SabakaLang.Studio.Elements"
              x:Class="SabakaLang.Studio.MainPage"
              Shell.NavBarIsVisible="False"
-             Background="#191A1CFF">
+             Background="#191a1c">
     
     <GraphicsView x:Name="MainGraphicsView"
                   HorizontalOptions="Fill"
