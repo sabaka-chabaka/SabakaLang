@@ -28,9 +28,13 @@ jobs:
         run: ls **/*.csproj | grep -v "Studio" | xargs -I {} dotnet build {} --no-restore --configuration Release /p:TreatWarningsAsErrors=true
         
       - name: Test
-        run: dotnet test --no-build -c Release --os linux --property:TestingPlatformDotnetTestSupport=true --report-trx --results-directory ./TestResults
-      
-      - name: Upload test results
+        run: dotnet test --no-build -c Release --os linux \
+             --property:TestingPlatformDotnetTestSupport=true \
+             --results-directory ./TestResults \
+             -- --report-trx
+  
+  
+  - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -80,16 +84,12 @@ jobs:
 
 
       - name: Cover
-        run: |
-          dotnet test --no-build --configuration Release \
-          --collect:"XPlat Code Coverage" \
-          --results-directory ./coverage \
-          -p:TestingPlatformDotnetTestSupport=true \
-          -p:Threshold=50 \
-          -p:ThresholdType=line \
-          -p:ThresholdStat=total
-      
-      - name: Debug - List Files
+        run: dotnet test --no-build -c Release --os linux \
+             --property:TestingPlatformDotnetTestSupport=true \
+             --property:TestingPlatformCommandLineArguments="--report-trx --results-directory ./TestResults --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml"
+  
+  
+  - name: Debug - List Files
         run: find ./coverage -name "coverage.cobertura.xml"    
           
       - name: Merge Reports & Create Summary
