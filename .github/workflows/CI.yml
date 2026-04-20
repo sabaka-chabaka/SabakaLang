@@ -29,8 +29,13 @@ jobs:
       - name: Test
         run: |
           mkdir -p ./TestResults
-          find . -name "*UnitTests" -type f -not -path "*/obj/*" | grep "bin/Release" | xargs -I {} {} --report-trx --results-directory ./TestResults
-
+          find ./ -type f -wholename "*/bin/Release/*UnitTests" -not -path "*/obj/*" -not -name "*.*" | while read -r test_bin; do
+            echo "Running tests in: $test_bin"
+            chmod +x "$test_bin"
+            "$test_bin" --report-trx --results-directory ./TestResults
+          done
+      
+      
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -71,8 +76,12 @@ jobs:
       - name: Cover
         run: |
           mkdir -p ./TestResults
-          find . -name "*UnitTests" -type f -not -path "*/obj/*" | grep "bin/Release" | xargs -I {} {} --coverage --coverage-output-format cobertura --coverage-output ./TestResults/coverage.cobertura.xml
-
+          find ./ -type f -wholename "*/bin/Release/*UnitTests" -not -path "*/obj/*" -not -name "*.*" | while read -r test_bin; do
+            echo "Running coverage for: $test_bin"
+            chmod +x "$test_bin"
+            "$test_bin" --coverage --coverage-output-format cobertura --coverage-output ./TestResults/coverage.cobertura.xml
+          done
+      
       - name: Merge Reports & Create Summary
         uses: danielpalme/ReportGenerator-GitHub-Action@5.2.4
         with:
