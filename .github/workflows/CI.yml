@@ -71,6 +71,7 @@ jobs:
 
       - name: Cover
         run: |
+          dotnet tool install --global dotnet-coverage
           mkdir -p ./TestResults
 
           # Ищем DLL тестовых проектов в папке Release
@@ -79,10 +80,10 @@ jobs:
             proj_name=$(basename "$test_dll" .dll)
             mkdir -p "./TestResults/$proj_name"
 
-            dotnet exec "$test_dll" \
-              --coverage \
-              --coverage-output-format cobertura \
-              --coverage-output "./TestResults/$proj_name/coverage.cobertura.xml"
+            dotnet-coverage collect \
+              --output "./TestResults/$proj_name/coverage.cobertura.xml" \
+              --output-format cobertura \
+              dotnet exec "$test_dll"
           done
 
       - name: Merge Reports & Create Summary
