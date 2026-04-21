@@ -1,5 +1,3 @@
-using Microsoft.Maui.Graphics;
-
 namespace SabakaLang.Studio.Editor.Highlighting;
 
 public static class StudioTheme

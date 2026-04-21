@@ -2,7 +2,7 @@ using SabakaLang.Studio.Editor.Core;
 
 namespace SabakaLang.Studio.Editor.Highlighting;
 
-public sealed class BracketMacher
+public sealed class BracketMatcher
 {
     private static readonly Dictionary<char, char> _open  = new() { ['{'] = '}', ['('] = ')', ['['] = ']' };
     private static readonly Dictionary<char, char> _close = new() { ['}'] = '{', [')'] = '(', [']'] = '[' };
