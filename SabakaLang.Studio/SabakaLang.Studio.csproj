@@ -55,6 +55,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="Editor\Core\" />
       <Folder Include="Resources\Images\" />
     </ItemGroup>
 

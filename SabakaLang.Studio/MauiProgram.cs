@@ -13,12 +13,10 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .ConfigureFonts(fonts =>
             {
-                fonts.AddFont("JetBrainsMono-Regular.ttf", "JetMonoRegular");
+                fonts.AddFont("JetBrainsMono-Medium.ttf", "JMM");
             });
 
         builder.Services.AddSingleton<DocumentStore>();
-        builder.Services.AddSingleton<Services.FileService>();
-        builder.Services.AddSingleton<Git.GitService>();
         builder.Services.AddTransient<MainPage>();
 
 #if DEBUG
