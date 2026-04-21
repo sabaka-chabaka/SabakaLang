@@ -58,4 +58,8 @@
       <Folder Include="Resources\Images\" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\SabakaLang.LanguageServer\SabakaLang.LanguageServer.csproj" />
+    </ItemGroup>
+
 </Project>
