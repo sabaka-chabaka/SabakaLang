@@ -4,36 +4,4 @@
              x:Class="SabakaLang.Studio.MainPage"
              Shell.NavBarIsVisible="False"
              Background="#1E1F22">
-
-    <Grid RowDefinitions="*,24">
-
-        <Grid Grid.Row="0" ColumnDefinitions="48,240,*">
-
-            <ContentView x:Name="ActivityBarHost" Grid.Column="0" BackgroundColor="#1E1F22" />
-
-            <Grid Grid.Column="1" BackgroundColor="#1E1F22">
-                <ContentView x:Name="SidePanelHost" />
-                <BoxView WidthRequest="1" HorizontalOptions="End" BackgroundColor="#393B40" />
-            </Grid>
-
-            <Grid Grid.Column="2" RowDefinitions="36,*,200">
-
-                <ContentView x:Name="TabBarHost" Grid.Row="0" BackgroundColor="#1E1F22" />
-
-                <Grid Grid.Row="1" x:Name="EditorHost" BackgroundColor="#1E1F22">
-                    <ContentView x:Name="FindReplaceHost"
-                                 VerticalOptions="Start" ZIndex="50" />
-                    <ContentView x:Name="PaletteHost"
-                                 ZIndex="100" />
-                </Grid>
-
-                <Grid Grid.Row="2" BackgroundColor="#2B2D30">
-                    <BoxView HeightRequest="1" VerticalOptions="Start" BackgroundColor="#393B40" />
-                    <ContentView x:Name="BottomPanelContent" Margin="0,1,0,0" />
-                </Grid>
-            </Grid>
-        </Grid>
-
-        <ContentView x:Name="StatusBarHost" Grid.Row="1" BackgroundColor="#3C3F41" />
-    </Grid>
 </ContentPage>
