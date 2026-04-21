@@ -10,7 +10,7 @@ namespace SabakaLang.Studio.Editor.Controls;
 
 public sealed class EditorView : GraphicsView, IDrawable
 {
-    private readonly EditorDocument    _document;
+    public readonly EditorDocument    Document;
     private readonly EditorSelection   _selection  = new();
     private readonly SyntaxHighlighter _highlighter;
     private readonly BracketMatcher    _bracketMatcher = new();
@@ -41,13 +41,13 @@ public sealed class EditorView : GraphicsView, IDrawable
         Drawable = this;
         BackgroundColor = StudioTheme.Background;
 
-        _document      = new EditorDocument();
+        Document      = new EditorDocument();
         _highlighter  = new SyntaxHighlighter(store);
         _renderer     = new EditorRenderer(_highlighter, _bracketMatcher);
         _completionPopup = new CompletionPopup();
         _completions  = new CompletionProvider(store);
-        _keyboard     = new KeyboardHandler(_document, _selection, _completionPopup);
-        _mouse        = new MouseHandler(_document, _selection);
+        _keyboard     = new KeyboardHandler(Document, _selection, _completionPopup);
+        _mouse        = new MouseHandler(Document, _selection);
 
         _keyboard.CaretMoved             += OnCaretMoved;
         _keyboard.CompletionRequested    += TriggerCompletion;
@@ -61,7 +61,7 @@ public sealed class EditorView : GraphicsView, IDrawable
 
         _completionPopup.ItemCommitted += CommitCompletion;
 
-        _document.TextChanged += OnTextChanged;
+        Document.TextChanged += OnTextChanged;
 
         _blinkTimer = Application.Current!.Dispatcher.CreateTimer();
         _blinkTimer.Interval = TimeSpan.FromMilliseconds(530);
@@ -85,8 +85,8 @@ public sealed class EditorView : GraphicsView, IDrawable
 
     public string Text
     {
-        get => _document.GetText();
-        set { _document.SetText(value); RunAnalysis(); }
+        get => Document.GetText();
+        set { Document.SetText(value); RunAnalysis(); }
     }
 
     public bool IsDirty { get; private set; }
@@ -106,7 +106,7 @@ public sealed class EditorView : GraphicsView, IDrawable
         Invalidate();
     }
 
-    private void ScrollToLine(int line)
+    public void ScrollToLine(int line)
     {
         _scrollY = (float)Math.Max(0, line * StudioTheme.LineHeight - Height / 2);
         Invalidate();
@@ -115,7 +115,7 @@ public sealed class EditorView : GraphicsView, IDrawable
     public void Draw(ICanvas canvas, RectF dirty)
     {
         _renderer.Draw(
-            canvas, dirty, _document, _selection, _keyboard.Caret,
+            canvas, dirty, Document, _selection, _keyboard.Caret,
             _scrollY, _scrollX, _diagnostics, _searchHits,
             _searchCurrent, _caretVisible);
     }
@@ -176,7 +176,7 @@ public sealed class EditorView : GraphicsView, IDrawable
 
     private void RunAnalysis()
     {
-        var source = _document.GetText();
+        var source = Document.GetText();
         _highlighter.Invalidate(_fileUri, source);
 
         var store = GetStore();
@@ -211,18 +211,18 @@ public sealed class EditorView : GraphicsView, IDrawable
     private void CommitCompletion(CompletionEntry entry)
     {
         var caret = _keyboard.Caret;
-        var line  = _document.GetLine(caret.Line);
+        var line  = Document.GetLine(caret.Line);
         var start = caret.Column;
         while (start > 0 && (char.IsLetterOrDigit(line[start - 1]) || line[start - 1] == '_'))
             start--;
 
-        _document.Delete(new CaretPosition(caret.Line, start), caret);
+        Document.Delete(new CaretPosition(caret.Line, start), caret);
 
         var insertText = entry.IsSnippet
             ? entry.Insert.Replace("$0", "")
             : entry.Insert;
 
-        _keyboard.Caret = _document.Insert(new CaretPosition(caret.Line, start), insertText);
+        _keyboard.Caret = Document.Insert(new CaretPosition(caret.Line, start), insertText);
         _selection.Clear(_keyboard.Caret);
         _completionPopup.Hide();
         Invalidate();
@@ -231,8 +231,8 @@ public sealed class EditorView : GraphicsView, IDrawable
     private void GotoDefinition()
     {
         var caret    = _keyboard.Caret;
-        var (s, _)   = _document.WordAt(caret);
-        var line     = _document.GetLine(caret.Line);
+        var (s, _)   = Document.WordAt(caret);
+        var line     = Document.GetLine(caret.Line);
         var wordStart = s.Column;
         var wordEnd   = caret.Column;
         while (wordEnd < line.Length && (char.IsLetterOrDigit(line[wordEnd]) || line[wordEnd] == '_'))
@@ -240,7 +240,7 @@ public sealed class EditorView : GraphicsView, IDrawable
         var word = line[wordStart..wordEnd];
         if (word.Length == 0) return;
 
-        var hits = _document.FindAll(word);
+        var hits = Document.FindAll(word);
         if (hits.Count > 0)
         {
             _keyboard.Caret = hits[0];
