@@ -15,23 +15,23 @@ public sealed class SabakaHighlightingColorizer : DocumentColorizingTransformer
     private readonly DocumentStore _store;
     private DocumentAnalysis? _analysis;
 
-    private static readonly IBrush BrushKeyword    = new SolidColorBrush(Color.Parse("#569CD6"));
+    private static readonly IBrush BrushKeyword    = new SolidColorBrush(Color.Parse("#6CD5EB"));
     private static readonly IBrush BrushString     = new SolidColorBrush(Color.Parse("#CE9178"));
     private static readonly IBrush BrushNumber     = new SolidColorBrush(Color.Parse("#B5CEA8"));
     private static readonly IBrush BrushComment    = new SolidColorBrush(Color.Parse("#6A9955"));
     private static readonly IBrush BrushOperator   = new SolidColorBrush(Color.Parse("#D4D4D4"));
-    private static readonly IBrush BrushClass      = new SolidColorBrush(Color.Parse("#4EC9B0"));
-    private static readonly IBrush BrushInterface  = new SolidColorBrush(Color.Parse("#B8D7A3"));
-    private static readonly IBrush BrushStruct     = new SolidColorBrush(Color.Parse("#86C691"));
-    private static readonly IBrush BrushEnum       = new SolidColorBrush(Color.Parse("#B8D7A3"));
+    private static readonly IBrush BrushClass      = new SolidColorBrush(Color.Parse("#C191FF"));
+    private static readonly IBrush BrushInterface  = new SolidColorBrush(Color.Parse("#C191FF"));
+    private static readonly IBrush BrushStruct     = new SolidColorBrush(Color.Parse("#C191FF"));
+    private static readonly IBrush BrushEnum       = new SolidColorBrush(Color.Parse("#C191FF"));
     private static readonly IBrush BrushEnumMember = new SolidColorBrush(Color.Parse("#4FC1FF"));
     private static readonly IBrush BrushFunction   = new SolidColorBrush(Color.Parse("#DCDCAA"));
-    private static readonly IBrush BrushMethod     = new SolidColorBrush(Color.Parse("#DCDCAA"));
+    private static readonly IBrush BrushMethod     = new SolidColorBrush(Color.Parse("#39CC9B"));
     private static readonly IBrush BrushParameter  = new SolidColorBrush(Color.Parse("#9CDCFE"));
     private static readonly IBrush BrushProperty   = new SolidColorBrush(Color.Parse("#9CDCFE"));
     private static readonly IBrush BrushNamespace  = new SolidColorBrush(Color.Parse("#4EC9B0"));
     private static readonly IBrush BrushVariable   = new SolidColorBrush(Color.Parse("#9CDCFE"));
-    private static readonly IBrush BrushBuiltin    = new SolidColorBrush(Color.Parse("#DCDCAA"));
+    private static readonly IBrush BrushBuiltin    = new SolidColorBrush(Color.Parse("#39CC9B"));
 
     public SabakaHighlightingColorizer(DocumentStore store)
     {
