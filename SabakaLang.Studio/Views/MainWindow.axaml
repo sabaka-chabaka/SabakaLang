@@ -3,6 +3,7 @@
         xmlns:vm="using:SabakaLang.Studio.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:avaloniaEdit="clr-namespace:AvaloniaEdit;assembly=AvaloniaEdit"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="SabakaLang.Studio.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -10,11 +11,16 @@
         Title="SabakaLang.Studio">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" />
+    <avaloniaEdit:TextEditor Name="Editor"
+                             ShowLineNumbers="True"
+                             FontFamily="Consolas"
+                             FontSize="14"
+                             Text="Hello, world!"
+                             Background="#191A1C"
+                             HorizontalAlignment="Stretch"
+                             VerticalAlignment="Stretch"/>
 
 </Window>
