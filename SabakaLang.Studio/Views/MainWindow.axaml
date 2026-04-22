@@ -4,11 +4,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:avaloniaEdit="clr-namespace:AvaloniaEdit;assembly=AvaloniaEdit"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
         x:Class="SabakaLang.Studio.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="SabakaLang.Studio">
+        Title="SabakaLang Studio"
+        Width="900" Height="600">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
@@ -16,11 +17,41 @@
 
     <avaloniaEdit:TextEditor Name="Editor"
                              ShowLineNumbers="True"
-                             FontFamily="Consolas"
+                             FontFamily="Cascadia Code,Consolas,Menlo,monospace"
                              FontSize="14"
-                             Text="Hello, world!"
-                             Background="#191A1C"
+                             Background="#1E1E1E"
+                             Foreground="#D4D4D4"
                              HorizontalAlignment="Stretch"
-                             VerticalAlignment="Stretch"/>
+                             VerticalAlignment="Stretch"
+                             HorizontalScrollBarVisibility="Auto"
+                             VerticalScrollBarVisibility="Auto">
+        <avaloniaEdit:TextEditor.Text>
+            class Animal {
+                public string Name;
+                public int Age;
+
+                public void Speak() {
+                    print("...");
+                }
+            }
+
+            class Dog : Animal {
+                override void Speak() {
+                    print("Woof! I am " + Name);
+                }
+            }
+
+            Dog dog = new Dog();
+            dog.Name = "Rex";
+            dog.Age = 3;
+            dog.Speak();
+
+            int sum = 0;
+            for (int i = 0; i &lt; 10; i++) {
+            sum += i;
+            }
+            print("Sum: " + sum);
+        </avaloniaEdit:TextEditor.Text>
+    </avaloniaEdit:TextEditor>
 
 </Window>
