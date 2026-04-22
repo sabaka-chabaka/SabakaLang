@@ -7,4 +7,5 @@
   <Project Path="SabakaLang.Runner/SabakaLang.Runner.csproj" />
   <Project Path="SabakaLang.Runtime.UnitTests/SabakaLang.Runtime.UnitTests.csproj" />
   <Project Path="SabakaLang.Runtime/SabakaLang.Runtime.csproj" />
+  <Project Path="SabakaLang.Studio/SabakaLang.Studio.csproj" />
 </Solution>
