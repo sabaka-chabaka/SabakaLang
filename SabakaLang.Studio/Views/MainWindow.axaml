@@ -17,7 +17,7 @@
 
     <avaloniaEdit:TextEditor Name="Editor"
                              ShowLineNumbers="True"
-                             FontFamily="Cascadia Code,Consolas,Menlo,monospace"
+                             FontFamily="{StaticResource JbFont}"
                              FontSize="14"
                              Background="#1E1E1E"
                              Foreground="#D4D4D4"
@@ -26,31 +26,7 @@
                              HorizontalScrollBarVisibility="Auto"
                              VerticalScrollBarVisibility="Auto">
         <avaloniaEdit:TextEditor.Text>
-            class Animal {
-                public string Name;
-                public int Age;
-
-                public void Speak() {
-                    print("...");
-                }
-            }
-
-            class Dog : Animal {
-                override void Speak() {
-                    print("Woof! I am " + Name);
-                }
-            }
-
-            Dog dog = new Dog();
-            dog.Name = "Rex";
-            dog.Age = 3;
-            dog.Speak();
-
-            int sum = 0;
-            for (int i = 0; i &lt; 10; i++) {
-            sum += i;
-            }
-            print("Sum: " + sum);
+            print("hello world");
         </avaloniaEdit:TextEditor.Text>
     </avaloniaEdit:TextEditor>
 

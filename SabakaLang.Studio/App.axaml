@@ -4,6 +4,10 @@
              xmlns:local="using:SabakaLang.Studio"
              RequestedThemeVariant="Default">
 
+    <Application.Resources>
+        <FontFamily x:Key="JbFont">avares://SabakaLang.Studio/Assets/Fonts#JetBrains Mono</FontFamily>
+    </Application.Resources>
+    
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
