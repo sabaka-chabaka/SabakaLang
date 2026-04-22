@@ -41,11 +41,13 @@ public sealed class EditorSurface : AbsoluteLayout, IDisposable
 
     private CancellationTokenSource? _analysisCts;
 
-    public event Action<bool>?  DirtyChanged;     // isDirty
-    public event Action<int,int>? CaretMoved;     // row, col (0-based)
+    public event Action<bool>?  DirtyChanged;
+    public event Action<int,int>? CaretMoved;
     public event Action<List<Diagnostic>>? DiagnosticsChanged;
 
     private bool _disposed;
+
+    private int _invalidatePending;
 
     public EditorSurface(DocumentStore store)
     {
@@ -149,7 +151,7 @@ public sealed class EditorSurface : AbsoluteLayout, IDisposable
         _analysisTimer.Start();
     }
 
-    private void OnBlinkTick(object? sender, EventArgs e) { _caretBlink = !_caretBlink; Invalidate(); }
+    private void OnBlinkTick(object? sender, EventArgs e) { _caretBlink = !_caretBlink; _canvas.SyncState(_caretBlink); Invalidate(); }
     private void OnAnalysisTick(object? sender, EventArgs e) => RunAnalysis();
     private void OnFocusTapped(object? sender, TappedEventArgs e) { _keyCapture.Focus(); }
 
@@ -228,18 +230,6 @@ public sealed class EditorSurface : AbsoluteLayout, IDisposable
 
     private void WireKeyboard()
     {
-        _keyCapture.TextChanged += (_, e) =>
-        {
-            var newText = e.NewTextValue ?? "";
-            _keyCapture.Text = "";
-
-            foreach (var ch in newText)
-            {
-                if (ch < 32 || ch == 127) continue;
-                _input.OnChar(ch);
-                _caretBlink = true; _blinkTimer.Stop(); _blinkTimer.Start();
-            }
-        };
     }
 
     public bool HandleKeyDown(string key, bool ctrl, bool shift, bool alt)
@@ -248,6 +238,7 @@ public sealed class EditorSurface : AbsoluteLayout, IDisposable
         if (handled)
         {
             _caretBlink = true;
+            _canvas.SyncState(true);
             _blinkTimer.Stop();
             _blinkTimer.Start();
         }
@@ -281,7 +272,7 @@ public sealed class EditorSurface : AbsoluteLayout, IDisposable
             else           _input.OnPointerPressed(px, py, shift: false);
 
             _keyCapture.Focus();
-            _caretBlink = true; _blinkTimer.Stop(); _blinkTimer.Start();
+            _caretBlink = true; _canvas.SyncState(true); _blinkTimer.Stop(); _blinkTimer.Start();
         };
 
         ptr.PointerMoved += (_, e) =>
@@ -307,21 +298,25 @@ public sealed class EditorSurface : AbsoluteLayout, IDisposable
     
     private void RunAnalysis()
     {
-        _analysisCts?.Cancel();
-        _analysisCts?.Dispose();
+        var oldCts = _analysisCts;
         _analysisCts = new CancellationTokenSource();
         var ct = _analysisCts.Token;
 
+        oldCts?.Cancel();
+        oldCts?.Dispose();
+
         var src = _model.Text;
         var uri = _uri;
+        var cts = _analysisCts;
+
         _ = Task.Run(() =>
         {
             try
             {
-                if (ct.IsCancellationRequested) return;
+                ct.ThrowIfCancellationRequested();
                 _tokenizer.Analyze(uri, src, _store);
 
-                if (ct.IsCancellationRequested) return;
+                ct.ThrowIfCancellationRequested();
                 var analysis = _store.Get(uri);
                 if (analysis is null) return;
 
@@ -337,6 +332,12 @@ public sealed class EditorSurface : AbsoluteLayout, IDisposable
             }
             catch (OperationCanceledException) { }
             catch { /* ignored */ }
+            finally
+            {
+                if (ReferenceEquals(_analysisCts, cts))
+                {
+                }
+            }
         }, ct);
     }
     
@@ -408,7 +409,26 @@ public sealed class EditorSurface : AbsoluteLayout, IDisposable
         AbsoluteLayout.SetLayoutBounds(_hoverView, new Rect(cx, popY, AbsoluteLayout.AutoSize, AbsoluteLayout.AutoSize));
     }
 
-    private void Invalidate() => MainThread.BeginInvokeOnMainThread(() => _canvas.Invalidate());
+    private void Invalidate()
+    {
+        if (System.Threading.Interlocked.CompareExchange(ref _invalidatePending, 1, 0) == 0)
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                System.Threading.Interlocked.Exchange(ref _invalidatePending, 0);
+                if (!_disposed) _canvas.Invalidate();
+            });
+        }
+    }
+
+    public void HandleChar(char ch)
+    {
+        if (_disposed) return;
+        _input.OnChar(ch);
+        _caretBlink = true;
+        _blinkTimer.Stop();
+        _blinkTimer.Start();
+    }
 }
 
 internal sealed class EditorCanvas : GraphicsView, IDrawable

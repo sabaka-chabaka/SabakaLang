@@ -130,47 +130,91 @@ public partial class MainPage : ContentPage
         });
     }
 
-    private void ShowPalette()
-    {
-    }
+    private void ShowPalette() { }
 
     private void WirePlatformKeyboard()
     {
 #if WINDOWS
         var window = Application.Current?.Windows.FirstOrDefault();
-        if (window?.Handler?.PlatformView is Microsoft.UI.Xaml.Window win)
+        if (window?.Handler?.PlatformView is not Microsoft.UI.Xaml.Window win) return;
+
+        win.Content.KeyDown += (s, e) =>
         {
-            win.Content.KeyDown += (s, e) =>
+            var ctrl  = IsKeyDown(Windows.System.VirtualKey.Control);
+            var shift = IsKeyDown(Windows.System.VirtualKey.Shift);
+            var alt   = IsKeyDown(Windows.System.VirtualKey.Menu);
+            var key   = e.Key.ToString();
+
+            if (e.Key == Windows.System.VirtualKey.Shift && !ctrl && !alt)
             {
-                var key   = e.Key.ToString();
-                var ctrl  = Microsoft.UI.Input.InputKeyboardSource
-                    .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control)
-                    .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-                var shift = Microsoft.UI.Input.InputKeyboardSource
-                    .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift)
-                    .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-                var alt   = Microsoft.UI.Input.InputKeyboardSource
-                    .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Menu)
-                    .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+                _shiftCount++;
+                _shiftResetTimer?.Stop();
+                _shiftResetTimer = Dispatcher.CreateTimer();
+                _shiftResetTimer.Interval    = TimeSpan.FromMilliseconds(400);
+                _shiftResetTimer.IsRepeating = false;
+                _shiftResetTimer.Tick        += (_, _) => _shiftCount = 0;
+                _shiftResetTimer.Start();
+                if (_shiftCount >= 2) { _shiftCount = 0; ShowPalette(); return; }
+                return;
+            }
+            _shiftCount = 0;
 
-                if (e.Key == Windows.System.VirtualKey.Shift && !ctrl && !alt)
-                {
-                    _shiftCount++;
-                    _shiftResetTimer?.Stop();
-                    _shiftResetTimer = Dispatcher.CreateTimer();
-                    _shiftResetTimer.Interval    = TimeSpan.FromMilliseconds(400);
-                    _shiftResetTimer.IsRepeating = false;
-                    _shiftResetTimer.Tick        += (_, _) => _shiftCount = 0;
-                    _shiftResetTimer.Start();
-                    if (_shiftCount >= 2) { _shiftCount = 0; ShowPalette(); return; }
-                }
-                else _shiftCount = 0;
-
+            if (ctrl || alt)
+            {
                 e.Handled = _editor.HandleKeyDown(key, ctrl, shift, alt);
-            };
-        }
+                return;
+            }
+
+            var isControl = e.Key is
+                Windows.System.VirtualKey.Back or
+                Windows.System.VirtualKey.Delete or
+                Windows.System.VirtualKey.Enter or
+                Windows.System.VirtualKey.Tab or
+                Windows.System.VirtualKey.Escape or
+                Windows.System.VirtualKey.Left or
+                Windows.System.VirtualKey.Right or
+                Windows.System.VirtualKey.Up or
+                Windows.System.VirtualKey.Down or
+                Windows.System.VirtualKey.Home or
+                Windows.System.VirtualKey.End or
+                Windows.System.VirtualKey.PageUp or
+                Windows.System.VirtualKey.PageDown or
+                Windows.System.VirtualKey.Insert or
+                Windows.System.VirtualKey.F1 or
+                Windows.System.VirtualKey.F2 or
+                Windows.System.VirtualKey.F3 or
+                Windows.System.VirtualKey.F4 or
+                Windows.System.VirtualKey.F5 or
+                Windows.System.VirtualKey.F6 or
+                Windows.System.VirtualKey.F7 or
+                Windows.System.VirtualKey.F8 or
+                Windows.System.VirtualKey.F9 or
+                Windows.System.VirtualKey.F10 or
+                Windows.System.VirtualKey.F11 or
+                Windows.System.VirtualKey.F12;
+
+            if (isControl)
+            {
+                e.Handled = _editor.HandleKeyDown(key, ctrl, shift, alt);
+            }
+        };
+        
+        win.Content.CharacterReceived += (s, e) =>
+        {
+            var ch = e.Character;
+            if (ch < 32 || ch == 127) return;
+            _editor.HandleChar(ch);
+            e.Handled = true;
+        };
 #endif
     }
+
+#if WINDOWS
+    private static bool IsKeyDown(Windows.System.VirtualKey k) =>
+        Microsoft.UI.Input.InputKeyboardSource
+            .GetKeyStateForCurrentThread(k)
+            .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+#endif
 
     private const string DemoCode =
         """
