@@ -57,7 +57,19 @@ public partial class MainWindow : Window
             if (completions.Count == 0)
                 return;
 
-            _completionWindow = new CompletionWindow(editor.TextArea);
+            var caret = editor.TextArea.Caret.Offset;
+            var text = editor.TextArea.Document.Text;
+
+            int start = caret;
+
+            while (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] == '_'))
+                start--;
+
+            _completionWindow = new CompletionWindow(editor.TextArea)
+            {
+                StartOffset = start,
+                EndOffset = caret
+            };
             var data = _completionWindow.CompletionList.CompletionData;
 
             foreach (var c in completions)

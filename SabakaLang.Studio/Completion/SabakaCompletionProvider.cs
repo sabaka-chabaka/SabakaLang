@@ -28,8 +28,9 @@ public sealed class SabakaCompletionData(
 
     public void Complete(TextArea area, ISegment completionSegment, EventArgs args)
     {
-        area.Document.Replace(completionSegment, InsertText);
-        // Place caret inside parens for callables
+        Console.WriteLine($"SEG: {completionSegment.Offset}, {completionSegment.Length}");
+        area.Document.Replace(completionSegment.Offset, completionSegment.Length, InsertText);
+
         if (InsertText.EndsWith("()"))
             area.Caret.Offset -= 1;
     }
