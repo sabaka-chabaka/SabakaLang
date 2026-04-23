@@ -1,6 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
+using AvaloniaEdit.Editing;
 using SabakaLang.LanguageServer;
 using SabakaLang.Studio.Completion;
 using SabakaLang.Studio.Highlighting;
@@ -19,6 +21,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         SetupHighlighting();
         SetupCompletion();
+        Editor.TextArea.TextEntered += OnTextEntered;
     }
 
     private void SetupHighlighting()
@@ -82,5 +85,42 @@ public partial class MainWindow : Window
                 _completionWindow = null;
             };
         };
+    }
+    
+    private void OnTextEntered(object? sender, TextInputEventArgs e)
+    {
+        if (sender is not TextArea area)
+            return;
+
+        var doc = area.Document;
+        var offset = area.Caret.Offset;
+
+        switch (e.Text)
+        {
+            case "(":
+                doc.Insert(offset, ")");
+                area.Caret.Offset = offset;
+                break;
+
+            case "{":
+                doc.Insert(offset, "}");
+                area.Caret.Offset = offset;
+                break;
+
+            case "[":
+                doc.Insert(offset, "]");
+                area.Caret.Offset = offset;
+                break;
+
+            case "\"":
+                doc.Insert(offset, "\"");
+                area.Caret.Offset = offset;
+                break;
+
+            case "'":
+                doc.Insert(offset, "'");
+                area.Caret.Offset = offset;
+                break;
+        }
     }
 }
