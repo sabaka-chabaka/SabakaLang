@@ -46,121 +46,68 @@ public sealed class SabakaHighlightingColorizer : DocumentColorizingTransformer
     protected override void ColorizeLine(DocumentLine line)
     {
         if (_analysis is null) return;
+        if (line.Length == 0) return;
 
-        int lineStartOffset = line.Offset;
-        int lineLength = line.Length;
-        if (lineLength == 0) return;
-
-        int compilerLine = line.LineNumber;
+        var source = _analysis.Source;
 
         foreach (var token in _analysis.Lexer.Tokens)
         {
             if (token.Type == TokenType.Eof) break;
 
-            if (token.Start.Line != compilerLine) continue;
-
             IBrush? brush = ResolveColor(token);
             if (brush is null) continue;
 
-            int startCol = token.Start.Column - 1;
-            int length = token.Value.Length > 0 ? token.Value.Length : 1;
+            int segStart = token.Start.Offset;
+            int segEnd   = token.End.Offset + 1;
 
-            int segStart = lineStartOffset + startCol;
-            int segEnd = segStart + length;
+            int lineStart = line.Offset;
+            int lineEnd   = line.Offset + line.Length;
 
-            segStart = Math.Max(lineStartOffset, Math.Min(segStart, lineStartOffset + lineLength));
-            segEnd   = Math.Max(lineStartOffset, Math.Min(segEnd,   lineStartOffset + lineLength));
-            if (segStart >= segEnd) continue;
+            int clampStart = Math.Max(segStart, lineStart);
+            int clampEnd   = Math.Min(segEnd,   lineEnd);
+            if (clampStart >= clampEnd) continue;
 
             IBrush capturedBrush = brush;
-            ChangeLinePart(segStart, segEnd, element =>
+            ChangeLinePart(clampStart, clampEnd, element =>
             {
                 element.TextRunProperties.SetForegroundBrush(capturedBrush);
             });
         }
     }
 
-    private IBrush? ResolveColor(Token token)
+    private IBrush? ResolveColor(Token token) => token.Type switch
     {
-        switch (token.Type)
-        {
-            case TokenType.Comment:
-                return BrushComment;
+        TokenType.Comment                   => BrushComment,
+        TokenType.StringLiteral             => BrushString,
+        TokenType.InterpolatedStringLiteral => BrushString,
+        TokenType.IntLiteral                => BrushNumber,
+        TokenType.FloatLiteral              => BrushNumber,
 
-            case TokenType.StringLiteral:
-            case TokenType.InterpolatedStringLiteral:
-                return BrushString;
+        TokenType.If          or TokenType.Else       or TokenType.While     or
+        TokenType.For         or TokenType.Foreach    or TokenType.In        or
+        TokenType.Return      or TokenType.Class      or TokenType.Interface or
+        TokenType.StructKeyword or TokenType.Enum    or TokenType.New       or
+        TokenType.Override    or TokenType.Super      or TokenType.Null      or
+        TokenType.Is          or TokenType.Switch     or TokenType.Case      or
+        TokenType.Default     or TokenType.Import     or TokenType.Public    or
+        TokenType.Private     or TokenType.Protected  or TokenType.BoolKeyword or
+        TokenType.IntKeyword  or TokenType.FloatKeyword or TokenType.StringKeyword or
+        TokenType.VoidKeyword or TokenType.True       or TokenType.False     => BrushKeyword,
 
-            case TokenType.IntLiteral:
-            case TokenType.FloatLiteral:
-                return BrushNumber;
+        TokenType.Plus        or TokenType.Minus      or TokenType.Star      or
+        TokenType.Slash       or TokenType.Percent    or TokenType.PlusEqual or
+        TokenType.MinusEqual  or TokenType.StarEqual  or TokenType.PlusPlus  or
+        TokenType.MinusMinus  or TokenType.Equal      or TokenType.EqualEqual or
+        TokenType.NotEqual    or TokenType.Greater    or TokenType.Less      or
+        TokenType.GreaterEqual or TokenType.LessEqual or TokenType.AndAnd    or
+        TokenType.OrOr        or TokenType.Bang       or TokenType.Question  or
+        TokenType.QuestionQuestion or TokenType.Dot   or TokenType.Colon     or
+        TokenType.ColonColon                          => BrushOperator,
 
-            case TokenType.If:
-            case TokenType.Else:
-            case TokenType.While:
-            case TokenType.For:
-            case TokenType.Foreach:
-            case TokenType.In:
-            case TokenType.Return:
-            case TokenType.Class:
-            case TokenType.Interface:
-            case TokenType.StructKeyword:
-            case TokenType.Enum:
-            case TokenType.New:
-            case TokenType.Override:
-            case TokenType.Super:
-            case TokenType.Null:
-            case TokenType.Is:
-            case TokenType.Switch:
-            case TokenType.Case:
-            case TokenType.Default:
-            case TokenType.Import:
-            case TokenType.Public:
-            case TokenType.Private:
-            case TokenType.Protected:
-            case TokenType.BoolKeyword:
-            case TokenType.IntKeyword:
-            case TokenType.FloatKeyword:
-            case TokenType.StringKeyword:
-            case TokenType.VoidKeyword:
-            case TokenType.True:
-            case TokenType.False:
-                return BrushKeyword;
+        TokenType.Identifier => ResolveIdentifierColor(token.Value),
 
-            case TokenType.Plus:
-            case TokenType.Minus:
-            case TokenType.Star:
-            case TokenType.Slash:
-            case TokenType.Percent:
-            case TokenType.PlusEqual:
-            case TokenType.MinusEqual:
-            case TokenType.StarEqual:
-            case TokenType.PlusPlus:
-            case TokenType.MinusMinus:
-            case TokenType.Equal:
-            case TokenType.EqualEqual:
-            case TokenType.NotEqual:
-            case TokenType.Greater:
-            case TokenType.Less:
-            case TokenType.GreaterEqual:
-            case TokenType.LessEqual:
-            case TokenType.AndAnd:
-            case TokenType.OrOr:
-            case TokenType.Bang:
-            case TokenType.Question:
-            case TokenType.QuestionQuestion:
-            case TokenType.Dot:
-            case TokenType.Colon:
-            case TokenType.ColonColon:
-                return BrushOperator;
-
-            case TokenType.Identifier:
-                return ResolveIdentifierColor(token.Value);
-
-            default:
-                return null;
-        }
-    }
+        _ => null
+    };
 
     private IBrush ResolveIdentifierColor(string name)
     {
@@ -170,23 +117,22 @@ public sealed class SabakaHighlightingColorizer : DocumentColorizingTransformer
         if (syms.Count == 0) return BrushVariable;
 
         var sym = syms.First();
-
         if (sym.Kind == SymbolKind.BuiltIn) return BrushBuiltin;
 
         return sym.Kind switch
         {
-            SymbolKind.Class       => BrushClass,
-            SymbolKind.Interface   => BrushInterface,
-            SymbolKind.Struct      => BrushStruct,
-            SymbolKind.Enum        => BrushEnum,
-            SymbolKind.EnumMember  => BrushEnumMember,
-            SymbolKind.Function    => BrushFunction,
-            SymbolKind.Method      => BrushMethod,
-            SymbolKind.Parameter   => BrushParameter,
-            SymbolKind.Field       => BrushProperty,
-            SymbolKind.TypeParam   => BrushParameter,
-            SymbolKind.Module      => BrushNamespace,
-            _                      => BrushVariable,
+            SymbolKind.Class      => BrushClass,
+            SymbolKind.Interface  => BrushInterface,
+            SymbolKind.Struct     => BrushStruct,
+            SymbolKind.Enum       => BrushEnum,
+            SymbolKind.EnumMember => BrushEnumMember,
+            SymbolKind.Function   => BrushFunction,
+            SymbolKind.Method     => BrushMethod,
+            SymbolKind.Parameter  => BrushParameter,
+            SymbolKind.Field      => BrushProperty,
+            SymbolKind.TypeParam  => BrushParameter,
+            SymbolKind.Module     => BrushNamespace,
+            _                     => BrushVariable,
         };
     }
 }
