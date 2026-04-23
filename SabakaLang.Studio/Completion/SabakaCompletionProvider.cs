@@ -21,7 +21,7 @@ public sealed class SabakaCompletionData(
     public string        InsertText { get; } = insertText;
     public CompletionIcon Icon      { get; } = icon;
 
-    public IImage?  Image       => null;
+    public IImage? Image => CompletionIconProvider.GetIcon(Icon);
     public object   Description => Detail;
     public double   Priority    => 0;
     public object   Content     => Text;
