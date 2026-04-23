@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using AvaloniaEdit;
+using AvaloniaEdit.CodeCompletion;
 using SabakaLang.LanguageServer;
 using SabakaLang.Studio.Completion;
 using SabakaLang.Studio.Highlighting;
@@ -11,7 +12,8 @@ public partial class MainWindow : Window
     private readonly DocumentStore _store = new();
     private SabakaHighlightingColorizer? _colorizer;
     private SabakaCompletionProvider? _completionProvider;
-
+    private CompletionWindow? _completionWindow;
+    
     public MainWindow()
     {
         InitializeComponent();
@@ -42,9 +44,31 @@ public partial class MainWindow : Window
 
         _completionProvider = new SabakaCompletionProvider(_store);
 
-        editor.Document.TextChanged += (_, _) =>
+        editor.TextArea.TextEntered += (sender, e) =>
         {
-            _completionProvider.GetCompletions(editor.Text, editor.CaretOffset);
+            if (string.IsNullOrWhiteSpace(e.Text))
+                return;
+
+            var completions = _completionProvider.GetCompletions(
+                editor.Text,
+                editor.CaretOffset
+            );
+
+            if (completions.Count == 0)
+                return;
+
+            _completionWindow = new CompletionWindow(editor.TextArea);
+            var data = _completionWindow.CompletionList.CompletionData;
+
+            foreach (var c in completions)
+                data.Add(c);
+
+            _completionWindow.Show();
+
+            _completionWindow.Closed += (_, _) =>
+            {
+                _completionWindow = null;
+            };
         };
     }
 }
