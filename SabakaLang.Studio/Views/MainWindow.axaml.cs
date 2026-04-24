@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -9,6 +10,7 @@ using SabakaLang.Compiler;
 using SabakaLang.LanguageServer;
 using SabakaLang.Runtime;
 using SabakaLang.Studio.Completion;
+using SabakaLang.Studio.Helpers;
 using SabakaLang.Studio.Highlighting;
 
 namespace SabakaLang.Studio.Views;
@@ -128,7 +130,7 @@ public partial class MainWindow : Window
         }
     }
 
-    public void Run_OnClick(object? sender, RoutedEventArgs routedEventArgs)
+    public async void Run_OnClick(object? sender, RoutedEventArgs routedEventArgs)
     {
         var lex = new Lexer(Editor.Text).Tokenize();
         var parser = new Parser(lex).Parse();
@@ -136,7 +138,13 @@ public partial class MainWindow : Window
         var comp = new Compiler.Compiler();
         var result = comp.Compile(parser.Statements, bind);
         
+        ConsoleHelper.Show();
+        
         var vm = new VirtualMachine();
         vm.Execute(result.Code.ToList());
+
+        await Task.Delay(10000);
+        
+        ConsoleHelper.Hide();
     }
 }
