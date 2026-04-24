@@ -1,9 +1,13 @@
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
 using AvaloniaEdit.Editing;
+using SabakaLang.Compiler;
 using SabakaLang.LanguageServer;
+using SabakaLang.Runtime;
 using SabakaLang.Studio.Completion;
 using SabakaLang.Studio.Highlighting;
 
@@ -122,5 +126,17 @@ public partial class MainWindow : Window
                 area.Caret.Offset = offset;
                 break;
         }
+    }
+
+    public void Run_OnClick(object? sender, RoutedEventArgs routedEventArgs)
+    {
+        var lex = new Lexer(Editor.Text).Tokenize();
+        var parser = new Parser(lex).Parse();
+        var bind = new Binder().Bind(parser.Statements);
+        var comp = new Compiler.Compiler();
+        var result = comp.Compile(parser.Statements, bind);
+        
+        var vm = new VirtualMachine();
+        vm.Execute(result.Code.ToList());
     }
 }

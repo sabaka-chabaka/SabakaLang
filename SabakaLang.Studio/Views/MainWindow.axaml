@@ -14,20 +14,27 @@
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
+    
+    <DockPanel>
+        <Button Name="Run" 
+                Content="Run" 
+                Click="Run_OnClick" 
+                DockPanel.Dock="Top"
+                Margin="5"/>
 
-    <avaloniaEdit:TextEditor Name="Editor"
-                             ShowLineNumbers="True"
-                             FontFamily="{StaticResource JbFont}"
-                             FontSize="14"
-                             Background="#1E1E1E"
-                             Foreground="#D4D4D4"
-                             HorizontalAlignment="Stretch"
-                             VerticalAlignment="Stretch"
-                             HorizontalScrollBarVisibility="Auto"
-                             VerticalScrollBarVisibility="Auto">
-        <avaloniaEdit:TextEditor.Text>
-            print("hello world");
-        </avaloniaEdit:TextEditor.Text>
-    </avaloniaEdit:TextEditor>
+        <avaloniaEdit:TextEditor Name="Editor"
+                                 ShowLineNumbers="True"
+                                 FontFamily="{StaticResource JbFont}"
+                                 FontSize="14"
+                                 Background="#1E1E1E"
+                                 Foreground="#D4D4D4"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 VerticalScrollBarVisibility="Auto">
+            <avaloniaEdit:TextEditor.Text>
+                print("hello world");
+            </avaloniaEdit:TextEditor.Text>
+        </avaloniaEdit:TextEditor>
+    </DockPanel>
+
 
 </Window>
