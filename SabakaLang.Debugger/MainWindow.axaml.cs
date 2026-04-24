@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using SabakaLang.Compiler;
+using SabakaLang.Runtime;
 
 namespace SabakaLang.Debugger;
 
@@ -55,11 +56,15 @@ public partial class MainWindow : Window
 
     private void StepButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (_bytecode == null || _ip >= _bytecode.Count) return;
+        if (_bytecode == null || _ip >= _bytecode.Count)
+            return;
 
-        var current = _bytecode[_ip];
+        var vm = new VirtualMachine();
 
-        ConsoleOutput.Text += $"[{_ip}] Executed: {current}\n";
+        vm.Execute(_bytecode.Take(_ip + 1).ToList());
+
+        ConsoleOutput.Text += $"[{_ip}] {_bytecode[_ip]}\n";
+
         _ip++;
         UpdateCodeDisplay();
     }
