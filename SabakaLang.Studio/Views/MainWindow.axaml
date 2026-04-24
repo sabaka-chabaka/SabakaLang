@@ -23,6 +23,10 @@
                 Margin="5"
                 HorizontalAlignment="Right"/>
 
+        <ContentControl Name="DiagnosticsPanelHost" 
+                        DockPanel.Dock="Bottom" 
+                        Height="150" /> 
+
         <avaloniaEdit:TextEditor Name="Editor"
                                  ShowLineNumbers="True"
                                  FontFamily="{StaticResource JbFont}"
@@ -35,8 +39,6 @@
                 print("hello world");
             </avaloniaEdit:TextEditor.Text>
         </avaloniaEdit:TextEditor>
-        
-        <ContentControl Name="DiagnosticsPanelHost" />
     </DockPanel>
     
 </Window>
