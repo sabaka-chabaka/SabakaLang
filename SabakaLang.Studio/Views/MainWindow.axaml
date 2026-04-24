@@ -15,12 +15,13 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
     
-    <DockPanel>
+    <DockPanel Background="#2E2E2E">
         <Button Name="Run" 
                 Content="Run" 
                 Click="Run_OnClick" 
                 DockPanel.Dock="Top"
-                Margin="5"/>
+                Margin="5"
+                HorizontalAlignment="Right"/>
 
         <avaloniaEdit:TextEditor Name="Editor"
                                  ShowLineNumbers="True"
