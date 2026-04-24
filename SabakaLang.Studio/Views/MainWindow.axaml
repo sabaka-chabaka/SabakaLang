@@ -35,7 +35,8 @@
                 print("hello world");
             </avaloniaEdit:TextEditor.Text>
         </avaloniaEdit:TextEditor>
+        
+        <ContentControl Name="DiagnosticsPanelHost" />
     </DockPanel>
-
-
+    
 </Window>

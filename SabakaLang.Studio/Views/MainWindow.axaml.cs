@@ -10,6 +10,7 @@ using SabakaLang.Compiler;
 using SabakaLang.LanguageServer;
 using SabakaLang.Runtime;
 using SabakaLang.Studio.Completion;
+using SabakaLang.Studio.Diagnostics;
 using SabakaLang.Studio.Helpers;
 using SabakaLang.Studio.Highlighting;
 
@@ -18,6 +19,8 @@ namespace SabakaLang.Studio.Views;
 public partial class MainWindow : Window
 {
     private readonly DocumentStore _store = new();
+    private DiagnosticsRenderer?         _diagRenderer;
+    private DiagnosticsPanel?            _diagPanel;
     private SabakaHighlightingColorizer? _colorizer;
     private SabakaCompletionProvider? _completionProvider;
     private CompletionWindow? _completionWindow;
@@ -26,8 +29,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetupHighlighting();
+        SetupDiagnostics(Editor);
         SetupCompletion();
         Editor.TextArea.TextEntered += OnTextEntered;
+        Editor.TextArea.TextEntered += (_, _) => Refresh(Editor.Text, Editor);
+        Refresh(Editor.Text, Editor);
     }
 
     private void SetupHighlighting()
@@ -146,5 +152,28 @@ public partial class MainWindow : Window
         await Task.Delay(10000);
         
         ConsoleHelper.Hide();
+    }
+    
+    private void SetupDiagnostics(TextEditor editor)
+    {
+        _diagRenderer = new DiagnosticsRenderer(editor.TextArea.TextView);
+        editor.TextArea.TextView.BackgroundRenderers.Add(_diagRenderer);
+ 
+        _diagPanel = new DiagnosticsPanel(editor);
+        var host = this.FindControl<ContentControl>("DiagnosticsPanelHost")!;
+        host.Content = _diagPanel.Root;
+    }
+    
+    private void Refresh(string source, TextEditor editor)
+    {
+        var analysis = _store.Get("studio://active-document");
+        if (analysis is not null)
+        {
+            _diagRenderer?.Update(analysis.Diagnostics);
+            _diagPanel?.Update(analysis.Diagnostics);
+        }
+ 
+        editor.TextArea.TextView.InvalidateLayer(
+            AvaloniaEdit.Rendering.KnownLayer.Background);
     }
 }
