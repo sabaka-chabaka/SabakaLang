@@ -17,4 +17,9 @@
             <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
         </PackageReference>
     </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\SabakaLang.Compiler\SabakaLang.Compiler.csproj" />
+      <ProjectReference Include="..\SabakaLang.Runtime\SabakaLang.Runtime.csproj" />
+    </ItemGroup>
 </Project>
