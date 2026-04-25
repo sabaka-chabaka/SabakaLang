@@ -28,12 +28,20 @@ public sealed class SabakaCompletionData(
 
     public void Complete(TextArea area, ISegment completionSegment, EventArgs args)
     {
-        Console.WriteLine($"SEG: {completionSegment.Offset}, {completionSegment.Length}");
-        area.Document.Replace(completionSegment.Offset, completionSegment.Length, InsertText);
-
+        var doc    = area.Document;
+        int caret  = area.Caret.Offset;
+ 
+        int wordStart = caret;
+        while (wordStart > 0 && IsIdentChar(doc.GetCharAt(wordStart - 1)))
+            wordStart--;
+ 
+        doc.Replace(wordStart, caret - wordStart, InsertText);
+ 
         if (InsertText.EndsWith("()"))
-            area.Caret.Offset -= 1;
+            area.Caret.Offset = wordStart + InsertText.Length - 1;
     }
+ 
+    private static bool IsIdentChar(char c) => char.IsLetterOrDigit(c) || c == '_';
 }
 
 public enum CompletionIcon
