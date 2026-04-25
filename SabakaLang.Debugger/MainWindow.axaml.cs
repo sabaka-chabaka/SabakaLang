@@ -19,6 +19,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         StepButton.Click += StepButton_OnClick;
+        if (Program.InitPath != null!)
+        {
+            PathBlock.Text = Program.InitPath;
+        }
     }
 
     private async void DebugButton_OnClick(object? sender, RoutedEventArgs e)
