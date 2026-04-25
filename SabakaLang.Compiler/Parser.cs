@@ -98,7 +98,9 @@ public sealed class Parser
         var stmts = new List<IStmt>();
         while (!IsAtEnd())
         {
+            int posBeforeTop = _pos;
             var stmt = ParseTopLevel();
+            if (!IsAtEnd() && _pos == posBeforeTop) Advance();
             if (stmt is not null) stmts.Add(stmt);
         }
         return new ParseResult(stmts, _errors);
@@ -201,7 +203,12 @@ public sealed class Parser
     {
         Expect(TokenType.LBrace);
         var stmts = new List<IStmt>();
-        while (!Check(TokenType.RBrace) && !IsAtEnd()) stmts.Add(ParseStatement());
+        while (!Check(TokenType.RBrace) && !IsAtEnd())
+        {
+            int posBeforeBlock = _pos;
+            stmts.Add(ParseStatement());
+            if (_pos == posBeforeBlock) Advance();
+        }
         Expect(TokenType.RBrace);
         return stmts;
     }
@@ -425,11 +432,10 @@ public sealed class Parser
         var methods = new List<FuncDecl>();
         while (!Check(TokenType.RBrace) && !IsAtEnd())
         {
+            int posBeforeClass = _pos;
             if (IsFuncDecl()) methods.Add(ParseFuncDecl());
-            else
-            {
-                fields.Add(ParseVarDecl());
-            }
+            else              fields.Add(ParseVarDecl());
+            if (_pos == posBeforeClass) Advance();
         }
         Expect(TokenType.RBrace);
         return new ClassDecl(name, typeParams, baseClass, interfaces, fields, methods, SpanFrom(start));
@@ -452,6 +458,7 @@ public sealed class Parser
         var methods = new List<FuncDecl>();
         while (!Check(TokenType.RBrace) && !IsAtEnd())
         {
+            int posBeforeIface = _pos;
             var mStart = Current.Start;
             var retType = ParseTypeRef();
             var mName = Expect(TokenType.Identifier).Value;
@@ -460,6 +467,7 @@ public sealed class Parser
             Expect(TokenType.RParen);
             Expect(TokenType.Semicolon);
             methods.Add(new FuncDecl(retType, mName, [], parms, [], AccessMod.Public, false, SpanFrom(mStart)));
+            if (_pos == posBeforeIface) Advance();
         }
         Expect(TokenType.RBrace);
         return new InterfaceDecl(name, typeParams, parents, methods, SpanFrom(start));
@@ -473,7 +481,11 @@ public sealed class Parser
         Expect(TokenType.LBrace);
         var fields = new List<VarDecl>();
         while (!Check(TokenType.RBrace) && !IsAtEnd())
+        {
+            int posBeforeStruct = _pos;
             fields.Add(ParseVarDecl());
+            if (_pos == posBeforeStruct) Advance();
+        }
         Expect(TokenType.RBrace);
         return new StructDecl(name, fields, SpanFrom(start));
     }
