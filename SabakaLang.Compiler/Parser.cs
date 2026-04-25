@@ -153,6 +153,9 @@ public sealed class Parser
                 case TokenType.While:
                 case TokenType.For:
                 case TokenType.Return:
+                case TokenType.Case:
+                case TokenType.Default:
+                case TokenType.RBrace:
                     return;
             }
             Advance();
@@ -367,6 +370,7 @@ public sealed class Parser
         var cases = new List<SwitchCase>();
         while (!Check(TokenType.RBrace) && !IsAtEnd())
         {
+            int posBeforeSwitch = _pos;
             if (Check(TokenType.Case))
             {
                 Advance();
@@ -385,6 +389,7 @@ public sealed class Parser
                 AddError($"Expected 'case' or 'default', got {Current.Type}", Current.Start);
                 Synchronize();
             }
+            if (_pos == posBeforeSwitch) Advance();
         }
         Expect(TokenType.RBrace);
         return new SwitchStmt(val, cases, SpanFrom(start));
