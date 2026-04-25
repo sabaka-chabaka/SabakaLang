@@ -21,5 +21,6 @@
     <ItemGroup>
       <ProjectReference Include="..\SabakaLang.Compiler\SabakaLang.Compiler.csproj" />
       <ProjectReference Include="..\SabakaLang.Runtime\SabakaLang.Runtime.csproj" />
+      <ProjectReference Include="..\SabakaLang.Studio\SabakaLang.Studio.csproj" />
     </ItemGroup>
 </Project>

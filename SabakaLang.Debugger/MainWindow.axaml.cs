@@ -7,6 +7,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using SabakaLang.Compiler;
 using SabakaLang.Runtime;
+using SabakaLang.Studio.Helpers;
 
 namespace SabakaLang.Debugger;
 
@@ -51,6 +52,8 @@ public partial class MainWindow : Window
             _ip = 0;
             ConsoleOutput.Text = "Compilation successful. Ready to debug.\n";
             UpdateCodeDisplay();
+            
+            ConsoleHelper.Show();
         }
         catch (Exception ex)
         {
