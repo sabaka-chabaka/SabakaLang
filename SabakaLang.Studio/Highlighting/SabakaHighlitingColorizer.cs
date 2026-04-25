@@ -5,6 +5,7 @@ using AvaloniaEdit.Document;
 using AvaloniaEdit.Rendering;
 using SabakaLang.Compiler;
 using SabakaLang.LanguageServer;
+using SabakaLang.LanguageServer.Services;
 
 namespace SabakaLang.Studio.Highlighting;
 
@@ -48,30 +49,38 @@ public sealed class SabakaHighlightingColorizer : DocumentColorizingTransformer
         if (_analysis is null) return;
         if (line.Length == 0) return;
 
-        var source = _analysis.Source;
+        int lineStart = line.Offset;
+        int lineEnd   = line.Offset + line.Length;
 
-        foreach (var token in _analysis.Lexer.Tokens)
+        try
         {
-            if (token.Type == TokenType.Eof) break;
-
-            IBrush? brush = ResolveColor(token);
-            if (brush is null) continue;
-
-            int segStart = token.Start.Offset;
-            int segEnd   = token.End.Offset + 1;
-
-            int lineStart = line.Offset;
-            int lineEnd   = line.Offset + line.Length;
-
-            int clampStart = Math.Max(segStart, lineStart);
-            int clampEnd   = Math.Min(segEnd,   lineEnd);
-            if (clampStart >= clampEnd) continue;
-
-            IBrush capturedBrush = brush;
-            ChangeLinePart(clampStart, clampEnd, element =>
+            foreach (var token in _analysis.Lexer.Tokens)
             {
-                element.TextRunProperties.SetForegroundBrush(capturedBrush);
-            });
+                if (token.Type == TokenType.Eof) break;
+
+                if (token.End.Offset < lineStart) continue;
+                if (token.Start.Offset > lineEnd) break;
+
+                IBrush? brush = ResolveColor(token);
+                if (brush is null) continue;
+
+                int segStart = token.Start.Offset;
+                int segEnd   = token.End.Offset + 1;
+
+                int clampStart = Math.Max(segStart, lineStart);
+                int clampEnd   = Math.Min(segEnd,   lineEnd);
+                if (clampStart >= clampEnd) continue;
+
+                IBrush capturedBrush = brush;
+                ChangeLinePart(clampStart, clampEnd, element =>
+                {
+                    element.TextRunProperties.SetForegroundBrush(capturedBrush);
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Colorizer] {ex.Message}");
         }
     }
 

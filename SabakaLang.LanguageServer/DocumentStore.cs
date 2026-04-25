@@ -71,9 +71,18 @@ public sealed class DocumentStore
 
     public DocumentAnalysis Analyze(string uri, string source)
     {
-        var lexer = new Lexer(source).Tokenize();
-        var parse = new Parser(lexer).Parse();
-        var bind = new Binder().Bind(parse.Statements);
+        LexerResult lexer;
+        ParseResult parse;
+        BindResult  bind;
+
+        try { lexer = new Lexer(source).Tokenize(); }
+        catch { lexer = new LexerResult([], []); }
+
+        try { parse = new Parser(lexer).Parse(); }
+        catch { parse = new ParseResult([], []); }
+
+        try { bind = new Binder().Bind(parse.Statements); }
+        catch { bind = new BindResult(new SymbolTable(), []); }
 
         var analysis = new DocumentAnalysis(uri, source, lexer, parse, bind);
 
