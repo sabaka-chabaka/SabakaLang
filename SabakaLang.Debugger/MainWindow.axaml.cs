@@ -56,7 +56,7 @@ public partial class MainWindow : Window
 
     private void StepButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (_bytecode == null || _ip >= _bytecode.Count)
+        if (_ip >= _bytecode.Count)
             return;
 
         var vm = new VirtualMachine();
