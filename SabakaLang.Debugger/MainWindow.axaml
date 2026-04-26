@@ -6,7 +6,7 @@
     
     <DockPanel Margin="10">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
-            <Button Content="Debug" Name="DebugButton" Click="DebugButton_OnClick" 
+            <Button Content="Debug" Name="DebugButton"
                     Background="MediumSeaGreen" Foreground="White"/>
               <Button Content="Step (F10)" Name="StepButton"/>
             <Separator Opacity="0"/>

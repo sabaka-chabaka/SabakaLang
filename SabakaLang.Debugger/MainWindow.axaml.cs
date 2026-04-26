@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
@@ -24,9 +25,10 @@ public partial class MainWindow : Window
         {
             PathBlock.Text = Program.InitPath;
         }
+        DebugButton.Click += (o, args) => _ = DebugButton_OnClickAsync();
     }
 
-    private async void DebugButton_OnClick(object? sender, RoutedEventArgs e)
+    private async Task DebugButton_OnClickAsync()
     {
         if (string.IsNullOrEmpty(PathBlock.Text))
         {
