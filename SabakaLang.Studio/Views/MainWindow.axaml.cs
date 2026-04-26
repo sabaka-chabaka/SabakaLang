@@ -66,9 +66,9 @@ public partial class MainWindow : Window
         _editor.TextArea.TextEntered += OnTextEntered;
         _editor.Document.TextChanged += (_, _) => ScheduleAnalysis(_editor.Text);
 
-        KeyDown += (_, e) =>
+        KeyDown += (o, keyEventArgs) =>
         {
-            if (e.Key == Key.F5) { _ = RunCodeAsync(); e.Handled = true; }
+            if (keyEventArgs.Key == Key.F5) { _ = RunCodeAsync(); keyEventArgs.Handled = true; }
         };
 
         ScheduleAnalysis(_editor.Text);
