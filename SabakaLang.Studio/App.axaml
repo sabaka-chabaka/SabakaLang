@@ -14,7 +14,7 @@
   
     <Application.Styles>
         <FluentTheme />
-        
         <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
+        <StyleInclude Source="avares://SabakaLang.Studio/Theme.axaml" />
     </Application.Styles>
 </Application>

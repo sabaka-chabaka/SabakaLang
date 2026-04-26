@@ -27,11 +27,16 @@ public partial class MainWindow : Window
     private DiagnosticsRenderer?         _diagRenderer;
     private DiagnosticsPanel?            _diagPanel;
     private SabakaCompletionProvider?    _completionProvider;
-
-    private CompletionWindow? _completionWindow;
+    private CompletionWindow?            _completionWindow;
 
     private readonly DispatcherTimer _debounce;
     private string _pendingSource = "";
+
+    private TextEditor? _editor;
+    private TextBlock?  _statusPosition;
+    private TextBlock?  _statusErrors;
+    private TextBlock?  _statusWarnings;
+    private TextBlock?  _statusMessage;
 
     public MainWindow()
     {
@@ -39,27 +44,41 @@ public partial class MainWindow : Window
 
         _debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
         _debounce.Tick += (_, _) => { _debounce.Stop(); RunAnalysis(_pendingSource); };
+    }
 
-        var editor = this.FindControl<TextEditor>("Editor")!;
+    protected override void OnLoaded(RoutedEventArgs e)
+    {
+        base.OnLoaded(e);
 
-        SetupHighlighting(editor);
-        SetupDiagnostics(editor);
-        SetupCompletion(editor);
+        _editor         = this.FindControl<TextEditor>("Editor")!;
+        _statusPosition = this.FindControl<TextBlock>("StatusPosition");
+        _statusErrors   = this.FindControl<TextBlock>("StatusErrors");
+        _statusWarnings = this.FindControl<TextBlock>("StatusWarnings");
+        _statusMessage  = this.FindControl<TextBlock>("StatusMessage");
 
-        editor.Document.TextChanged += (_, _) =>
+        SetupHighlighting(_editor);
+        SetupDiagnostics(_editor);
+        SetupCompletion(_editor);
+        SetupCaretTracking(_editor);
+
+        this.FindControl<Button>("BtnRun")!.Click += (_, _) => _ = RunCodeAsync();
+
+        _editor.TextArea.TextEntered += OnTextEntered;
+        _editor.Document.TextChanged += (_, _) => ScheduleAnalysis(_editor.Text);
+
+        KeyDown += (_, e) =>
         {
-            _colorizer?.UpdateSource(editor.Text);
+            if (e.Key == Key.F5) { _ = RunCodeAsync(); e.Handled = true; }
         };
-        
-        editor.TextArea.TextEntered += OnTextEntered;
-        
-        Run.Click += (o, args) => _ = Run_OnClickAsync();
+
+        ScheduleAnalysis(_editor.Text);
     }
 
     private void SetupHighlighting(TextEditor editor)
     {
         _colorizer = new SabakaHighlightingColorizer(_store);
         editor.TextArea.TextView.LineTransformers.Add(_colorizer);
+        editor.Options.HighlightCurrentLine = true;
     }
 
     private void SetupDiagnostics(TextEditor editor)
@@ -68,8 +87,7 @@ public partial class MainWindow : Window
         editor.TextArea.TextView.BackgroundRenderers.Add(_diagRenderer);
 
         _diagPanel = new DiagnosticsPanel(editor);
-        var host = this.FindControl<ContentControl>("DiagnosticsPanelHost")!;
-        host.Content = _diagPanel.Root;
+        this.FindControl<ContentControl>("DiagnosticsPanelHost")!.Content = _diagPanel.Root;
     }
 
     private void SetupCompletion(TextEditor editor)
@@ -80,9 +98,7 @@ public partial class MainWindow : Window
         {
             if (e.Text is not { Length: > 0 }) return;
             char ch = e.Text[0];
-
             ScheduleAnalysis(editor.Text);
-
             if (char.IsLetter(ch) || ch == '_' || ch == '.' || ch == ':')
                 TryShowCompletion(editor);
         };
@@ -91,7 +107,6 @@ public partial class MainWindow : Window
         {
             if (_completionWindow is null) return;
             if (e.Text is not { Length: > 0 }) return;
-
             char ch = e.Text[0];
             if (!char.IsLetterOrDigit(ch) && ch != '_')
                 _completionWindow.CompletionList.RequestInsertion(e);
@@ -101,26 +116,72 @@ public partial class MainWindow : Window
     private void TryShowCompletion(TextEditor editor)
     {
         if (_completionWindow is not null) return;
-
         List<SabakaCompletionData> items;
-        try
-        {
-            items = _completionProvider!.GetCompletions(editor.Text, editor.CaretOffset).ToList();
-        }
-        catch
-        {
-            return;
-        }
-
+        try { items = _completionProvider!.GetCompletions(editor.Text, editor.CaretOffset).ToList(); }
+        catch { return; }
         if (items.Count == 0) return;
 
         _completionWindow = new CompletionWindow(editor.TextArea);
-        var list = _completionWindow.CompletionList.CompletionData;
         foreach (var item in items)
-            list.Add(item);
-
+            _completionWindow.CompletionList.CompletionData.Add(item);
         _completionWindow.Closed += (_, _) => _completionWindow = null;
         _completionWindow.Show();
+    }
+
+    private void OnTextEntered(object? sender, TextInputEventArgs e)
+    {
+        if (sender is not TextArea area) return;
+        var doc    = area.Document;
+        var offset = area.Caret.Offset;
+
+        string? closing = e.Text switch
+        {
+            "("  => ")",
+            "{"  => "}",
+            "["  => "]",
+            "\"" => "\"",
+            "'"  => "'",
+            _    => null
+        };
+
+        if (closing is null) return;
+        doc.Insert(offset, closing);
+        area.Caret.Offset = offset;
+    }
+
+    private async Task RunCodeAsync()
+    {
+        SetStatus("Running...");
+        try
+        {
+            var lex    = new Lexer(_editor!.Text).Tokenize();
+            var parse  = new Parser(lex).Parse();
+            var bind   = new Binder().Bind(parse.Statements);
+            var comp   = new Compiler.Compiler();
+            var result = comp.Compile(parse.Statements, bind);
+
+            ConsoleHelper.Show();
+            var vm = new VirtualMachine();
+            vm.Execute(result.Code.ToList());
+
+            await Task.Delay(10000);
+            ConsoleHelper.Hide();
+            SetStatus("Ready");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Runtime error: {ex.Message}");
+        }
+    }
+
+    private void SetupCaretTracking(TextEditor editor)
+    {
+        editor.TextArea.Caret.PositionChanged += (_, _) =>
+        {
+            if (_statusPosition is null) return;
+            var pos = editor.TextArea.Caret.Position;
+            _statusPosition.Text = $"Ln {pos.Line}, Col {pos.Column}";
+        };
     }
 
     private void ScheduleAnalysis(string source)
@@ -143,80 +204,24 @@ public partial class MainWindow : Window
             System.Diagnostics.Debug.WriteLine($"[SabakaLang] Analysis error: {ex}");
         }
 
-        var editor = this.FindControl<TextEditor>("Editor");
-        if (editor is null) return;
+        if (_editor is null) return;
 
-        var diags = analysis?.Diagnostics ?? [];
+        var diags    = analysis?.Diagnostics ?? [];
+        var errors   = diags.Count(d => d.Severity == DiagnosticSeverity.Error);
+        var warnings = diags.Count(d => d.Severity == DiagnosticSeverity.Warning);
+
         _diagRenderer?.Update(diags);
         _diagPanel?.Update(diags);
 
-        editor.TextArea.TextView.InvalidateLayer(
-            AvaloniaEdit.Rendering.KnownLayer.Background);
+        if (_statusErrors   is not null) _statusErrors.Text   = $"⛔ {errors}";
+        if (_statusWarnings is not null) _statusWarnings.Text = $"⚠ {warnings}";
+        SetStatus(errors == 0 && warnings == 0 ? "Ready" : $"{errors} error(s), {warnings} warning(s)");
+
+        _editor.TextArea.TextView.InvalidateLayer(AvaloniaEdit.Rendering.KnownLayer.Background);
     }
 
-    protected override void OnLoaded(RoutedEventArgs e)
+    private void SetStatus(string msg)
     {
-        base.OnLoaded(e);
-        var editor = this.FindControl<TextEditor>("Editor")!;
-
-        editor.Document.TextChanged += (_, _) => ScheduleAnalysis(editor.Text);
-
-        ScheduleAnalysis(editor.Text);
-    }
-    
-    
-    private void OnTextEntered(object? sender, TextInputEventArgs e)
-    {
-        if (sender is not TextArea area)
-            return;
-
-        var doc = area.Document;
-        var offset = area.Caret.Offset;
-
-        switch (e.Text)
-        {
-            case "(":
-                doc.Insert(offset, ")");
-                area.Caret.Offset = offset;
-                break;
-
-            case "{":
-                doc.Insert(offset, "}");
-                area.Caret.Offset = offset;
-                break;
-
-            case "[":
-                doc.Insert(offset, "]");
-                area.Caret.Offset = offset;
-                break;
-
-            case "\"":
-                doc.Insert(offset, "\"");
-                area.Caret.Offset = offset;
-                break;
-
-            case "'":
-                doc.Insert(offset, "'");
-                area.Caret.Offset = offset;
-                break;
-        }
-    }
-
-    private async Task Run_OnClickAsync()
-    {
-        var lex = new Lexer(Editor.Text).Tokenize();
-        var parser = new Parser(lex).Parse();
-        var bind = new Binder().Bind(parser.Statements);
-        var comp = new Compiler.Compiler();
-        var result = comp.Compile(parser.Statements, bind);
-
-        ConsoleHelper.Show();
-
-        var vm = new VirtualMachine();
-        vm.Execute(result.Code.ToList());
-
-        await Task.Delay(10000);
-
-        ConsoleHelper.Hide();
+        if (_statusMessage is not null) _statusMessage.Text = msg;
     }
 }

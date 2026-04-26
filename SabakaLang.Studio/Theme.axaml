@@ -1,0 +1,144 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style Selector="Window">
+        <Setter Property="Background" Value="#1E1F22"/>
+        <Setter Property="FontFamily" Value="JetBrains Mono,Cascadia Code,Consolas,monospace"/>
+    </Style>
+
+    <Style Selector="Border.Toolbar">
+        <Setter Property="Background" Value="#2B2D30"/>
+        <Setter Property="BorderBrush" Value="#1A1A1A"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+    </Style>
+
+    <Style Selector="Button.ToolbarBtn">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="#A8AAAE"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="8,4"/>
+        <Setter Property="Margin" Value="1,2"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.ToolbarBtn:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#3C3F41"/>
+    </Style>
+    <Style Selector="Button.ToolbarBtn:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="#4C5052"/>
+    </Style>
+
+    <Style Selector="Button.RunBtn">
+        <Setter Property="Background" Value="#3C7A34"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="12,5"/>
+        <Setter Property="Margin" Value="2"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.RunBtn:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#4A9A40"/>
+    </Style>
+
+    <Style Selector="Border.Sidebar">
+        <Setter Property="Background" Value="#252628"/>
+        <Setter Property="BorderBrush" Value="#1A1A1A"/>
+        <Setter Property="BorderThickness" Value="0,0,1,0"/>
+    </Style>
+
+    <Style Selector="TextBlock.SidebarHeader">
+        <Setter Property="Foreground" Value="#6E7073"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Margin" Value="8,8,8,4"/>
+        <Setter Property="LetterSpacing" Value="1.5"/>
+    </Style>
+
+    <Style Selector="Border.FileItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="CornerRadius" Value="3"/>
+        <Setter Property="Margin" Value="4,1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.FileItem:pointerover">
+        <Setter Property="Background" Value="#2E3033"/>
+    </Style>
+    <Style Selector="Border.FileItem.Active">
+        <Setter Property="Background" Value="#2D3549"/>
+    </Style>
+
+    <Style Selector="TextBlock.FileName">
+        <Setter Property="Foreground" Value="#BCBEC4"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontFamily" Value="JetBrains Mono,Cascadia Code,Consolas,monospace"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Border.TabBar">
+        <Setter Property="Background" Value="#2B2D30"/>
+        <Setter Property="BorderBrush" Value="#1A1A1A"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="Height" Value="32"/>
+    </Style>
+
+    <Style Selector="Border.EditorTab">
+        <Setter Property="Background" Value="#1E1F22"/>
+        <Setter Property="Padding" Value="12,0"/>
+        <Setter Property="BorderBrush" Value="#1A1A1A"/>
+        <Setter Property="BorderThickness" Value="0,2,1,0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.EditorTab.Active">
+        <Setter Property="BorderBrush" Value="#808080"/>
+        <Setter Property="Background" Value="#1E1F22"/>
+        <Setter Property="BorderThickness" Value="0,1,1,0"/>
+    </Style>
+
+    <Style Selector="TextBlock.TabLabel">
+        <Setter Property="Foreground" Value="#6E7073"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontFamily" Value="JetBrains Mono,Cascadia Code,Consolas,monospace"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="TextBlock.TabLabel.Active">
+        <Setter Property="Foreground" Value="#BCBEC4"/>
+    </Style>
+
+    <Style Selector="Border.StatusBar">
+        <Setter Property="Background" Value="#2B2D30"/>
+        <Setter Property="BorderBrush" Value="#1A1A1A"/>
+        <Setter Property="Height" Value="22"/>
+    </Style>
+
+    <Style Selector="TextBlock.StatusText">
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontFamily" Value="JetBrains Mono,Cascadia Code,Consolas,monospace"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="8,0"/>
+    </Style>
+
+    <Style Selector="Border.ProblemsBar">
+        <Setter Property="Background" Value="#2B2D30"/>
+        <Setter Property="BorderBrush" Value="#1A1A1A"/>
+        <Setter Property="BorderThickness" Value="0,1,0,0"/>
+    </Style>
+
+    <Style Selector="GridSplitter">
+        <Setter Property="Background" Value="#1A1A1A"/>
+        <Setter Property="Width" Value="1"/>
+    </Style>
+
+    <Style Selector="ScrollBar">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ScrollBar /template/ Thumb">
+        <Setter Property="Background" Value="#4A4D51"/>
+        <Setter Property="CornerRadius" Value="2"/>
+    </Style>
+
+</Styles>
