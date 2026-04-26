@@ -17,8 +17,7 @@
     
     <DockPanel Background="#2E2E2E">
         <Button Name="Run" 
-                Content="Run" 
-                Click="Run_OnClick" 
+                Content="Run"
                 DockPanel.Dock="Top"
                 Margin="5"
                 HorizontalAlignment="Right"/>

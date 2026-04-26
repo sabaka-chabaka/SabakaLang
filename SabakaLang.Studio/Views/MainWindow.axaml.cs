@@ -50,6 +50,10 @@ public partial class MainWindow : Window
         {
             _colorizer?.UpdateSource(editor.Text);
         };
+        
+        editor.TextArea.TextEntered += OnTextEntered;
+        
+        Run.Click += (o, args) => _ = Run_OnClickAsync();
     }
 
     private void SetupHighlighting(TextEditor editor)
@@ -150,7 +154,7 @@ public partial class MainWindow : Window
             AvaloniaEdit.Rendering.KnownLayer.Background);
     }
 
-    protected override void OnLoaded(Avalonia.Interactivity.RoutedEventArgs e)
+    protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
         var editor = this.FindControl<TextEditor>("Editor")!;
@@ -198,7 +202,7 @@ public partial class MainWindow : Window
         }
     }
 
-    public async void Run_OnClick(object? sender, RoutedEventArgs routedEventArgs)
+    private async Task Run_OnClickAsync()
     {
         var lex = new Lexer(Editor.Text).Tokenize();
         var parser = new Parser(lex).Parse();
