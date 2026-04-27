@@ -95,11 +95,17 @@ public readonly record struct BindError(string Message, Position Position)
     public override string ToString() => $"[{Position.Line}:{Position.Column}] {Message}";
 }
 
-public sealed class BindResult(SymbolTable symbols, IReadOnlyList<BindError> errors)
+public readonly record struct BindWarning(string Message, Position Position)
 {
-    public SymbolTable              Symbols   { get; } = symbols;
-    public IReadOnlyList<BindError> Errors    { get; } = errors;
-    public bool                     HasErrors => Errors.Count > 0;
+    public override string ToString() => $"[{Position.Line}:{Position.Column}] warning: {Message}";
+}
+
+public sealed class BindResult(SymbolTable symbols, IReadOnlyList<BindError> errors, IReadOnlyList<BindWarning> warnings)
+{
+    public SymbolTable              Symbols  { get; } = symbols;
+    public IReadOnlyList<BindError>   Errors   { get; } = errors;
+    public IReadOnlyList<BindWarning> Warnings { get; } = warnings;
+    public bool HasErrors => Errors.Count > 0;
 }
 
 public sealed class Binder
@@ -108,6 +114,7 @@ public sealed class Binder
     private readonly Scope _globalScope;
     private readonly SymbolTable         _table  = new();
     private readonly List<BindError>     _errors = [];
+    private readonly List<BindWarning> _warnings = [];
 
     private string? _currentType;
 
@@ -139,7 +146,7 @@ public sealed class Binder
         foreach (var stmt in statements)
             BindStmt(stmt);
 
-        return new BindResult(_table, _errors);
+        return new BindResult(_table, _errors, _warnings);
     }
     
     private void RegisterBuiltIns()
@@ -229,7 +236,13 @@ public sealed class Binder
 
     private void BindVarDecl(VarDecl v, string? forceParent = null)
     {
-        if (v.Init is not null) BindExpr(v.Init);
+        if (v.Init is not null)
+        {
+            BindExpr(v.Init);
+            
+            if (v.Init is NullLit && !v.Type.IsNullable)
+                AddWarning($"Variable '{v.Name}' has non-nullable type '{TypeRefToString(v.Type)}' but is assigned null.", v.Span.Start);
+        }
 
         var kind = (forceParent ?? _currentType) is not null
             ? SymbolKind.Field
@@ -466,6 +479,13 @@ public sealed class Binder
             case AssignExpr a:
                 BindExpr(a.Target);
                 BindExpr(a.Value);
+                
+                if (a.Value is NullLit && a.Target is NameExpr nameTarget)
+                {
+                    var sym = _scope.Resolve(nameTarget.Name);
+                    if (sym is not null && !sym.Type.EndsWith("?") && !sym.Type.EndsWith("[]"))
+                        AddWarning($"Cannot assign null to non-nullable '{sym.Type} {nameTarget.Name}'.", a.Span.Start);
+                }
                 break;
 
             case CallExpr call:
@@ -549,6 +569,9 @@ public sealed class Binder
 
     private void AddError(string message, Position pos) =>
         _errors.Add(new BindError(message, pos));
+    
+    private void AddWarning(string message, Position pos) =>
+        _warnings.Add(new BindWarning(message, pos));
   
     private static string TypeRefToString(TypeRef t)
     {
@@ -560,6 +583,7 @@ public sealed class Binder
             sb.Append('>');
         }
         if (t.IsArray) sb.Append("[]");
+        if (t.IsNullable) sb.Append("?"); 
         return sb.ToString();
     }
 

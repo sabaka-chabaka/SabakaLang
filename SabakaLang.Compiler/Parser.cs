@@ -68,7 +68,7 @@ public record StructDecl(string Name, List<VarDecl> Fields, Span Span) : IStmt;
 public record EnumDecl(string Name, List<string> Members, Span Span) : IStmt;
 
 public record SwitchCase(IExpr? Value, List<IStmt> Body);
-public record TypeRef(string Name, List<string> TypeArgs, bool IsArray);
+public record TypeRef(string Name, List<string> TypeArgs, bool IsArray, bool IsNullable = false);
 public record TypeParam(string Name);
 public record Param(TypeRef Type, string Name);
 public enum AccessMod { Public, Private, Protected }
@@ -229,7 +229,14 @@ public sealed class Parser
 
         var cur = Peek(offset).Type;
 
-        if (IsBuiltinType(cur) && cur != TokenType.VoidKeyword) return true;
+        if (IsBuiltinType(cur) && cur != TokenType.VoidKeyword)
+        {
+            offset++;
+            while (Peek(offset).Type == TokenType.LBracket && Peek(offset + 1).Type == TokenType.RBracket)
+                offset += 2;
+            if (Peek(offset).Type == TokenType.Question) offset++;
+            return Peek(offset).Type == TokenType.Identifier;
+        }
 
         if (cur == TokenType.Identifier)
         {
@@ -238,9 +245,14 @@ public sealed class Parser
                 offset = SkipAngles(offset);
             while (Peek(offset).Type == TokenType.LBracket && Peek(offset + 1).Type == TokenType.RBracket)
                 offset += 2;
-            return Peek(offset).Type == TokenType.Identifier;
+            if (Peek(offset).Type == TokenType.Question) offset++;
+            if (Peek(offset).Type != TokenType.Identifier) return false;
+            offset++;
+            var next = Peek(offset).Type;
+            return next is TokenType.Equal or TokenType.Semicolon or TokenType.Eof
+                or TokenType.Comma or TokenType.RParen;
         }
-        
+
         return false;
     }
     
@@ -925,7 +937,7 @@ public sealed class Parser
             TokenType.Identifier    => Current.Value,
             _ => null
         };
-        if (name is null) { AddError($"Expected type, got {Current.Type}", Current.Start); return new TypeRef("?", [], false); }
+        if (name is null) { AddError($"Expected type, got {Current.Type}", Current.Start); return new TypeRef("?", [], false, false); }
         Advance();
         var typeArgs = TryParseTypeArgs();
         bool isArray = false;
@@ -934,7 +946,9 @@ public sealed class Parser
             Advance(); Advance();
             isArray = true;
         }
-        return new TypeRef(name, typeArgs, isArray);
+        
+        bool isNullable = Match(TokenType.Question);
+        return new TypeRef(name, typeArgs, isArray, isNullable);
     }
     
     private List<TypeParam> TryParseTypeParams()

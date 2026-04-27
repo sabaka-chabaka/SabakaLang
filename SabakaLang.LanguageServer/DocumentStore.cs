@@ -42,6 +42,11 @@ public sealed class DocumentAnalysis
         foreach (var e in bind.Errors)
             list.Add(new Diagnostic(e.Message, e.Position, e.Position, DiagnosticSeverity.Error));
 
+        foreach (var w in bind.Warnings)
+        {
+            list.Add(new Diagnostic(w.Message, w.Position, w.Position, DiagnosticSeverity.Warning));
+        }
+
         return list;
     }
 }
@@ -82,7 +87,7 @@ public sealed class DocumentStore
         catch { parse = new ParseResult([], []); }
 
         try { bind = new Binder().Bind(parse.Statements); }
-        catch { bind = new BindResult(new SymbolTable(), []); }
+        catch { bind = new BindResult(new SymbolTable(), [], []); }
 
         var analysis = new DocumentAnalysis(uri, source, lexer, parse, bind);
 

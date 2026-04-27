@@ -72,7 +72,7 @@ public class CompilerCoverageTests
         var expr = new AssignExpr(new IntLit(1, default), new IntLit(2, default), default);
         var comp = new SabakaLang.Compiler.Compiler();
         // BindResult(SymbolTable table, IReadOnlyList<BindError> errors)
-        var result = comp.Compile(new List<IStmt> { new ExprStmt(expr, default) }, new BindResult(new SymbolTable(), new List<BindError>()));
+        var result = comp.Compile(new List<IStmt> { new ExprStmt(expr, default) }, new BindResult(new SymbolTable(), new List<BindError>(), new List<BindWarning>()));
         Assert.True(result.HasErrors);
         Assert.Contains("Invalid assignment target", result.Errors[0].Message);
     }
