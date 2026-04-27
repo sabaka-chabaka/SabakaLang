@@ -181,11 +181,9 @@ public sealed class Compiler
 {
     private readonly List<Instruction>  _code   = [];
     private readonly List<CompileError> _errors = [];
- 
-    private readonly Dictionary<string, ClassMeta>              _classes   = new();
-    private readonly Dictionary<string, List<VarDecl>>         _structs   = new();
-    private readonly Dictionary<string, Dictionary<string,int>> _enums     = new();
-    private readonly Dictionary<string, InterfaceDecl>          _interfaces= new();
+    
+    private readonly Dictionary<string, ClassMeta>      _classMeta = new();
+    private readonly Dictionary<string, List<VarDecl>>  _structs   = new();
  
     private readonly Dictionary<string,(int ParamCount, bool Registered)> _externals = new();
  
@@ -223,18 +221,13 @@ public sealed class Compiler
     }
 
     private bool IsKnownClass(string name) =>
-        _classes.ContainsKey(name) ||
         _symbolTable.Lookup(name).Any(s => s.Kind == SymbolKind.Class);
 
     private bool IsKnownEnum(string name) =>
-        _enums.ContainsKey(name) ||
         _symbolTable.Lookup(name).Any(s => s.Kind == SymbolKind.Enum);
 
     private bool TryGetEnumValue(string enumName, string member, out int value)
     {
-        if (_enums.TryGetValue(enumName, out var dict) && dict.TryGetValue(member, out value))
-            return true;
-
         var members = _symbolTable.MembersOf(enumName)
                                   .Where(s => s.Kind == SymbolKind.EnumMember)
                                   .ToList();
@@ -246,7 +239,6 @@ public sealed class Compiler
     }
 
     private bool IsMethodOf(string className, string funcName) =>
-        (_classes.TryGetValue(className, out var m) && m.Methods.Any(mm => mm.Name == funcName)) ||
         _symbolTable.MembersOf(className).Any(s => s.Name == funcName && s.Kind == SymbolKind.Method);
 
     private int Emit(OpCode op, object? operand = null, string? name = null, object? extra = null)
@@ -265,29 +257,16 @@ public sealed class Compiler
     {
         switch (stmt)
         {
-            case FuncDecl:
-                break;
- 
             case ClassDecl c:
                 var meta = new ClassMeta(c.Name, c.Base);
                 foreach (var f in c.Fields)  { meta.Fields.Add(f.Name); meta.FieldDecls.Add(f); }
                 foreach (var m in c.Methods) meta.Methods.Add(m);
                 meta.Interfaces.AddRange(c.Interfaces);
-                _classes[c.Name] = meta;
-                break;
- 
-            case InterfaceDecl i:
-                _interfaces[i.Name] = i;
+                _classMeta[c.Name] = meta;
                 break;
  
             case StructDecl s:
                 _structs[s.Name] = s.Fields;
-                break;
- 
-            case EnumDecl e:
-                var vals = new Dictionary<string, int>();
-                for (int i = 0; i < e.Members.Count; i++) vals[e.Members[i]] = i;
-                _enums[e.Name] = vals;
                 break;
         }
     }
@@ -340,12 +319,13 @@ public sealed class Compiler
             case "bool":   Emit(OpCode.Push, Value.FromBool(false));break;
             case "string": Emit(OpCode.Push, Value.FromString("")); break;
             default:
-                if (_structs.ContainsKey(t.Name))
+                if (_structs.ContainsKey(t.Name) ||
+                    _symbolTable.Lookup(t.Name).Any(s => s.Kind == SymbolKind.Struct))
                 {
                     var fieldNames = GetAllStructFields(t.Name);
                     Emit(OpCode.CreateStruct, name: t.Name, extra: fieldNames);
                 }
-                else if (_classes.ContainsKey(t.Name))
+                else if (IsKnownClass(t.Name))
                 {
                     EmitCreateObject(t.Name);
                 }
@@ -373,7 +353,7 @@ public sealed class Compiler
         foreach (var p in f.Params)
             DeclareVarType(p.Name, TypeRefToString(p.Type));
  
-        if (ownerClass is not null && _classes.TryGetValue(ownerClass, out var meta))
+        if (ownerClass is not null && _classMeta.TryGetValue(ownerClass, out var meta))
             foreach (var field in meta.FieldDecls)
                 DeclareVarType(field.Name, TypeRefToString(field.Type));
  
@@ -389,29 +369,31 @@ public sealed class Compiler
     
     private void EmitClassDecl(ClassDecl c)
     {
-        if (!_classes.TryGetValue(c.Name, out var meta)) return;
- 
+        if (!_classMeta.TryGetValue(c.Name, out var meta)) return;
+
         foreach (var inter in c.Interfaces)
         {
-            if (!_interfaces.TryGetValue(inter, out var id)) continue;
-            foreach (var m in id.Methods)
+            var interfaceMethods = _symbolTable.MembersOf(inter)
+                .Where(s => s.Kind == SymbolKind.Method)
+                .ToList();
+            foreach (var m in interfaceMethods)
             {
                 if (meta.Methods.All(cm => cm.Name != m.Name))
                     Error($"Class '{c.Name}' does not implement '{inter}.{m.Name}'", c.Span.Start);
             }
         }
- 
+
         if (c.Base is not null)
             Emit(OpCode.Inherit, operand: c.Base, name: c.Name);
- 
+
         var savedClass = _currentClass;
         _currentClass = c.Name;
- 
+
         GetAllClassFields(c.Name);
- 
+
         foreach (var m in c.Methods)
             EmitFuncDecl(m, ownerClass: c.Name);
- 
+
         _currentClass = savedClass;
     }
  
@@ -805,7 +787,7 @@ public sealed class Compiler
                     Error("'super' outside class", c.Span.Start);
                     return;
                 }
-                var baseClass = _classes.GetValueOrDefault(_currentClass)?.Base;
+                var baseClass = _classMeta.GetValueOrDefault(_currentClass)?.Base;
                 if (baseClass is null)
                 {
                     Error($"Class '{_currentClass}' has no base class", c.Span.Start);
@@ -944,7 +926,7 @@ public sealed class Compiler
  
     private void EmitFieldInitializers(string className)
     {
-        if (!_classes.TryGetValue(className, out var meta)) return;
+        if (!_classMeta.TryGetValue(className, out var meta)) return;
  
         if (meta.Base is not null) EmitFieldInitializers(meta.Base);
  
@@ -1081,7 +1063,7 @@ public sealed class Compiler
     private List<string> GetAllClassFields(string className)
     {
         var result = new List<string>();
-        if (!_classes.TryGetValue(className, out var meta)) return result;
+        if (!_classMeta.TryGetValue(className, out var meta)) return result;
         if (meta.Base is not null) result.AddRange(GetAllClassFields(meta.Base));
         result.AddRange(meta.Fields);
         return result;
@@ -1095,7 +1077,7 @@ public sealed class Compiler
  
     private bool HasConstructor(string className)
     {
-        if (!_classes.TryGetValue(className, out var meta)) return false;
+        if (!_classMeta.TryGetValue(className, out var meta)) return false;
         if (meta.Methods.Any(m => m.Name == className)) return true;
         if (meta.Base is not null) return HasConstructor(meta.Base);
         return false;
