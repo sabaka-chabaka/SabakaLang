@@ -226,15 +226,15 @@ public sealed class Compiler
     private bool IsKnownEnum(string name) =>
         _symbolTable.Lookup(name).Any(s => s.Kind == SymbolKind.Enum);
 
-    private bool TryGetEnumValue(string enumName, string member, out int value)
+    private bool TryGetEnumValue(string enumName, string member, out string value)
     {
         var members = _symbolTable.MembersOf(enumName)
                                   .Where(s => s.Kind == SymbolKind.EnumMember)
                                   .ToList();
-        var idx = members.FindIndex(s => s.Name == member);
-        if (idx >= 0) { value = idx; return true; }
+        var m = members.FirstOrDefault(s => s.Name == member);
+        if (m != null) { value = m.Name; return true; }
 
-        value = 0;
+        value = "";
         return false;
     }
 
@@ -825,7 +825,7 @@ public sealed class Compiler
         {
             if (!TryGetEnumValue(oe.Name, m.Member, out var enumVal))
                 Error($"Unknown enum member '{m.Member}' in '{oe.Name}'", m.Span.Start);
-            Emit(OpCode.Push, Value.FromInt(enumVal));
+            Emit(OpCode.Push, Value.FromString(enumVal));
             return;
         }
 

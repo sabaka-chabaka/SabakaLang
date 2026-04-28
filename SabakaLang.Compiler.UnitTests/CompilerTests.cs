@@ -643,19 +643,19 @@ public class CompilerTests
     }
 
     [Fact]
-    public void EnumMemberAccess_EmitsPushInt()
+    public void EnumMemberAccess_EmitsPushString()
     {
         var code = Code("enum Color { Red, Green, Blue } Color c = Color.Red;");
         Assert.Contains(All(code, OpCode.Push),
-            p => p.Operand is Value v && v.Type == SabakaType.Int && v.Int == 0);
+            p => p.Operand is Value v && v.Type == SabakaType.String && v.String == "Red");
     }
 
     [Fact]
-    public void EnumMemberAccess_SecondMember_PushesOne()
+    public void EnumMemberAccess_SecondMember_PushesName()
     {
-        var code = Code("enum Color { Red, Green, Blue } int g = Color.Green;");
+        var code = Code("enum Color { Red, Green, Blue } string g = Color.Green;");
         Assert.Contains(All(code, OpCode.Push),
-            p => p.Operand is Value v && v.Type == SabakaType.Int && v.Int == 1);
+            p => p.Operand is Value v && v.Type == SabakaType.String && v.String == "Green");
     }
     
     [Fact]
