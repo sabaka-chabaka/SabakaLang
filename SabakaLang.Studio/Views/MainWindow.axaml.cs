@@ -62,6 +62,8 @@ public partial class MainWindow : Window
         SetupCaretTracking(_editor);
 
         this.FindControl<Button>("BtnRun")!.Click += (_, _) => _ = RunCodeAsync();
+        this.FindControl<Button>("BtnSave")!.Click += (_, _) => _ = SaveDocumentAsync();
+        this.FindControl<Button>("BtnOpen")!.Click += (_, _) => _ = OpenDocumentAsync();
 
         _editor.TextArea.TextEntered += OnTextEntered;
         _editor.Document.TextChanged += (_, _) => ScheduleAnalysis(_editor.Text);
@@ -69,6 +71,7 @@ public partial class MainWindow : Window
         KeyDown += (o, keyEventArgs) =>
         {
             if (keyEventArgs.Key == Key.F5) { _ = RunCodeAsync(); keyEventArgs.Handled = true; }
+            if (keyEventArgs.Key == Key.S && keyEventArgs.KeyModifiers.HasFlag(KeyModifiers.Control)) { _ = SaveDocumentAsync(); keyEventArgs.Handled = true; }
         };
 
         ScheduleAnalysis(_editor.Text);
@@ -148,6 +151,9 @@ public partial class MainWindow : Window
         doc.Insert(offset, closing);
         area.Caret.Offset = offset;
     }
+    
+    private async Task SaveDocumentAsync(){}
+    private async Task OpenDocumentAsync(){}
 
     private async Task RunCodeAsync()
     {
