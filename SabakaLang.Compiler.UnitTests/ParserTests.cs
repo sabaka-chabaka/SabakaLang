@@ -1207,4 +1207,17 @@ public class ParserTests
         Assert.Equal("x", ((NameExpr)coalesce.Left).Name);
         Assert.Equal("y", ((NameExpr)coalesce.Right).Name);
     }
+
+    [Fact]
+    public void Char_Parsed()
+    {
+        var result = Parse("'c'");
+        
+        Assert.False(result.HasErrors);
+        
+        var expr = Assert.IsType<ExprStmt>(result.Statements[0]).Expr;
+        var chr = Assert.IsType<CharLit>(expr);
+        
+        Assert.Equal('c', chr.Value);
+    }
 }

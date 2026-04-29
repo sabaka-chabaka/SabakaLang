@@ -74,6 +74,14 @@ public class CompilerTests
         Assert.Contains(All(code, OpCode.Push),
             p => p.Operand is Value v && v.Type == SabakaType.String && v.String == "hello");
     }
+    
+    [Fact]
+    public void CharLiteral_EmitsPush()
+    {
+        var code = Code("'h'");
+        Assert.Contains(All(code, OpCode.Push),
+            p => p.Operand is Value { Type: SabakaType.Char, Char: 'h' });
+    }
 
     [Fact]
     public void BoolTrue_EmitsPushTrue()
