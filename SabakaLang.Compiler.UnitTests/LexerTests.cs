@@ -45,6 +45,15 @@ public class LexerTests
         Assert.Equal(TokenType.StringLiteral, tokens[0].Type);
         Assert.Equal("line1\nline2", tokens[0].Value);
     }
+
+    [Fact]
+    public void CharLiteral_ReturnsCorrectToken()
+    {
+        var tokens = Tokenize("'a'");
+        
+        Assert.Equal(TokenType.CharLiteral, tokens[0].Type);
+        Assert.Equal("a", tokens[0].Value);
+    }
     
     [Theory]
     [InlineData("if",     TokenType.If)]
@@ -56,6 +65,7 @@ public class LexerTests
     [InlineData("true",   TokenType.True)]
     [InlineData("false",  TokenType.False)]
     [InlineData("null",   TokenType.Null)]
+    [InlineData("char", TokenType.CharKeyword)]
     [InlineData("is", TokenType.Is)]
     public void Keywords_RecognizedCorrectly(string source, TokenType expected)
     {

@@ -293,24 +293,25 @@ public sealed class Lexer(string source)
     
     private Token ReadChar(Position start)
     {
-        if (IsAtEnd()) 
-        {
+        Advance();
+
+        if (IsAtEnd()) {
             AddError("Unterminated char literal", start);
         }
-        Advance(); 
+
+        Advance();
 
         if (IsAtEnd() || source[_offset] != '\'') 
         {
             AddError("Unterminated char literal", start);
         }
-        else 
+        else
         {
             Advance();
         }
-
-        return new Token(TokenType.CharLiteral, source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+    
+        return new Token(TokenType.CharLiteral, source.Substring(start.Offset + 1, _offset - start.Offset - 2), start, PreviousPosition());
     }
-
 
     private Token ReadInterpolatedString(Position start)
     {
