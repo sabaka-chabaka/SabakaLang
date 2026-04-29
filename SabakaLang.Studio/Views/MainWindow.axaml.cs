@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
@@ -37,6 +39,8 @@ public partial class MainWindow : Window
     private TextBlock?  _statusErrors;
     private TextBlock?  _statusWarnings;
     private TextBlock?  _statusMessage;
+
+    private string? _currentPath;
 
     public MainWindow()
     {
@@ -151,9 +155,67 @@ public partial class MainWindow : Window
         doc.Insert(offset, closing);
         area.Caret.Offset = offset;
     }
+
+    private async Task SaveDocumentAsync()
+    {
+        if (_currentPath == null)
+        {
+            await SaveDocumentAsAsync();
+            return;
+        }
+
+        await File.WriteAllTextAsync(_currentPath, Editor.Text);
+    }
+
+    private async Task OpenDocumentAsync()
+    {
+        var topLevel = GetTopLevel(this);
+        
+        var files = await topLevel!.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select a file to open",
+            AllowMultiple = false,
+            FileTypeFilter = 
+            [
+                new FilePickerFileType("SabakaLang source files") { Patterns = ["*.sabaka"] },
+                new FilePickerFileType("All files") { Patterns = ["*"] }
+            ]
+        });
+
+        if (files.Count == 1)
+        {
+            await using var stream = await files[0].OpenReadAsync();
+            using var reader = new StreamReader(stream);
+            var fileContent = await reader.ReadToEndAsync();
+            
+            Editor.Text = fileContent;
+            _currentPath = files[0].Path.LocalPath;
+        }
+    }
     
-    private async Task SaveDocumentAsync(){}
-    private async Task OpenDocumentAsync(){}
+    private async Task SaveDocumentAsAsync()
+    {
+        var topLevel = GetTopLevel(this);
+
+        var file = await topLevel!.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save SabakaLang File",
+            DefaultExtension = ".sabaka",
+            FileTypeChoices = 
+            [
+                new FilePickerFileType("SabakaLang source files") { Patterns = ["*.sabaka"] },
+                new FilePickerFileType("All files") { Patterns = ["*"] }
+            ]
+        });
+
+        if (file != null)
+        {
+            await File.WriteAllTextAsync(file.Path.LocalPath, Editor.Text);
+        
+            _currentPath = file.Path.LocalPath;
+        }
+    }
+
 
     private async Task RunCodeAsync()
     {
