@@ -138,6 +138,7 @@ public sealed class VirtualMachine
                             "array"  => value.Type == SabakaType.Array,
                             "object" => value.Type == SabakaType.Object,
                             "null"   => value.Type == SabakaType.Null,
+                            "char" => value.Type == SabakaType.Char,
 
                             _ when value is { Type: SabakaType.Object, Object: not null } && (value.Object.ClassName == type.String || IsSubclassOf(value.Object.ClassName, type.String)) => true,
                             _ => false
@@ -625,9 +626,17 @@ public sealed class VirtualMachine
  
                     case OpCode.Ord:
                     {
-                        var s = Pop().String;
-                        if (string.IsNullOrEmpty(s)) throw new RuntimeException("ord: empty string");
-                        Push(Value.FromInt(s[0]));
+                        var v = Pop();
+                        if (v.Type == SabakaType.Char)
+                        {
+                            Push(Value.FromInt(v.Char));
+                        }
+                        else
+                        {
+                            var s = v.String;
+                            if (string.IsNullOrEmpty(s)) throw new RuntimeException("ord: empty string");
+                            Push(Value.FromInt(s[0]));
+                        }
                         break;
                     }
  
@@ -857,6 +866,7 @@ public sealed class VirtualMachine
             eq = a.Type switch
             {
                 SabakaType.Bool   => a.Bool   == b.Bool,
+                SabakaType.Char   => a.Char   == b.Char,
                 SabakaType.String => a.String == b.String,
                 SabakaType.Array  => ReferenceEquals(a.Array, b.Array),
                 SabakaType.Object => ReferenceEquals(a.Object, b.Object),

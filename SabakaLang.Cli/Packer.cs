@@ -103,6 +103,11 @@ public static class BinaryWriterWorker
                 bw.Write((byte)0x05);
                 WriteValue(bw, v);
                 break;
+
+            case char c:
+                bw.Write((byte)0x06);
+                bw.Write(c);
+                break;
  
             default:
                 throw new InvalidOperationException(
@@ -170,6 +175,10 @@ public static class BinaryWriterWorker
  
             case SabakaType.Object:
                 WriteSabakaObject(bw, v.Object!);
+                break;
+
+            case SabakaType.Char:
+                bw.Write(v.Char);
                 break;
  
             default:

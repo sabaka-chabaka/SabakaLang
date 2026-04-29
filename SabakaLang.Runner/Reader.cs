@@ -43,6 +43,7 @@ public static class Reader
             0x03 => (object)br.ReadBoolean(),
             0x04 => (object)br.ReadString(),
             0x05 => (object)ReadValue(br),
+            0x06 => (object)br.ReadChar(),
             _    => throw new InvalidOperationException($"SarPacker: неизвестный тег Operand: 0x{tag:X2}")
         };
     }
@@ -82,6 +83,7 @@ public static class Reader
             SabakaType.String => Value.FromString(br.ReadString()),
             SabakaType.Array  => ReadArrayValue(br),
             SabakaType.Object => Value.FromObject(ReadSabakaObject(br)),
+            SabakaType.Char   => Value.FromChar(br.ReadChar()),
             _                 => throw new InvalidOperationException($"SarPacker: неизвестный SabakaType: {type}")
         };
     }

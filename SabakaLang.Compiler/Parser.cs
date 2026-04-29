@@ -936,6 +936,7 @@ public sealed class Parser
             TokenType.FloatKeyword  => "float",
             TokenType.BoolKeyword   => "bool",
             TokenType.StringKeyword => "string",
+            TokenType.CharKeyword   => "char",
             TokenType.VoidKeyword   => "void",
             TokenType.Identifier    => Current.Value,
             _ => null
@@ -1004,7 +1005,7 @@ public sealed class Parser
  
     private static bool IsBuiltinType(TokenType t) =>
         t is TokenType.IntKeyword or TokenType.FloatKeyword or
-            TokenType.BoolKeyword or TokenType.StringKeyword or TokenType.VoidKeyword;
+            TokenType.BoolKeyword or TokenType.StringKeyword or TokenType.CharKeyword or TokenType.VoidKeyword;
  
     private static bool IsTypeStart(TokenType t) => IsBuiltinType(t) || t == TokenType.Identifier;
  

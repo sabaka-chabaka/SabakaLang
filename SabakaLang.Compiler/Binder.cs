@@ -120,7 +120,7 @@ public sealed class Binder
 
     private string? _currentReturn;
     private static readonly HashSet<string> BuiltinTypes =
-        ["int", "float", "bool", "string", "void"];
+        ["int", "float", "bool", "string", "char", "void"];
     
     public Binder()
     {
