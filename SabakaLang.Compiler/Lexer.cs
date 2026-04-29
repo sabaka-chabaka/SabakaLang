@@ -49,8 +49,10 @@ public enum TokenType
     IntKeyword,
     FloatKeyword,
     StringLiteral,
+    CharLiteral,
     InterpolatedStringLiteral,
     StringKeyword,
+    CharKeyword,
 
     Return,
     VoidKeyword,
@@ -121,6 +123,7 @@ public sealed class Lexer(string source)
     private static readonly Dictionary<string, TokenType> Keywords = new()
     {
         ["bool"]      = TokenType.BoolKeyword,
+        ["char"]      = TokenType.CharKeyword,
         ["true"]      = TokenType.True,
         ["false"]     = TokenType.False,
         ["if"]        = TokenType.If,
@@ -178,6 +181,7 @@ public sealed class Lexer(string source)
         if (char.IsDigit(ch)) return ReadNumber(start);
         if (char.IsLetter(ch) || ch == '_') return ReadIdentifier(start);
         if (ch == '"') return ReadString(start);
+        if (ch == '\'') return ReadChar(start);
         if (ch == '$' && _offset + 1 < source.Length && source[_offset + 1] == '"') return ReadInterpolatedString(start);
 
         return ch switch
@@ -286,6 +290,27 @@ public sealed class Lexer(string source)
  
         return new Token(TokenType.StringLiteral, sb.ToString(), start, PreviousPosition());
     }
+    
+    private Token ReadChar(Position start)
+    {
+        if (IsAtEnd()) 
+        {
+            AddError("Unterminated char literal", start);
+        }
+        Advance(); 
+
+        if (IsAtEnd() || source[_offset] != '\'') 
+        {
+            AddError("Unterminated char literal", start);
+        }
+        else 
+        {
+            Advance();
+        }
+
+        return new Token(TokenType.CharLiteral, source.Substring(start.Offset, _offset - start.Offset), start, PreviousPosition());
+    }
+
 
     private Token ReadInterpolatedString(Position start)
     {
