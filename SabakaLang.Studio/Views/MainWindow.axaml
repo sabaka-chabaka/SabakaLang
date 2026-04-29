@@ -25,6 +25,11 @@
                             VerticalAlignment="Center" HorizontalAlignment="Right">
                     <Button Classes="RunBtn" Name="BtnRun" ToolTip.Tip="Run (F5)" HorizontalAlignment="Right">▶  Run</Button>
                 </StackPanel>
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal"
+                            VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <Button Name="BtnSave" ToolTip.Tip="Save (Ctrl+S)" HorizontalAlignment="Right">💾 Save</Button>
+                    <Button Name="BtnOpen" ToolTip.Tip="Open" HorizontalAlignment="Right">📂 Open</Button>
+                </StackPanel>
             </DockPanel>
         </Border>
 
