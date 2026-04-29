@@ -232,7 +232,7 @@ public partial class MainWindow : Window
             var vm = new VirtualMachine();
             vm.Execute(result.Code.ToList());
 
-            await Task.Delay(10000);
+            await Task.Delay(1000);
             ConsoleHelper.Hide();
             SetStatus("Ready");
         }
