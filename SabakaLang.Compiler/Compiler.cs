@@ -107,7 +107,7 @@ public sealed class CompileResult(
     public bool HasErrors => Errors.Count > 0;
 }
 
-public enum SabakaType { Null, Int, Float, Bool, String, Array, Object }
+public enum SabakaType { Null, Int, Float, Bool, String, Array, Object, Char }
 
 public readonly struct Value
 {
@@ -117,15 +117,17 @@ public readonly struct Value
     public readonly double Float;
     public readonly bool   Bool;
     public readonly string String;
+    public readonly char Char;
  
     public readonly List<Value>?           Array;
     public readonly SabakaObject?          Object;
  
     private Value(SabakaType t, int i = 0, double f = 0, bool b = false,
-                  string s = "", List<Value>? arr = null, SabakaObject? obj = null)
+                  string s = "", char c = '\0', List<Value>? arr = null, SabakaObject? obj = null)
     {
         Type   = t; Int = i; Float = f; Bool = b;
-        String = s; Array = arr; Object = obj;
+        String = s;
+        Char = c; Array = arr; Object = obj;
     }
  
     public static readonly Value Null    = new(SabakaType.Null);
@@ -133,6 +135,7 @@ public readonly struct Value
     public static Value FromFloat(double v)      => new(SabakaType.Float, f: v);
     public static Value FromBool(bool v)         => new(SabakaType.Bool,  b: v);
     public static Value FromString(string? v)     => new(SabakaType.String, s: v ?? "");
+    public static Value FromChar(char? v)     => new(SabakaType.Char, c: v ?? '\0');
     public static Value FromArray(List<Value> v) => new(SabakaType.Array,  arr: v);
     public static Value FromObject(SabakaObject v) => new(SabakaType.Object, obj: v);
  
@@ -155,6 +158,7 @@ public readonly struct Value
         SabakaType.String => String,
         SabakaType.Array  => "[" + string.Join(", ", Array!.Select(v => v.ToString())) + "]",
         SabakaType.Object => Object!.ToString(),
+        SabakaType.Char   => Char.ToString(),
         _ => "?"
     };
 }
@@ -318,6 +322,7 @@ public sealed class Compiler
             case "float":  Emit(OpCode.Push, Value.FromFloat(0.0));break;
             case "bool":   Emit(OpCode.Push, Value.FromBool(false));break;
             case "string": Emit(OpCode.Push, Value.FromString("")); break;
+            case "char": Emit(OpCode.Push, Value.FromChar('\0')); break;
             default:
                 if (_structs.ContainsKey(t.Name) ||
                     _symbolTable.Lookup(t.Name).Any(s => s.Kind == SymbolKind.Struct))
@@ -596,6 +601,7 @@ public sealed class Compiler
             case StringLit x: Emit(OpCode.Push, Value.FromString(x.Value)); break;
             case BoolLit   x: Emit(OpCode.Push, Value.FromBool(x.Value));   break;
             case NullLit   : Emit(OpCode.Push, Value.Null);                 break;
+            case CharLit   c: Emit(OpCode.Push, Value.FromChar(c.Value));   break;
  
             case NameExpr n:  EmitName(n);    break;
             case IsExpr ise: EmitIs(ise); break;
