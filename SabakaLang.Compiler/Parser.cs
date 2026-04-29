@@ -12,6 +12,7 @@ public interface IStmt : INode {}
 public record IntLit (int Value, Span Span) : IExpr;
 public record FloatLit (double Value, Span Span) : IExpr;
 public record StringLit (string Value, Span Span) : IExpr;
+public record CharLit (char Value, Span Span) : IExpr;
 public record BoolLit (bool Value, Span Span) : IExpr;
 public record NullLit(Span Span) : IExpr;
 
@@ -791,6 +792,8 @@ public sealed class Parser
         }
         if (Check(TokenType.StringLiteral))
             return new StringLit(Advance().Value, SpanFrom(start));
+        if (Check(TokenType.CharLiteral))
+            return  new CharLit(Advance().Value[0], SpanFrom(start));
         if (Check(TokenType.InterpolatedStringLiteral))
             return ParseInterpolatedString(start);
         if (Check(TokenType.True))  { Advance(); return new BoolLit(true,  SpanFrom(start)); }
