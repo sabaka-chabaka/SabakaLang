@@ -446,6 +446,7 @@ public sealed class Binder
             case IntLit:
             case FloatLit:
             case StringLit:
+            case CharLit:    
             case BoolLit:
             case NullLit:
                 break;
