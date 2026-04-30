@@ -188,6 +188,7 @@ public sealed class Compiler
     
     private readonly Dictionary<string, ClassMeta>      _classMeta = new();
     private readonly Dictionary<string, List<VarDecl>>  _structs   = new();
+    private readonly Dictionary<string, Value> _constants = new();
  
     private readonly Dictionary<string,(int ParamCount, bool Registered)> _externals = new();
  
@@ -203,6 +204,14 @@ public sealed class Compiler
     public CompileResult Compile(IReadOnlyList<IStmt> statements, BindResult bindResult)
     {
         _symbolTable = bindResult.Symbols;
+        
+        foreach (var sym in _symbolTable.All)
+        {
+            if (sym.Kind == SymbolKind.Constant)
+            {
+                // now it's null
+            }
+        }
 
         foreach (var be in bindResult.Errors)
             _errors.Add(new CompileError(be.Message, be.Position));
@@ -292,6 +301,7 @@ public sealed class Compiler
             case ForeachStmt fe:EmitForeach(fe);   break;
             case SwitchStmt sw: EmitSwitch(sw);    break;
             case ReturnStmt r:  EmitReturn(r);     break;
+            case ConstDecl c: EmitConstDecl(c); break;
             case ExprStmt es:
                 EmitExpr(es.Expr);
                 //Emit(OpCode.Pop);
@@ -404,6 +414,35 @@ public sealed class Compiler
  
     private void EmitStructDecl()
     {
+    }
+    
+    private void EmitConstDecl(ConstDecl c)
+    {
+        var value = EvaluateConstantExpression(c.Value);
+    
+        if (value == null)
+        {
+            Error("Failed to evaluate constant expression", c.Span.Start);
+            value = Value.Null;
+        }
+
+        _constants[c.Name] = value.Value;
+
+    }
+    
+    private Value? EvaluateConstantExpression(IExpr expr)
+    {
+        return expr switch
+        {
+            IntLit i => Value.FromInt(i.Value),
+            FloatLit f => Value.FromFloat(f.Value),
+            BoolLit b => Value.FromBool(b.Value),
+            StringLit s => Value.FromString(s.Value),
+            CharLit c => Value.FromChar(c.Value),
+            NullLit => Value.Null,
+            NameExpr n when _constants.TryGetValue(n.Name, out var v) => v,
+            _ => null
+        };
     }
     
     private void EmitIf(IfStmt s)
@@ -639,7 +678,16 @@ public sealed class Compiler
  
     private void EmitName(NameExpr n)
     {
-        if (n.Name == "this") { Emit(OpCode.PushThis); return; }
+        if (_constants.TryGetValue(n.Name, out var constValue))
+        {
+            Emit(OpCode.Push, constValue);
+            return;
+        }
+        if (n.Name == "this") 
+        { 
+            Emit(OpCode.PushThis); 
+            return; 
+        }
         Emit(OpCode.Load, name: n.Name);
     }
  
