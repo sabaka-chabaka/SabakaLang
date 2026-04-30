@@ -70,7 +70,11 @@ public partial class MainWindow : Window
         this.FindControl<Button>("BtnRun")!.Click += (_, _) => _ = RunCodeAsync();
         this.FindControl<Button>("BtnSave")!.Click += (_, _) => _ = SaveDocumentAsync();
         this.FindControl<Button>("BtnOpen")!.Click += (_, _) => _ = OpenDocumentAsync();
-        this.FindControl<Button>("BtnBytecode")!.Click += (_, _) => ShowBytecode();
+        this.FindControl<Button>("BtnBytecode")!.Click += (_, _) =>
+        {
+            _instructionsView?.SetSource(_editor.Text);
+            ShowBytecode();
+        };
 
         _editor.TextArea.TextEntered += OnTextEntered;
         _editor.Document.TextChanged += (_, _) => ScheduleAnalysis(_editor.Text);
