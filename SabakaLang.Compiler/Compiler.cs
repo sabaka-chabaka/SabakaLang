@@ -440,7 +440,42 @@ public sealed class Compiler
             StringLit s => Value.FromString(s.Value),
             CharLit c => Value.FromChar(c.Value),
             NullLit => Value.Null,
+            UnaryExpr u => EvaluateUnary(u),
+            BinaryExpr b => EvaluateBinary(b),
             NameExpr n when _constants.TryGetValue(n.Name, out var v) => v,
+            _ => null
+        };
+    }
+
+    private Value? EvaluateUnary(UnaryExpr u)
+    {
+        var val = EvaluateConstantExpression(u.Operand);
+        if (val == null) return null;
+
+        return u.Op switch
+        {
+            TokenType.Minus when val.Value.Type == SabakaType.Int => Value.FromInt(-val.Value.Int),
+            TokenType.Minus when val.Value.Type == SabakaType.Float => Value.FromFloat(-val.Value.Float),
+            TokenType.Bang when val.Value.Type == SabakaType.Bool => Value.FromBool(!val.Value.Bool),
+            _ => null
+        };
+    }
+
+    private Value? EvaluateBinary(BinaryExpr b)
+    {
+        var left = EvaluateConstantExpression(b.Left);
+        var right = EvaluateConstantExpression(b.Right);
+        if (left == null || right == null) return null;
+
+        var l = left.Value;
+        var r = right.Value;
+
+        return b.Op switch
+        {
+            TokenType.Plus when l.Type == SabakaType.Int && r.Type == SabakaType.Int => Value.FromInt(l.Int + r.Int),
+            TokenType.Minus when l.Type == SabakaType.Int && r.Type == SabakaType.Int => Value.FromInt(l.Int - r.Int),
+            TokenType.Star when l.Type == SabakaType.Int && r.Type == SabakaType.Int => Value.FromInt(l.Int * r.Int),
+            TokenType.Slash when l.Type == SabakaType.Int && r.Type == SabakaType.Int => r.Int != 0 ? Value.FromInt(l.Int / r.Int) : null,
             _ => null
         };
     }

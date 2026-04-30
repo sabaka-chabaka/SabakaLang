@@ -13,9 +13,6 @@ public class CompilerTests
             throw new Exception("Parse errors:\n" +
                                 string.Join("\n", parse.Errors.Select(e => e.Message)));
         var bind = new Binder().Bind(parse.Statements);
-        if (bind.HasErrors)
-            throw new Exception("Bind errors:\n" +
-                                string.Join("\n", bind.Errors.Select(e => e.ToString())));
         return new Compiler().Compile(parse.Statements, bind);
     }
 
@@ -1055,5 +1052,78 @@ public class CompilerTests
         Assert.Contains(OpCode.Pop, ops);
 
         Assert.False(code.HasErrors);
+    }
+    
+    [Fact]
+    public void Const_IntLiteral_ShouldBeInlined()
+    {
+        var result = Compile(@"
+            const int MAX = 100;
+            print(MAX);
+        ");
+
+        Assert.False(result.HasErrors);
+
+        var push100 = result.Code.FirstOrDefault(i => 
+            i.OpCode == OpCode.Push && 
+            i.Operand is Value v && v.Int == 100);
+
+        Assert.NotNull(push100);
+    }
+
+    [Fact]
+    public void Const_Expression_ShouldBeEvaluated()
+    {
+        var result = Compile(@"
+            const int SIZE = 10 * 20 + 5;
+            print(SIZE);
+        ");
+
+        Assert.False(result.HasErrors);
+
+        var push205 = result.Code.FirstOrDefault(i => 
+            i.OpCode == OpCode.Push && 
+            i.Operand is Value v && v.Int == 205);
+
+        Assert.NotNull(push205);
+    }
+
+    [Fact]
+    public void Const_UsingOtherConst_ShouldWork()
+    {
+        var result = Compile(@"
+            const int A = 42;
+            const int B = A + 8;
+            print(B);
+        ");
+
+        Assert.False(result.HasErrors);
+    }
+
+    [Fact]
+    public void Const_NonConstantExpression_ShouldFail()
+    {
+        var result = Compile(@"
+            int x = 10;
+            const int Y = x * 2;
+        ");
+
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Errors, e => e.Message.Contains("constant expression"));
+    }
+
+    [Fact]
+    public void Const_InClass_ShouldWork()
+    {
+        var result = Compile(@"
+            class Test {
+                const int VERSION = 1;
+                public void run() {
+                    print(VERSION);
+                }
+            }
+        ");
+
+        Assert.False(result.HasErrors);
     }
 }

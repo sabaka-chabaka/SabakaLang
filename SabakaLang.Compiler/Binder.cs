@@ -605,11 +605,14 @@ public sealed class Binder
         if (!IsConstantExpression(c.Value))
             AddError($"The value of 'const' must be a constant expression.", c.Span.Start);
 
-        var sym = new Symbol(c.Name, SymbolKind.Constant, 
-            TypeRefToString(c.Type), c.Span, 
-            parentName: _currentType);
+        if (_scope.ResolveLocal(c.Name) is null)
+        {
+            var sym = new Symbol(c.Name, SymbolKind.Constant, 
+                TypeRefToString(c.Type), c.Span, 
+                parentName: _currentType);
 
-        DeclareSymbol(sym, c.Span.Start);
+            DeclareSymbol(sym, c.Span.Start);
+        }
     }
     
     private bool IsConstantExpression(IExpr expr)

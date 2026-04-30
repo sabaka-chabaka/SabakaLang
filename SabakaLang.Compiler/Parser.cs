@@ -41,8 +41,11 @@ public record ForeachStmt(TypeRef ItemType, string ItemName, IExpr Collection, L
 public record SwitchStmt(IExpr Value, List<SwitchCase> Cases, Span Span) : IStmt;
 public record ImportStmt(string Path, List<string> Names, string? Alias, Span Span) : IStmt;
 
-public record VarDecl(TypeRef Type, string Name, IExpr? Init, AccessMod Access, Span Span) : IStmt;
-public record ConstDecl(TypeRef Type, string Name, IExpr Value, AccessMod Access, Span Span) : IStmt;
+public record VarDecl(TypeRef Type, string Name, IExpr? Init, AccessMod Access, Span Span, bool IsConst = false) : IStmt;
+public record ConstDecl(TypeRef Type, string Name, IExpr Value, AccessMod Access, Span Span) : IStmt
+{
+    public VarDecl ToVarDecl() => new(Type, Name, Value, Access, Span, IsConst: true);
+}
 public record FuncDecl(
     TypeRef ReturnType,
     string Name,
@@ -478,8 +481,9 @@ public sealed class Parser
         while (!Check(TokenType.RBrace) && !IsAtEnd())
         {
             int posBeforeClass = _pos;
-            if (IsFuncDecl()) methods.Add(ParseFuncDecl());
-            else              fields.Add(ParseVarDecl());
+            if (IsFuncDecl())       methods.Add(ParseFuncDecl());
+            else if (IsConstDecl()) fields.Add(ParseConstDecl().ToVarDecl());
+            else                    fields.Add(ParseVarDecl());
             if (_pos == posBeforeClass) Advance();
         }
         Expect(TokenType.RBrace);
