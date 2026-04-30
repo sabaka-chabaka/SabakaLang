@@ -42,6 +42,7 @@ public record SwitchStmt(IExpr Value, List<SwitchCase> Cases, Span Span) : IStmt
 public record ImportStmt(string Path, List<string> Names, string? Alias, Span Span) : IStmt;
 
 public record VarDecl(TypeRef Type, string Name, IExpr? Init, AccessMod Access, Span Span) : IStmt;
+public record ConstDecl(TypeRef Type, string Name, IExpr Value, AccessMod Access, Span Span) : IStmt;
 public record FuncDecl(
     TypeRef ReturnType,
     string Name,
@@ -199,7 +200,9 @@ public sealed class Parser
             TokenType.StructKeyword => ParseStruct(),
             TokenType.Enum      => ParseEnum(),
             TokenType.Import    => ParseImport(),
-            _ => IsFuncDecl() ? ParseFuncDecl() : IsVarDecl() ? ParseVarDecl() : ParseExprStmt()
+            _ => IsConstDecl() ? ParseConstDecl() :
+                IsFuncDecl() ? ParseFuncDecl() :
+                IsVarDecl() ? ParseVarDecl() : ParseExprStmt()
         };
     }
 
@@ -257,6 +260,13 @@ public sealed class Parser
         return false;
     }
     
+    private bool IsConstDecl()
+    {
+        int offset = 0;
+        if (IsAccessMod(Peek(offset).Type)) offset++;
+        return Peek(offset).Type == TokenType.Const;
+    }
+    
     private int SkipAngles(int offset)
     {
         offset++; 
@@ -270,6 +280,23 @@ public sealed class Parser
             offset++;
         }
         return offset;
+    }
+    
+    private ConstDecl ParseConstDecl(AccessMod defaultAccess = AccessMod.Public)
+    {
+        var start = Current.Start;
+        var access = TryConsumeAccessMod(defaultAccess);
+
+        Expect(TokenType.Const);
+        var type = ParseTypeRef();
+        var name = Expect(TokenType.Identifier).Value;
+
+        Expect(TokenType.Equal);
+        var value = ParseExpr();
+
+        Match(TokenType.Semicolon);
+
+        return new ConstDecl(type, name, value, access, SpanFrom(start));
     }
 
     private VarDecl ParseVarDecl(AccessMod defaultAccess  = AccessMod.Public)

@@ -1220,4 +1220,20 @@ public class ParserTests
         
         Assert.Equal('c', chr.Value);
     }
+
+    [Fact]
+    public void Const_Parsed()
+    {
+        var result = Parse("const int x = 1;");
+        
+        Assert.False(result.HasErrors);
+
+        var constDecl = Assert.IsType<ConstDecl>(result.Statements[0]);
+        
+        Assert.Equal("x", constDecl.Name);
+
+        var lit = (IntLit)constDecl.Value;
+        
+        Assert.Equal(1, lit.Value);
+    }
 }
