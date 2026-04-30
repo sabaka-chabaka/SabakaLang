@@ -15,6 +15,7 @@ public enum SymbolKind
     TypeParam,
     BuiltIn,
     Module,
+    Constant
 }
 
 public sealed class Symbol(
@@ -201,6 +202,11 @@ public sealed class Binder
             case EnumDecl e:
                 DeclareIfAbsent(e.Name, SymbolKind.Enum, e.Name, e.Span);
                 break;
+            
+            case ConstDecl c:
+                DeclareIfAbsent(c.Name, SymbolKind.Constant, 
+                    TypeRefToString(c.Type), c.Span);
+                break;
         }
     }
     
@@ -213,6 +219,7 @@ public sealed class Binder
             case FuncDecl   f:       BindFuncDecl(f);      break;
             case ClassDecl  c:       BindClassDecl(c);     break;
             case InterfaceDecl i:    BindInterfaceDecl(i); break;
+            case ConstDecl c: BindConstDecl(c); break;
             case StructDecl s:       BindStructDecl(s);    break;
             case EnumDecl   e:       BindEnumDecl(e);      break;
             case IfStmt     ifs:     BindIf(ifs);          break;
@@ -590,4 +597,30 @@ public sealed class Binder
 
     private static string ParamsString(IEnumerable<Param> ps) =>
         string.Join(", ", ps.Select(p => $"{TypeRefToString(p.Type)} {p.Name}"));
+    
+    private void BindConstDecl(ConstDecl c)
+    {
+        BindExpr(c.Value);
+
+        if (!IsConstantExpression(c.Value))
+            AddError($"The value of 'const' must be a constant expression.", c.Span.Start);
+
+        var sym = new Symbol(c.Name, SymbolKind.Constant, 
+            TypeRefToString(c.Type), c.Span, 
+            parentName: _currentType);
+
+        DeclareSymbol(sym, c.Span.Start);
+    }
+    
+    private bool IsConstantExpression(IExpr expr)
+    {
+        return expr switch
+        {
+            IntLit or FloatLit or BoolLit or StringLit or CharLit or NullLit => true,
+            UnaryExpr u => IsConstantExpression(u.Operand),
+            BinaryExpr b => IsConstantExpression(b.Left) && IsConstantExpression(b.Right),
+            NameExpr n => _scope.Resolve(n.Name)?.Kind == SymbolKind.Constant,
+            _ => false
+        };
+    }
 }
