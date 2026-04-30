@@ -29,6 +29,7 @@
                             VerticalAlignment="Center" HorizontalAlignment="Left">
                     <Button Name="BtnSave" ToolTip.Tip="Save (Ctrl+S)" HorizontalAlignment="Right">💾 Save</Button>
                     <Button Name="BtnOpen" ToolTip.Tip="Open" HorizontalAlignment="Right">📂 Open</Button>
+                    <Button Name="BtnBytecode" ToolTip.Tip="View bytecode" HorizontalAlignment="Right">View bytecode</Button>
                 </StackPanel>
             </DockPanel>
         </Border>

@@ -41,6 +41,8 @@ public partial class MainWindow : Window
     private TextBlock?  _statusMessage;
 
     private string? _currentPath;
+    
+    private InstructionsView? _instructionsView;
 
     public MainWindow()
     {
@@ -68,17 +70,27 @@ public partial class MainWindow : Window
         this.FindControl<Button>("BtnRun")!.Click += (_, _) => _ = RunCodeAsync();
         this.FindControl<Button>("BtnSave")!.Click += (_, _) => _ = SaveDocumentAsync();
         this.FindControl<Button>("BtnOpen")!.Click += (_, _) => _ = OpenDocumentAsync();
+        this.FindControl<Button>("BtnBytecode")!.Click += (_, _) => ShowBytecode();
 
         _editor.TextArea.TextEntered += OnTextEntered;
         _editor.Document.TextChanged += (_, _) => ScheduleAnalysis(_editor.Text);
 
         KeyDown += (o, keyEventArgs) =>
         {
-            if (keyEventArgs.Key == Key.F5) { _ = RunCodeAsync(); keyEventArgs.Handled = true; }
-            if (keyEventArgs.Key == Key.S && keyEventArgs.KeyModifiers.HasFlag(KeyModifiers.Control)) { _ = SaveDocumentAsync(); keyEventArgs.Handled = true; }
+            switch (keyEventArgs.Key)
+            {
+                case Key.F5:
+                    _ = RunCodeAsync(); keyEventArgs.Handled = true;
+                    break;
+                case Key.S when keyEventArgs.KeyModifiers.HasFlag(KeyModifiers.Control):
+                    _ = SaveDocumentAsync(); keyEventArgs.Handled = true;
+                    break;
+            }
         };
 
         ScheduleAnalysis(_editor.Text);
+        
+        _instructionsView = new InstructionsView(_editor.Text);
     }
 
     private void SetupHighlighting(TextEditor editor)
@@ -118,6 +130,11 @@ public partial class MainWindow : Window
             if (!char.IsLetterOrDigit(ch) && ch != '_')
                 _completionWindow.CompletionList.RequestInsertion(e);
         };
+    }
+
+    private void ShowBytecode()
+    {
+        _instructionsView?.Show();
     }
 
     private void TryShowCompletion(TextEditor editor)
