@@ -94,6 +94,8 @@ public enum TokenType
     
     Import,
     
+    Const,
+    
     Eof
 }
 
@@ -152,7 +154,8 @@ public sealed class Lexer(string source)
         ["public"]    = TokenType.Public,
         ["private"]   = TokenType.Private,
         ["protected"] = TokenType.Protected,
-        ["import"]    = TokenType.Import
+        ["import"]    = TokenType.Import,
+        ["const"]     = TokenType.Const
     };
 
     public LexerResult Tokenize()
