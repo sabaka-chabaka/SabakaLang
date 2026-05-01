@@ -1,7 +1,11 @@
 using System.Text;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Compiling;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
+using SabakaLang.Compiler.Runtime;
 using Spectre.Console;
-using Binder = SabakaLang.Compiler.Binder;
+using Binder = SabakaLang.Compiler.Binding.Binder;
 
 namespace SabakaLang.Cli;
 
@@ -31,7 +35,7 @@ public class Packer
                 var binder = new Binder().Bind(parser.Statements);
 
                 ctx.Status("Compiling to bytecode...");
-                var compiler = new Compiler.Compiler();
+                var compiler = new Compiler.Compiling.Compiler();
                 var result = compiler.Compile(parser.Statements, binder);
 
                 ctx.Status("Writing [green]app.sar[/]...");

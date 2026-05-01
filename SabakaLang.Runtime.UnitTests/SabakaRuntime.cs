@@ -1,4 +1,10 @@
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.AST;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Compiling;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
+using SabakaLang.Compiler.Runtime;
 
 namespace SabakaLang.Runtime.UnitTests;
 
@@ -57,14 +63,14 @@ public sealed class SabakaRuntime
                 name: kvp.Key, 
                 kind: SymbolKind.Function,
                 type: "dynamic",
-                span: new Compiler.Span(default, default),
+                span: new Span(default, default),
                 parameters: new string(',', kvp.Value) 
             )
         );
 
         binder.AddGlobalSymbols(externalSymbols);
         
-        var comp  = new Compiler.Compiler();
+        var comp  = new Compiler.Compiling.Compiler();
 
         foreach (var (name, arity) in _externalArities)
             comp.RegisterExternal(name, arity);

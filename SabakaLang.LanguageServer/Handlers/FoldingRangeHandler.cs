@@ -2,6 +2,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.AST;
 
 namespace SabakaLang.LanguageServer.Handlers;
 
@@ -96,7 +97,7 @@ public sealed class FoldingRangeHandler(DocumentStore store) : FoldingRangeHandl
         }
     }
 
-    private static void AddFold(List<FoldingRange> ranges, Compiler.Span span)
+    private static void AddFold(List<FoldingRange> ranges, Span span)
     {
         var startLine = PositionHelper.ToLsp(span.Start).Line;
         var endLine   = PositionHelper.ToLsp(span.End).Line;

@@ -2,8 +2,9 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Lexing;
 using SemanticTokensLegend = SabakaLang.LanguageServer.Services.SemanticTokensLegend;
-using SymbolKind = SabakaLang.Compiler.SymbolKind;
+using SymbolKind = SabakaLang.Compiler.Binding.SymbolKind;
 
 namespace SabakaLang.LanguageServer.Handlers;
 

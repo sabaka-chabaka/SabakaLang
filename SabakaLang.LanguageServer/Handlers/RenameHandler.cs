@@ -3,6 +3,8 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Lexing;
+using SymbolKind = SabakaLang.Compiler.Binding.SymbolKind;
 
 namespace SabakaLang.LanguageServer.Handlers;
 
@@ -63,7 +65,7 @@ public sealed class RenameHandler(DocumentStore store) : RenameHandlerBase, IPre
             return Task.FromResult<RangeOrPlaceholderRange?>(null);
 
         if (analysis.Bind.Symbols.Lookup(token.Value)
-            .Any(s => s.Kind == Compiler.SymbolKind.BuiltIn))
+            .Any(s => s.Kind == SymbolKind.BuiltIn))
             return Task.FromResult<RangeOrPlaceholderRange?>(null);
 
         var range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(

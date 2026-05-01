@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using SabakaLang.Compiler.Lexing;
 
 namespace SabakaLang.Compiler.UnitTests;
 

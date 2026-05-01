@@ -6,6 +6,8 @@ using AvaloniaEdit.Document;
 using AvaloniaEdit.Editing;
 using Avalonia.Media;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Lexing;
 using SabakaLang.LanguageServer;
 
 namespace SabakaLang.Studio.Completion;

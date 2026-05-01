@@ -1,8 +1,9 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.AST;
 using SabakaLang.LanguageServer;
 using LspPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
-using CompilerPosition = SabakaLang.Compiler.Position;
+using CompilerPosition = SabakaLang.Compiler.Lexing.Position;
 
 namespace SabakaLang.LanguageServer.UnitTests;
 

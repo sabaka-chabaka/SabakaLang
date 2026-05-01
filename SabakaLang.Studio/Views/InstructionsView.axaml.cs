@@ -3,6 +3,9 @@ using System.Linq;
 using System.Text;
 using Avalonia.Controls;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
 
 namespace SabakaLang.Studio.Views;
 
@@ -22,7 +25,7 @@ public partial class InstructionsView : Window
     
     protected override void OnOpened(EventArgs e)
     {
-        var val = new Compiler.Compiler().Compile(new Parser(new Lexer(_src!).Tokenize()).Parse().Statements,
+        var val = new Compiler.Compiling.Compiler().Compile(new Parser(new Lexer(_src!).Tokenize()).Parse().Statements,
             new Binder().Bind(new Parser(new Lexer(_src!).Tokenize()).Parse().Statements)).Code.ToList();
         
         var sb = new StringBuilder();

@@ -1,3 +1,8 @@
+using SabakaLang.Compiler.AST;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
+
 namespace SabakaLang.Compiler.UnitTests;
 
 public class NullableBinderTests

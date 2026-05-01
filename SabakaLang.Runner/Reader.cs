@@ -1,5 +1,7 @@
 using System.Text;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Compiling;
+using SabakaLang.Compiler.Runtime;
 
 namespace SabakaLang.Runner;
 

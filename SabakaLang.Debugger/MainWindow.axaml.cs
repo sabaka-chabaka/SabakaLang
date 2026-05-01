@@ -7,6 +7,10 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Compiling;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
 using SabakaLang.Runtime;
 using SabakaLang.Studio.Helpers;
 
@@ -47,7 +51,7 @@ public partial class MainWindow : Window
             var lex = new Lexer(source).Tokenize();
             var parser = new Parser(lex).Parse();
             var bind = new Binder().Bind(parser.Statements);
-            var comp = new Compiler.Compiler();
+            var comp = new Compiler.Compiling.Compiler();
             
             _bytecode = comp.Compile(parser.Statements, bind).Code.ToList(); 
             

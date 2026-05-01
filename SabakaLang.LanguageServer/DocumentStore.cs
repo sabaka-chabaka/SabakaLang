@@ -1,4 +1,7 @@
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
 
 namespace SabakaLang.LanguageServer;
 

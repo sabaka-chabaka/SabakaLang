@@ -1,7 +1,7 @@
 using LspPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
-using CompilerPosition = SabakaLang.Compiler.Position;
-using CompilerSpan = SabakaLang.Compiler.Span;
+using CompilerPosition = SabakaLang.Compiler.Lexing.Position;
+using CompilerSpan = SabakaLang.Compiler.AST.Span;
 
 namespace SabakaLang.LanguageServer;
 

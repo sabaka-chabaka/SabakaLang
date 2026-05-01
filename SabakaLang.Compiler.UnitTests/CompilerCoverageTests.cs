@@ -1,6 +1,11 @@
 using SabakaLang.Compiler;
 using System.Collections.Generic;
 using System.Linq;
+using SabakaLang.Compiler.AST;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Compiling;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
 
 namespace SabakaLang.Compiler.UnitTests;
 
@@ -19,7 +24,7 @@ public class CompilerCoverageTests
         var parse = new Parser(lex).Parse();
         var binder = new Binder();
         var bound = binder.Bind(parse.Statements);
-        var comp  = new Compiler();
+        var comp  = new Compiling.Compiler();
         return comp.Compile(parse.Statements, bound);
     }
 
@@ -70,7 +75,7 @@ public class CompilerCoverageTests
         // it SHOULD hit the default case.
         // Let's try to bypass Binder entirely by constructing the AST manually.
         var expr = new AssignExpr(new IntLit(1, default), new IntLit(2, default), default);
-        var comp = new SabakaLang.Compiler.Compiler();
+        var comp = new Compiling.Compiler();
         // BindResult(SymbolTable table, IReadOnlyList<BindError> errors)
         var result = comp.Compile(new List<IStmt> { new ExprStmt(expr, default) }, new BindResult(new SymbolTable(), new List<BindError>(), new List<BindWarning>()));
         Assert.True(result.HasErrors);
@@ -85,7 +90,7 @@ public class CompilerCoverageTests
         var parse = new Parser(lex).Parse();
         var binder = new Binder();
         var bound = binder.Bind(parse.Statements);
-        var comp = new Compiler();
+        var comp = new Compiling.Compiler();
         var r = comp.Compile(parse.Statements, bound);
         Assert.True(r.HasErrors);
         Assert.Contains("used outside a class", r.Errors.Any(e => e.Message.Contains("super")) ? r.Errors.First(e => e.Message.Contains("super")).Message : "");

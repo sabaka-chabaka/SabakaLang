@@ -12,6 +12,9 @@ using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
 using AvaloniaEdit.Editing;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
 using SabakaLang.LanguageServer;
 using SabakaLang.Runtime;
 using SabakaLang.Studio.Completion;
@@ -246,7 +249,7 @@ public partial class MainWindow : Window
             var lex    = new Lexer(_editor!.Text).Tokenize();
             var parse  = new Parser(lex).Parse();
             var bind   = new Binder().Bind(parse.Statements);
-            var comp   = new Compiler.Compiler();
+            var comp   = new Compiler.Compiling.Compiler();
             var result = comp.Compile(parse.Statements, bind);
 
             ConsoleHelper.Show();

@@ -2,6 +2,8 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Lexing;
+using SymbolKind = SabakaLang.Compiler.Binding.SymbolKind;
 
 namespace SabakaLang.LanguageServer.Handlers;
 
@@ -25,7 +27,7 @@ public sealed class ReferencesHandler(DocumentStore store) : ReferencesHandlerBa
         if (request.Context.IncludeDeclaration)
         {
             foreach (var sym in analysis.Bind.Symbols.Lookup(word)
-                         .Where(s => s.Kind is not Compiler.SymbolKind.BuiltIn))
+                         .Where(s => s.Kind is not SymbolKind.BuiltIn))
             {
                 locations.Add(new Location
                 {

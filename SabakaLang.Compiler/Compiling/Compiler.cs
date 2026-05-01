@@ -1,185 +1,9 @@
-using System.Globalization;
+using SabakaLang.Compiler.AST;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Runtime;
 
-namespace SabakaLang.Compiler;
-
-public enum OpCode
-{
-    Push,
-    Pop,
-    Dup,
-    Swap,
- 
-    Add, Sub, Mul, Div, Mod,
- 
-    Equal, NotEqual, Greater, Less, GreaterEqual, LessEqual,
- 
-    And, Or, Not, Negate,
- 
-    Declare,
-    Load,
-    Store,
- 
-    EnterScope,
-    ExitScope,
- 
-    Jump,
-    JumpIfFalse,
-    JumpIfTrue,
-    
-    Function,
-    Call,
-    Return,
-    
-    Is,
-    
-    CreateObject,
-    CallMethod,
-    LoadField,
-    StoreField,
-    PushThis,
-    Inherit,
- 
-    CreateArray,
-    ArrayLoad,
-    ArrayStore,
-    ArrayLength,
- 
-    CreateStruct,
- 
-    PushEnum,
- 
-    Print,
-    Input,
-    Sleep,
-    ReadFile, WriteFile, AppendFile, FileExists, DeleteFile, ReadLines,
-    Time, TimeMs,
-    HttpGet, HttpPost, HttpPostJson,
-    Ord, Chr,
- 
-    CallExternal
-}
-
-public sealed class Instruction(
-    OpCode opCode,
-    object? operand = null,
-    string? name = null,
-    object? extra = null)
-{
-    public OpCode  OpCode  { get; } = opCode;
-    public object? Operand { get; set; } = operand;
-    public string? Name    { get; } = name;
-    public object? Extra   { get; } = extra;
-
-    public override string ToString()
-    {
-        var parts = new List<string> { OpCode.ToString() };
-        if (Name    is not null) parts.Add($"'{Name}'");
-        if (Operand is not null) parts.Add(Operand.ToString()!);
-        return string.Join(" ", parts);
-    }
-}
-
-internal sealed class ClassMeta(string name, string? @base)
-{
-    public string  Name       { get; } = name;
-    public string? Base       { get; } = @base;
-    public List<string>         Fields  { get; } = [];
-    public List<VarDecl>        FieldDecls { get; } = [];
-    public List<FuncDecl>       Methods { get; } = [];
-
-    // ReSharper disable once CollectionNeverQueried.Global
-    public readonly List<string> Interfaces = [];
-}
-
-public readonly record struct CompileError(string Message, Position Position)
-{
-    public override string ToString() => $"[{Position.Line}:{Position.Column}] {Message}";
-}
-
-public sealed class CompileResult(
-    IReadOnlyList<Instruction> code,
-    IReadOnlyList<CompileError> errors,
-    SymbolTable? symbols = null)
-{
-    public IReadOnlyList<Instruction>  Code    { get; } = code;
-    public IReadOnlyList<CompileError> Errors  { get; } = errors;
-    public SymbolTable                 Symbols { get; } = symbols ?? new SymbolTable();
-    public bool HasErrors => Errors.Count > 0;
-}
-
-public enum SabakaType { Null, Int, Float, Bool, String, Array, Object, Char }
-
-public readonly struct Value
-{
-    public readonly SabakaType Type;
- 
-    public readonly int    Int;
-    public readonly double Float;
-    public readonly bool   Bool;
-    public readonly string String;
-    public readonly char Char;
- 
-    public readonly List<Value>?           Array;
-    public readonly SabakaObject?          Object;
- 
-    private Value(SabakaType t, int i = 0, double f = 0, bool b = false,
-                  string s = "", char c = '\0', List<Value>? arr = null, SabakaObject? obj = null)
-    {
-        Type   = t; Int = i; Float = f; Bool = b;
-        String = s;
-        Char = c; Array = arr; Object = obj;
-    }
- 
-    public static readonly Value Null    = new(SabakaType.Null);
-    public static Value FromInt(int v)           => new(SabakaType.Int,   i: v);
-    public static Value FromFloat(double v)      => new(SabakaType.Float, f: v);
-    public static Value FromBool(bool v)         => new(SabakaType.Bool,  b: v);
-    public static Value FromString(string? v)     => new(SabakaType.String, s: v ?? "");
-    public static Value FromChar(char? v)     => new(SabakaType.Char, c: v ?? '\0');
-    public static Value FromArray(List<Value> v) => new(SabakaType.Array,  arr: v);
-    public static Value FromObject(SabakaObject v) => new(SabakaType.Object, obj: v);
- 
-    public bool IsNull   => Type == SabakaType.Null;
-    public bool IsNumber => Type is SabakaType.Int or SabakaType.Float;
- 
-    public double ToDouble() => Type switch
-    {
-        SabakaType.Int   => Int,
-        SabakaType.Float => Float,
-        _ => throw new RuntimeException($"Expected number, got {Type}")
-    };
- 
-    public override string ToString() => Type switch
-    {
-        SabakaType.Null   => "null",
-        SabakaType.Int    => Int.ToString(CultureInfo.InvariantCulture),
-        SabakaType.Float  => Float.ToString(CultureInfo.InvariantCulture),
-        SabakaType.Bool   => Bool ? "true" : "false",
-        SabakaType.String => String,
-        SabakaType.Array  => "[" + string.Join(", ", Array!.Select(v => v.ToString())) + "]",
-        SabakaType.Object => Object!.ToString(),
-        SabakaType.Char   => Char.ToString(),
-        _ => "?"
-    };
-}
-
-public sealed class SabakaObject(string className)
-{
-    public string ClassName { get; } = className;
-    public Dictionary<string, Value> Fields { get; } = new();
-
-    public SabakaObject Clone()
-    {
-        var c = new SabakaObject(ClassName);
-        foreach (var kv in Fields) c.Fields[kv.Key] = kv.Value;
-        return c;
-    }
- 
-    public override string ToString() =>
-        $"{ClassName} {{ {string.Join(", ", Fields.Select(kv => $"{kv.Key}: {kv.Value}"))} }}";
-}
- 
-public sealed class RuntimeException(string msg) : Exception(msg);
+namespace SabakaLang.Compiler.Compiling;
 
 public sealed class Compiler
 {
@@ -839,21 +663,21 @@ public sealed class Compiler
         if (c.Callee is NameExpr ne)
         {
             if (TryEmitBuiltin(ne.Name, c)) return;
-
+ 
             if (_externals.TryGetValue(ne.Name, out _))
             {
                 foreach (var a in c.Args) EmitExpr(a);
                 Emit(OpCode.CallExternal, c.Args.Count, name: ne.Name);
                 return;
             }
-
+ 
             if (IsKnownClass(ne.Name))
             {
                 EmitCreateObject(ne.Name);
                 EmitConstructorCall(ne.Name, c.Args, c.Span.Start);
                 return;
             }
-
+ 
             if (_currentClass is not null && IsMethodOf(_currentClass, ne.Name))
             {
                 Emit(OpCode.PushThis);
@@ -861,12 +685,12 @@ public sealed class Compiler
                 Emit(OpCode.CallMethod, c.Args.Count, name: ne.Name);
                 return;
             }
-
+ 
             foreach (var a in c.Args) EmitExpr(a);
             Emit(OpCode.Call, c.Args.Count, name: ne.Name);
             return;
         }
-
+ 
         if (c.Callee is MemberExpr me)
         {
             if (me.Object is SuperExpr)
@@ -887,7 +711,7 @@ public sealed class Compiler
                 Emit(OpCode.CallMethod, c.Args.Count, name: me.Member, extra: baseClass);
                 return;
             }
-
+ 
             if (me.Object is NameExpr modName)
             {
                 string extKey = $"{modName.Name}.{me.Member}";
@@ -898,13 +722,13 @@ public sealed class Compiler
                     return;
                 }
             }
-
+ 
             EmitExpr(me.Object);
             foreach (var a in c.Args) EmitExpr(a);
             Emit(OpCode.CallMethod, c.Args.Count, name: me.Member);
             return;
         }
-
+ 
         Error("Unsupported call expression form", c.Span.Start);
     }
  
@@ -917,14 +741,14 @@ public sealed class Compiler
             Emit(OpCode.Push, Value.FromString(enumVal));
             return;
         }
-
+ 
         if (m.Member == "length")
         {
             EmitExpr(m.Object);
             Emit(OpCode.ArrayLength);
             return;
         }
-
+ 
         EmitExpr(m.Object);
         Emit(OpCode.LoadField, name: m.Member);
     }
@@ -959,7 +783,7 @@ public sealed class Compiler
         Emit(OpCode.PushThis);
     }
     
-
+ 
     private void EmitInterpolatedString(InterpolatedStringExpr interp)
     {
         if (interp.Parts.Count == 0)
@@ -967,36 +791,36 @@ public sealed class Compiler
             Emit(OpCode.Push, Value.FromString(""));
             return;
         }
-
+ 
         EmitExpr(interp.Parts[0]);
-
+ 
         if (interp.Parts[0] is not StringLit)
         {
             Emit(OpCode.Push, Value.FromString(""));
             Emit(OpCode.Swap);
             Emit(OpCode.Add);
         }
-
+ 
         for (int i = 1; i < interp.Parts.Count; i++)
         {
             EmitExpr(interp.Parts[i]);
             Emit(OpCode.Add);
         }
     }
-
+ 
     private void EmitTernary(TernaryExpr t)
     {
         EmitExpr(t.Condition);
-
+ 
         int jmpFalse = Emit(OpCode.JumpIfFalse, 0);
-
+ 
         EmitExpr(t.Then);
         int jmpEnd = Emit(OpCode.Jump, 0);
-
+ 
         Patch(jmpFalse, Ip);
-
+ 
         EmitExpr(t.Else);
-
+ 
         Patch(jmpEnd, Ip);
     }
     
@@ -1004,7 +828,7 @@ public sealed class Compiler
     {
         EmitCreateObject(className, className);
     }
-
+ 
     private void EmitCreateObject(string instanceClassName, string metaClassName)
     {
         var allFields = GetAllClassFields(metaClassName);

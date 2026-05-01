@@ -1,6 +1,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using SymbolKind = SabakaLang.Compiler.Binding.SymbolKind;
 
 namespace SabakaLang.LanguageServer.Handlers;
 
@@ -24,7 +25,7 @@ public sealed class DefinitionHandler(DocumentStore store) : DefinitionHandlerBa
 
         var locations = symbols
             .Where(s => s.Span.Start.Offset > 0 || s.Span.End.Offset > 0)
-            .Where(s => s.Kind is not Compiler.SymbolKind.BuiltIn)
+            .Where(s => s.Kind is not SymbolKind.BuiltIn)
             .Select(s => new Location
             {
                 Uri = request.TextDocument.Uri,

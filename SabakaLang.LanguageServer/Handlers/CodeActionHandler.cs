@@ -2,6 +2,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using SabakaLang.Compiler.AST;
 
 namespace SabakaLang.LanguageServer.Handlers;
 
@@ -120,7 +121,7 @@ public sealed class CodeActionHandler(DocumentStore store) : CodeActionHandlerBa
         CodeActionParams request, DocumentAnalysis analysis)
     {
         var imports = analysis.Parse.Statements
-            .OfType<SabakaLang.Compiler.ImportStmt>()
+            .OfType<ImportStmt>()
             .ToList();
 
         if (imports.Count < 2) return new WorkspaceEdit();

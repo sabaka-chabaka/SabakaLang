@@ -1,4 +1,6 @@
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Compiling;
+using SabakaLang.Compiler.Runtime;
 using SabakaLang.Runtime;
 
 namespace SabakaLang.Runtime.UnitTests;

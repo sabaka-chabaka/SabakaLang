@@ -1,4 +1,5 @@
 using SabakaLang.Compiler;
+using SabakaLang.Compiler.Binding;
 using SabakaLang.LanguageServer;
 
 namespace SabakaLang.LanguageServer.UnitTests;

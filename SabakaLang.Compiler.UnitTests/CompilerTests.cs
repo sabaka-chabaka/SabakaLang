@@ -1,4 +1,10 @@
 using System.Runtime.InteropServices;
+using SabakaLang.Compiler.AST;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Compiling;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
+using SabakaLang.Compiler.Runtime;
 
 namespace SabakaLang.Compiler.UnitTests;
 
@@ -13,7 +19,7 @@ public class CompilerTests
             throw new Exception("Parse errors:\n" +
                                 string.Join("\n", parse.Errors.Select(e => e.Message)));
         var bind = new Binder().Bind(parse.Statements);
-        return new Compiler().Compile(parse.Statements, bind);
+        return new Compiling.Compiler().Compile(parse.Statements, bind);
     }
 
     private static CompileResult CompileUnchecked(string source)
@@ -24,7 +30,7 @@ public class CompilerTests
             throw new Exception("Parse errors:\n" +
                                 string.Join("\n", parse.Errors.Select(e => e.Message)));
         var emptyBind = new Binder().Bind(Array.Empty<IStmt>());
-        return new Compiler().Compile(parse.Statements, emptyBind);
+        return new Compiling.Compiler().Compile(parse.Statements, emptyBind);
     }
 
     private static IReadOnlyList<Instruction> Code(string source)
@@ -669,7 +675,7 @@ public class CompilerTests
         var lex   = new Lexer("myExt(1, 2);").Tokenize();
         var parse = new Parser(lex).Parse();
         var bind  = new Binder().Bind(parse.Statements);
-        var comp  = new Compiler();
+        var comp  = new Compiling.Compiler();
         comp.RegisterExternal("myExt", 2);
         var result = comp.Compile(parse.Statements, bind);
 

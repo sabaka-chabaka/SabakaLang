@@ -1,4 +1,7 @@
 ﻿using SabakaLang.Compiler;
+using SabakaLang.Compiler.Binding;
+using SabakaLang.Compiler.Lexing;
+using SabakaLang.Compiler.Parsing;
 using SabakaLang.Runtime;
 
 namespace SabakaLang.Cli;
@@ -21,7 +24,7 @@ public static class Program
                 var lexer = new Lexer(src);
                 var parser = new Parser(lexer.Tokenize());
                 var binder = new Binder();
-                var compiler = new Compiler.Compiler();
+                var compiler = new Compiler.Compiling.Compiler();
                 var result = compiler.Compile(parser.Parse().Statements, binder.Bind(parser.Parse().Statements));
 
                 var vm = new VirtualMachine();
