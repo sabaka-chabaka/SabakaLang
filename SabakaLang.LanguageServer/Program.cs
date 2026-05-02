@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Server;
 using SabakaLang.LanguageServer;
 using SabakaLang.LanguageServer.Handlers;
@@ -29,14 +28,8 @@ var server = await LanguageServer.From(options =>
         .WithHandler<SemanticTokensHandler>()
         .WithHandler<FoldingRangeHandler>()
         .WithHandler<CodeActionHandler>()
-        .OnInitialize((srv, req, ct) =>
-        {
-            return Task.CompletedTask;
-        })
-        .OnInitialized((srv, req, res, ct) =>
-        {
-            return Task.CompletedTask;
-        });
+        .OnInitialize((_, _, _) => Task.CompletedTask)
+        .OnInitialized((_, _, _, _) => Task.CompletedTask);
 });
 
 await server.WaitForExit;

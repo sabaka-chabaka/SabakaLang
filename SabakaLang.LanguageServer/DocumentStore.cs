@@ -1,34 +1,23 @@
-using SabakaLang.Compiler;
 using SabakaLang.Compiler.Binding;
 using SabakaLang.Compiler.Lexing;
 using SabakaLang.Compiler.Parsing;
 
 namespace SabakaLang.LanguageServer;
 
-public sealed class DocumentAnalysis
+public sealed class DocumentAnalysis(
+    string uri,
+    string source,
+    LexerResult lexer,
+    ParseResult parse,
+    BindResult bind)
 {
-    public string Uri { get; }
-    public string Source { get; }
-    public LexerResult Lexer { get; }
-    public ParseResult Parse { get; }
-    public BindResult Bind { get; }
-    public IReadOnlyList<Diagnostic> Diagnostics { get; }
-    
-    public DocumentAnalysis(
-        string uri,
-        string source,
-        LexerResult lexer,
-        ParseResult parse,
-        BindResult bind)
-    {
-        Uri = uri;
-        Source = source;
-        Lexer = lexer;
-        Parse = parse;
-        Bind = bind;
-        Diagnostics = BuildDiagnostics(lexer, parse, bind);
-    }
-    
+    public string Uri { get; } = uri;
+    public string Source { get; } = source;
+    public LexerResult Lexer { get; } = lexer;
+    public ParseResult Parse { get; } = parse;
+    public BindResult Bind { get; } = bind;
+    public IReadOnlyList<Diagnostic> Diagnostics { get; } = BuildDiagnostics(lexer, parse, bind);
+
     private static List<Diagnostic> BuildDiagnostics(
         LexerResult lexer,
         ParseResult parse,
@@ -56,20 +45,12 @@ public sealed class DocumentAnalysis
 
 public enum DiagnosticSeverity { Error, Warning, Information, Hint }
 
-public sealed class Diagnostic
+public sealed class Diagnostic(string message, Position start, Position end, DiagnosticSeverity severity)
 {
-    public string Message { get; }
-    public Position Start { get; }
-    public Position End { get; }
-    public DiagnosticSeverity Severity { get; }
-
-    public Diagnostic(string message, Position start, Position end, DiagnosticSeverity severity)
-    {
-        Message = message;
-        Start = start;
-        End = end;
-        Severity = severity;
-    }
+    public string Message { get; } = message;
+    public Position Start { get; } = start;
+    public Position End { get; } = end;
+    public DiagnosticSeverity Severity { get; } = severity;
 }
 
 public sealed class DocumentStore
