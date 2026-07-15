@@ -3,6 +3,7 @@ using SabakaLang.Compiler.Binding;
 using SabakaLang.Compiler.Lexing;
 using SabakaLang.Compiler.Parsing;
 using SabakaLang.Runtime;
+using Spectre.Console;
 
 namespace SabakaLang.Cli;
 
@@ -32,6 +33,10 @@ public static class Program
                 
                 break;
             
+            case "check":
+                CheckCode(File.ReadAllText(args[1]));
+                break;
+            
             case "version":
                 Console.WriteLine("0.1");
                 break;
@@ -40,5 +45,29 @@ public static class Program
                 new Packer().Pack(args[1].Trim(), args[2].Trim());
                 break;
         }
+    }
+
+    private static void CheckCode(string src)
+    {
+        AnsiConsole.Status().Spinner(Spinner.Known.Dots).Start("[green] sabaka check running[/]", ctx =>
+        {
+            var start = DateTime.UtcNow;
+
+            try
+            {
+                var lexer = new Lexer(src);
+                var parser = new Parser(lexer.Tokenize());
+                var binder = new Binder();
+                var compiler = new Compiler.Compiling.Compiler();
+                compiler.Compile(parser.Parse().Statements, binder.Bind(parser.Parse().Statements));
+
+            }
+            catch (Exception e)
+            {
+                ctx.Status($"[red] sabaka check failed for {DateTime.Now - start}. Exception: {e} [/]");
+            }
+            
+            ctx.Status($"[green] sabaka check successfully runned for {DateTime.UtcNow - start}[/]");
+        });
     }
 }
