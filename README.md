@@ -21,7 +21,7 @@ print("Hello, World!");
 
 Next you must open terminal in this folder that contains this file and run
 ```bash
-sabaka run <yourfile>
+sabaka run <yourfile.sabaka>
 ```
 
 ## Documentation
