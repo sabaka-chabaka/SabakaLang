@@ -1,10 +1,1 @@
-import "other.sabaka";
-import "System.Text";
-
-Hello();
-
-StringBuilder sb = new StringBuilder();
-
-sb.Append("debug");
-
-print(sb.ToString());
+print(52+42+67+69);
