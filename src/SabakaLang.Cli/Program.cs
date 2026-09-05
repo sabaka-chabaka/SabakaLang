@@ -27,7 +27,7 @@ public static class Program
             case "run":
                 var src = File.ReadAllText(args[1]);
 
-                if (args[2] == "--to-il")
+                /*if (args.Length > 1 && args[2] == "--to-il")
                 {
                     var transpiler = new Transpiler.Transpiler();
                     
@@ -48,7 +48,7 @@ public static class Program
                     CSharpScript.RunAsync(csharp, options).Wait();
                     
                     break;
-                }
+                }*/
 
                 var lexer = new Lexer(src);
                 var parser = new Parser(lexer.Tokenize()).Parse();

@@ -1,1 +1,606 @@
-print(52+42+67+69);
+// ============================================================================
+// SabakaLang Showcase Script
+// Demonstrating language features: OOP, Inheritance, Recursion, Data Structures,
+// String Manipulation, Math Built-ins, and Algorithms.
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. MATH & NUMERICAL ALGORITHMS
+// ----------------------------------------------------------------------------
+
+int factorial(int n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+int fibonacci(int n) {
+    if (n <= 0) {
+        return 0;
+    }
+    if (n == 1) {
+        return 1;
+    }
+    int a = 0;
+    int b = 1;
+    for (int i = 2; i <= n; i = i + 1) {
+        int temp = a + b;
+        a = b;
+        b = temp;
+    }
+    return b;
+}
+
+int gcd(int a, int b) {
+    while (b != 0) {
+        int temp = b;
+        b = a % b;
+        a = temp;
+    }
+    return a;
+}
+
+int lcm(int a, int b) {
+    if (a == 0 || b == 0) {
+        return 0;
+    }
+    return (a * b) / gcd(a, b);
+}
+
+bool isPrime(int n) {
+    if (n <= 1) {
+        return false;
+    }
+    if (n <= 3) {
+        return true;
+    }
+    if (n % 2 == 0 || n % 3 == 0) {
+        return false;
+    }
+    int i = 5;
+    while (i * i <= n) {
+        if (n % i == 0 || n % (i + 2) == 0) {
+            return false;
+        }
+        i = i + 6;
+    }
+    return true;
+}
+
+void demoMathAlgorithms() {
+    print("------------------------------------------------------------");
+    print("[1] MATHEMATICAL ALGORITHMS & BUILT-INS");
+    print("------------------------------------------------------------");
+
+    int f5 = factorial(5);
+    int f7 = factorial(7);
+    print($"Factorial of 5: {f5}");
+    print($"Factorial of 7: {f7}");
+
+    print("Fibonacci sequence (first 10 terms):");
+    string fibList = "";
+    for (int i = 0; i < 10; i = i + 1) {
+        int fibVal = fibonacci(i);
+        if (i > 0) {
+            fibList = fibList + ", ";
+        }
+        fibList = fibList + fibVal;
+    }
+    print($"  {fibList}");
+
+    int num1 = 48;
+    int num2 = 18;
+    int g = gcd(num1, num2);
+    int l = lcm(num1, num2);
+    print($"GCD({num1}, {num2}) = {g}");
+    print($"LCM({num1}, {num2}) = {l}");
+
+    print("Prime numbers up to 30:");
+    string primes = "";
+    for (int p = 2; p <= 30; p = p + 1) {
+        if (isPrime(p)) {
+            if (primes.length > 0) {
+                primes = primes + ", ";
+            }
+            primes = primes + p;
+        }
+    }
+    print($"  {primes}");
+
+    print("Math Built-ins verification:");
+    float sq = sqrt(144.0);
+    float pwr = pow(2.0, 8.0);
+    float absolute = abs(-42.75);
+    int fl = floor(9.85);
+    int cl = ceil(9.15);
+    int rd = round(9.5);
+    print($"  sqrt(144)  = {sq}");
+    print($"  pow(2, 8)  = {pwr}");
+    print($"  abs(-42.75)= {absolute}");
+    print($"  floor(9.85)= {fl}, ceil(9.15) = {cl}, round(9.5) = {rd}");
+    print("");
+}
+
+// ----------------------------------------------------------------------------
+// 2. DATA STRUCTURES & SORTING
+// ----------------------------------------------------------------------------
+
+void printIntArray(string prefix, int[] arr) {
+    string res = prefix + "[";
+    for (int i = 0; i < arr.length; i = i + 1) {
+        if (i > 0) {
+            res = res + ", ";
+        }
+        res = res + arr[i];
+    }
+    res = res + "]";
+    print(res);
+}
+
+void bubbleSort(int[] arr) {
+    int n = arr.length;
+    for (int i = 0; i < n - 1; i = i + 1) {
+        for (int j = 0; j < n - i - 1; j = j + 1) {
+            if (arr[j] > arr[j + 1]) {
+                int temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+        }
+    }
+}
+
+int binarySearch(int[] arr, int target) {
+    int left = 0;
+    int right = arr.length - 1;
+    while (left <= right) {
+        int mid = (left + right) / 2;
+        if (arr[mid] == target) {
+            return mid;
+        }
+        if (arr[mid] < target) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+    return -1;
+}
+
+class Stack {
+    int[] items;
+    int count;
+
+    void Stack() {
+        items = [];
+        count = 0;
+    }
+
+    void push(int val) {
+        items[count] = val;
+        count = count + 1;
+    }
+
+    int pop() {
+        if (count == 0) {
+            print("Error: Stack underflow");
+            return -1;
+        }
+        count = count - 1;
+        return items[count];
+    }
+
+    int peek() {
+        if (count == 0) {
+            return -1;
+        }
+        return items[count - 1];
+    }
+
+    int size() {
+        return count;
+    }
+
+    bool isEmpty() {
+        return count == 0;
+    }
+}
+
+void demoDataStructures() {
+    print("------------------------------------------------------------");
+    print("[2] DATA STRUCTURES & SORTING ALGORITHMS");
+    print("------------------------------------------------------------");
+
+    int[] numbers = [64, 34, 25, 12, 22, 11, 90, 88, 45, 1];
+    printIntArray("Original array: ", numbers);
+
+    bubbleSort(numbers);
+    printIntArray("Sorted array:   ", numbers);
+
+    int target1 = 22;
+    int target2 = 99;
+    int idx1 = binarySearch(numbers, target1);
+    int idx2 = binarySearch(numbers, target2);
+
+    print($"Binary search for {target1}: found at index {idx1}");
+    print($"Binary search for {target2}: found at index {idx2} (not found)");
+
+    print("Testing Custom Stack Data Structure:");
+    Stack st = new Stack();
+    st.push(100);
+    st.push(200);
+    st.push(300);
+    print($"  Stack size: {st.size()}, Top element: {st.peek()}");
+
+    int p1 = st.pop();
+    int p2 = st.pop();
+    print($"  Popped: {p1}, Popped: {p2}");
+    print($"  Stack size after pops: {st.size()}, Top element: {st.peek()}");
+    print("");
+}
+
+// ----------------------------------------------------------------------------
+// 3. STRING MANIPULATION & CRYPTOGRAPHY
+// ----------------------------------------------------------------------------
+
+string reverseString(string s) {
+    string rev = "";
+    int len = s.length;
+    for (int i = len - 1; i >= 0; i = i - 1) {
+        rev = rev + s[i];
+    }
+    return rev;
+}
+
+bool isPalindrome(string s) {
+    int left = 0;
+    int right = s.length - 1;
+    while (left < right) {
+        if (s[left] != s[right]) {
+            return false;
+        }
+        left = left + 1;
+        right = right - 1;
+    }
+    return true;
+}
+
+string caesarEncrypt(string text, int shift) {
+    string result = "";
+    int len = text.length;
+    for (int i = 0; i < len; i = i + 1) {
+        string ch = text[i];
+        int code = ord(ch);
+        // Uppercase A-Z (65..90)
+        if (code >= 65 && code <= 90) {
+            int newCode = 65 + ((code - 65 + shift) % 26);
+            result = result + chr(newCode);
+        } else if (code >= 97 && code <= 122) {
+            // Lowercase a-z (97..122)
+            int newCode = 97 + ((code - 97 + shift) % 26);
+            result = result + chr(newCode);
+        } else {
+            result = result + ch;
+        }
+    }
+    return result;
+}
+
+string caesarDecrypt(string text, int shift) {
+    int adjustedShift = (26 - (shift % 26)) % 26;
+    return caesarEncrypt(text, adjustedShift);
+}
+
+void demoStringAndCrypto() {
+    print("------------------------------------------------------------");
+    print("[3] STRING MANIPULATION & CRYPTOGRAPHY");
+    print("------------------------------------------------------------");
+
+    string original = "SabakaLang is awesome";
+    string reversed = reverseString(original);
+    print($"Original string: '{original}'");
+    print($"Reversed string: '{reversed}'");
+
+    string word1 = "racecar";
+    string word2 = "sabaka";
+    print($"Is '{word1}' a palindrome? {isPalindrome(word1)}");
+    print($"Is '{word2}' a palindrome? {isPalindrome(word2)}");
+
+    string secretMessage = "Hello World! SabakaLang Virtual Machine 2026";
+    int shift = 5;
+    string encrypted = caesarEncrypt(secretMessage, shift);
+    string decrypted = caesarDecrypt(encrypted, shift);
+
+    print($"Plaintext : {secretMessage}");
+    print($"Encrypted (shift={shift}): {encrypted}");
+    print($"Decrypted : {decrypted}");
+    print("");
+}
+
+// ----------------------------------------------------------------------------
+// 4. OBJECT-ORIENTED PROGRAMMING & INHERITANCE
+// ----------------------------------------------------------------------------
+
+class Vector2D {
+    float x;
+    float y;
+
+    void Vector2D(float px, float py) {
+        x = px;
+        y = py;
+    }
+
+    float magnitude() {
+        return sqrt((x * x) + (y * y));
+    }
+
+    void display(string label) {
+        float mag = magnitude();
+        print($"  {label}: ({x}, {y}) | Magnitude = {mag}");
+    }
+}
+
+class Shape {
+    string name;
+
+    void Shape(string n) {
+        name = n;
+    }
+
+    void printInfo() {
+        print($"Shape Name: {name}");
+    }
+}
+
+class Rectangle : Shape {
+    int width;
+    int height;
+
+    void Rectangle(string n, int w, int h) {
+        super.Shape(n);
+        width = w;
+        height = h;
+    }
+
+    int getArea() {
+        return width * height;
+    }
+
+    int getPerimeter() {
+        return 2 * (width + height);
+    }
+
+    override void printInfo() {
+        super.printInfo();
+        int a = getArea();
+        int p = getPerimeter();
+        print($"  Dimensions: {width} x {height} | Area: {a} | Perimeter: {p}");
+    }
+}
+
+class Circle : Shape {
+    float radius;
+
+    void Circle(string n, float r) {
+        super.Shape(n);
+        radius = r;
+    }
+
+    float getArea() {
+        return 3.14159 * radius * radius;
+    }
+
+    float getCircumference() {
+        return 2.0 * 3.14159 * radius;
+    }
+
+    override void printInfo() {
+        super.printInfo();
+        float a = getArea();
+        float c = getCircumference();
+        print($"  Radius: {radius} | Area: {a} | Circumference: {c}");
+    }
+}
+
+// Mini RPG Simulation
+class Character {
+    string name;
+    int hp;
+    int maxHp;
+    int attackPower;
+    int defense;
+
+    void Character(string n, int h, int atk, int def) {
+        name = n;
+        hp = h;
+        maxHp = h;
+        attackPower = atk;
+        defense = def;
+    }
+
+    bool isAlive() {
+        return hp > 0;
+    }
+
+    void takeDamage(int dmg) {
+        int actualDmg = dmg - defense;
+        if (actualDmg < 1) {
+            actualDmg = 1;
+        }
+        hp = hp - actualDmg;
+        if (hp < 0) {
+            hp = 0;
+        }
+        print($"  -> {name} takes {actualDmg} damage (HP: {hp}/{maxHp})");
+    }
+
+    void attack(Character target) {
+        print($"[Attack] {name} attacks {target.name} for {attackPower} raw damage!");
+        target.takeDamage(attackPower);
+    }
+
+    void status() {
+        print($"  [{name}] HP: {hp}/{maxHp} | ATK: {attackPower} | DEF: {defense}");
+    }
+}
+
+class Hero : Character {
+    int mana;
+
+    void Hero(string n, int h, int atk, int def, int m) {
+        super.Character(n, h, atk, def);
+        mana = m;
+    }
+
+    void castSpell(Character target) {
+        if (mana >= 15) {
+            mana = mana - 15;
+            int spellDmg = attackPower * 2;
+            print($"[Magic] {name} casts Flame Strike on {target.name} for {spellDmg} damage! (Mana left: {mana})");
+            target.takeDamage(spellDmg);
+        } else {
+            print($"[Magic] {name} does not have enough mana! Using normal attack instead.");
+            attack(target);
+        }
+    }
+
+    override void status() {
+        print($"  [Hero: {name}] HP: {hp}/{maxHp} | Mana: {mana} | ATK: {attackPower} | DEF: {defense}");
+    }
+}
+
+void demoOOPAndGameSimulation() {
+    print("------------------------------------------------------------");
+    print("[4] OBJECT-ORIENTED PROGRAMMING & GAME SIMULATION");
+    print("------------------------------------------------------------");
+
+    print("Geometric Shapes Demonstration:");
+    Rectangle rect = new Rectangle("Cabinet Front", 12, 8);
+    rect.printInfo();
+
+    Circle circ = new Circle("Wheel", 5.0);
+    circ.printInfo();
+
+    Vector2D v1 = new Vector2D(3.0, 4.0);
+    Vector2D v2 = new Vector2D(5.0, 12.0);
+    v1.display("Vector 1");
+    v2.display("Vector 2");
+
+    print("");
+    print("Mini RPG Turn-Based Battle Simulation:");
+    Hero hero = new Hero("Knight Arthur", 120, 25, 6, 40);
+    Character monster = new Character("Shadow Dragon", 100, 20, 4);
+
+    hero.status();
+    monster.status();
+
+    print("--- Battle Start ---");
+    int round = 1;
+    while (hero.isAlive() && monster.isAlive() && round <= 5) {
+        print($"--- Round {round} ---");
+        if (round % 2 == 1) {
+            hero.castSpell(monster);
+        } else {
+            hero.attack(monster);
+        }
+
+        if (monster.isAlive()) {
+            monster.attack(hero);
+        }
+        round = round + 1;
+    }
+
+    print("--- Battle Result ---");
+    if (hero.isAlive() && !monster.isAlive()) {
+        print($"Victory! {hero.name} defeated the {monster.name}!");
+    } else if (!hero.isAlive() && monster.isAlive()) {
+        print($"Defeat! {monster.name} has defeated {hero.name}.");
+    } else {
+        print("Battle ended in a stalemate!");
+    }
+    print("");
+}
+
+// ----------------------------------------------------------------------------
+// 5. ASCII ART & PROCEDURAL PATTERNS
+// ----------------------------------------------------------------------------
+
+void drawDiamond(int n) {
+    print($"ASCII Diamond Pattern (radius = {n}):");
+    // Upper half
+    for (int i = 1; i <= n; i = i + 1) {
+        string line = "";
+        for (int s = 0; s < n - i; s = s + 1) {
+            line = line + " ";
+        }
+        for (int star = 0; star < (2 * i - 1); star = star + 1) {
+            line = line + "*";
+        }
+        print(line);
+    }
+    // Lower half
+    for (int i = n - 1; i >= 1; i = i - 1) {
+        string line = "";
+        for (int s = 0; s < n - i; s = s + 1) {
+            line = line + " ";
+        }
+        for (int star = 0; star < (2 * i - 1); star = star + 1) {
+            line = line + "*";
+        }
+        print(line);
+    }
+}
+
+void drawSineWave() {
+    print("ASCII Wave Visualizer:");
+    for (int step = 0; step <= 20; step = step + 1) {
+        float angle = (step * 3.14159) / 5.0;
+        float val = sin(angle);
+        int pos = 15 + round(val * 10.0);
+        string line = "";
+        for (int col = 0; col < pos; col = col + 1) {
+            line = line + " ";
+        }
+        line = line + "o";
+        print(line);
+    }
+}
+
+void demoVisualPatterns() {
+    print("------------------------------------------------------------");
+    print("[5] PROCEDURAL PATTERNS & VISUALIZATION");
+    print("------------------------------------------------------------");
+    drawDiamond(5);
+    print("");
+    drawSineWave();
+    print("");
+}
+
+// ----------------------------------------------------------------------------
+// MAIN ENTRY POINT
+// ----------------------------------------------------------------------------
+
+void printBanner() {
+    print("============================================================");
+    print("           WELCOME TO SABAKALANG RUNTIME DEMO               ");
+    print("       A Modern, High-Performance Programming Language      ");
+    print("============================================================");
+    print("");
+}
+
+void main() {
+    printBanner();
+    demoMathAlgorithms();
+    demoDataStructures();
+    demoStringAndCrypto();
+    demoOOPAndGameSimulation();
+    demoVisualPatterns();
+
+    print("============================================================");
+    print("         All SabakaLang demonstrations completed!           ");
+    print("============================================================");
+}
+
+// Execute main
+main();
