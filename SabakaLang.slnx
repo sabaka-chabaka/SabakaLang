@@ -3,5 +3,6 @@
         <Project Path="src/SabakaLang.Lexer/SabakaLang.Lexer.csproj" />
     </Folder>
     <Folder Name="/tests/">
+        <Project Path="tests/SabakaLang.Lexer.Tests/SabakaLang.Lexer.Tests.csproj" />
     </Folder>
 </Solution>
