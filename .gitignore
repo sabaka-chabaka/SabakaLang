@@ -1,0 +1,13 @@
+.idea
+.git
+
+output
+
+obj
+bin
+
+*.user
+
+*.coverage.cobertura
+
+nupkg
