@@ -6,4 +6,9 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\SabakaLang.AST\SabakaLang.AST.csproj" />
+      <ProjectReference Include="..\SabakaLang.Lexer\SabakaLang.Lexer.csproj" />
+    </ItemGroup>
+
 </Project>
