@@ -2,6 +2,7 @@
     <Folder Name="/src/">
         <Project Path="src/SabakaLang.AST/SabakaLang.AST.csproj" />
         <Project Path="src/SabakaLang.Lexer/SabakaLang.Lexer.csproj" />
+        <Project Path="src/SabakaLang.Parser/SabakaLang.Parser.csproj" />
     </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/SabakaLang.Lexer.Tests/SabakaLang.Lexer.Tests.csproj" />
