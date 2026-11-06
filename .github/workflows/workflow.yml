@@ -21,10 +21,10 @@ jobs:
           dotnet-version: '10.0.x'
         
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore --configuration Release
       
       - name: Build
-        run: dotnet build --configuration Release --no-restore -r linux-x64
+        run: dotnet build --configuration Release --no-restore
         
       - name: Test
-        run: dotnet test --no-build --configuration Release -r linux-x64
+        run: dotnet test --no-build --configuration Release
