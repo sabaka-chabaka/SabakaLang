@@ -194,8 +194,10 @@ public sealed class Lexer()
     {
         Advance();
 
-        if (IsAtEnd()) {
+        if (IsAtEnd()) 
+        {
             AddError("Unterminated char literal", start);
+            return new Token(TokenType.CharLiteral, "", start, PreviousPosition());
         }
 
         Advance();
@@ -203,12 +205,13 @@ public sealed class Lexer()
         if (IsAtEnd() || _source[_offset] != '\'') 
         {
             AddError("Unterminated char literal", start);
+            var val = _offset > start.Offset + 1 && start.Offset + 1 < _source.Length 
+                ? _source.Substring(start.Offset + 1, Math.Min(_offset, _source.Length) - start.Offset - 1) 
+                : "";
+            return new Token(TokenType.CharLiteral, val, start, PreviousPosition());
         }
-        else
-        {
-            Advance();
-        }
-    
+        
+        Advance();
         return new Token(TokenType.CharLiteral, _source.Substring(start.Offset + 1, _offset - start.Offset - 2), start, PreviousPosition());
     }
 
@@ -218,6 +221,7 @@ public sealed class Lexer()
         Advance();
         var sb = new StringBuilder();
         int depth = 0;
+        bool closed = false;
 
         while (!IsAtEnd())
         {
@@ -226,6 +230,7 @@ public sealed class Lexer()
             if (depth == 0 && c == '"')
             {
                 Advance();
+                closed = true;
                 break;
             }
 
@@ -267,7 +272,7 @@ public sealed class Lexer()
             Advance();
         }
 
-        if (IsAtEnd())
+        if (!closed)
             AddError("Unterminated interpolated string", start);
         
         return new Token(TokenType.InterpolatedStringLiteral, sb.ToString(), start, PreviousPosition());
