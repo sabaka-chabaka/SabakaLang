@@ -15,4 +15,12 @@
     <PropertyGroup Condition="'$(SabakaTfm)' == 'net11.0'">
         <DefineConstants>$(DefineConstants);SABAKA_CS15</DefineConstants>
     </PropertyGroup>
+
+    <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
+        <PublishDir>$(MSBuildThisFileDirectory)PublishedAll\</PublishDir>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+        <IsPublishable>false</IsPublishable>
+    </PropertyGroup>
 </Project>
