@@ -94,5 +94,10 @@ public enum TokenType
     
     Const,
     
+    Break,
+    Continue,
+    SlashEqual,
+    PercentEqual,
+    
     Eof
 }

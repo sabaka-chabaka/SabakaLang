@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <RootNamespace>SabakaLang.SampleExtension</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- An extension only needs the Runtime project (or the SabakaLang.Runtime package). -->
+        <ProjectReference Include="..\..\src\SabakaLang.Runtime\SabakaLang.Runtime.csproj"/>
+    </ItemGroup>
+
+</Project>

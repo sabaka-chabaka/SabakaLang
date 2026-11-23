@@ -46,7 +46,9 @@ public sealed class Lexer()
         ["private"]   = TokenType.Private,
         ["protected"] = TokenType.Protected,
         ["import"]    = TokenType.Import,
-        ["const"]     = TokenType.Const
+        ["const"]     = TokenType.Const,
+        ["break"]     = TokenType.Break,
+        ["continue"]  = TokenType.Continue
     };
 
     public LexerResult Tokenize(string source)
@@ -88,7 +90,7 @@ public sealed class Lexer()
             '+' => ReadTriple('+', TokenType.PlusPlus, '=', TokenType.PlusEqual, TokenType.Plus, start),
             '-' => ReadTriple('-', TokenType.MinusMinus, '=', TokenType.MinusEqual, TokenType.Minus, start),
             '*' => ReadDouble('=', TokenType.StarEqual, TokenType.Star, start),
-            '%' => Consume(TokenType.Percent,   "%", start),
+            '%' => ReadDouble('=', TokenType.PercentEqual, TokenType.Percent, start),
             '(' => Consume(TokenType.LParen,    "(", start),
             ')' => Consume(TokenType.RParen,    ")", start),
             '{' => Consume(TokenType.LBrace,    "{", start),
@@ -118,7 +120,7 @@ public sealed class Lexer()
         var sb = new StringBuilder();
         bool hasDot = false;
 
-        while (!IsAtEnd() && (char.IsDigit(Current()) || Current() == '.'))
+        while (!IsAtEnd() && (char.IsDigit(Current()) || Current() == '.' && NextIsDigit()))
         {
             if (Current() == '.')
             {
@@ -138,6 +140,9 @@ public sealed class Lexer()
         return new Token(type, sb.ToString(), start, PreviousPosition());
     }
     
+    // a '.' belongs to the number only when a digit follows: `3.14` is a float, `4.isEven` is a member access
+    private bool NextIsDigit() => _offset + 1 < _source.Length && char.IsDigit(_source[_offset + 1]);
+
     private Token ReadIdentifier(Position start)
     {
         var sb = new StringBuilder();
@@ -192,27 +197,51 @@ public sealed class Lexer()
     
     private Token ReadChar(Position start)
     {
-        Advance();
+        Advance(); // opening quote
 
-        if (IsAtEnd()) 
+        if (IsAtEnd())
         {
             AddError("Unterminated char literal", start);
             return new Token(TokenType.CharLiteral, "", start, PreviousPosition());
         }
 
-        Advance();
+        char value;
+        if (Current() == '\\')
+        {
+            Advance();
+            value = Current() switch
+            {
+                'n'  => '\n',
+                'r'  => '\r',
+                't'  => '\t',
+                '0'  => '\0',
+                '\\' => '\\',
+                '\'' => '\'',
+                '"'  => '"',
+                var c => c
+            };
+            if (!IsAtEnd()) Advance();
+        }
+        else if (Current() == '\'')
+        {
+            AddError("Empty char literal", start);
+            Advance();
+            return new Token(TokenType.CharLiteral, "", start, PreviousPosition());
+        }
+        else
+        {
+            value = Current();
+            Advance();
+        }
 
-        if (IsAtEnd() || _source[_offset] != '\'') 
+        if (IsAtEnd() || Current() != '\'')
         {
             AddError("Unterminated char literal", start);
-            var val = _offset > start.Offset + 1 && start.Offset + 1 < _source.Length 
-                ? _source.Substring(start.Offset + 1, Math.Min(_offset, _source.Length) - start.Offset - 1) 
-                : "";
-            return new Token(TokenType.CharLiteral, val, start, PreviousPosition());
+            return new Token(TokenType.CharLiteral, value.ToString(), start, PreviousPosition());
         }
-        
+
         Advance();
-        return new Token(TokenType.CharLiteral, _source.Substring(start.Offset + 1, _offset - start.Offset - 2), start, PreviousPosition());
+        return new Token(TokenType.CharLiteral, value.ToString(), start, PreviousPosition());
     }
 
     private Token ReadInterpolatedString(Position start)
@@ -281,23 +310,52 @@ public sealed class Lexer()
     private Token ReadSlashOrComment(Position start)
     {
         Advance();
- 
+
         if (!IsAtEnd() && Current() == '/')
         {
-            var commentStart = start;
             var sb = new StringBuilder("//");
             Advance();
- 
+
             while (!IsAtEnd() && Current() != '\n' && Current() != '\r')
             {
                 sb.Append(Current());
                 Advance();
             }
- 
-            return new Token(TokenType.Comment, sb.ToString(), commentStart, PreviousPosition());
+
+            return new Token(TokenType.Comment, sb.ToString(), start, PreviousPosition());
         }
- 
-        return new Token(TokenType.Slash, "/", start, CurrentPosition());
+
+        if (!IsAtEnd() && Current() == '*')
+        {
+            var sb = new StringBuilder("/*");
+            Advance();
+            var closed = false;
+
+            while (!IsAtEnd())
+            {
+                if (Current() == '*' && _offset + 1 < _source.Length && _source[_offset + 1] == '/')
+                {
+                    sb.Append("*/");
+                    Advance();
+                    Advance();
+                    closed = true;
+                    break;
+                }
+                sb.Append(Current());
+                Advance();
+            }
+
+            if (!closed) AddError("Unterminated block comment", start);
+            return new Token(TokenType.Comment, sb.ToString(), start, PreviousPosition());
+        }
+
+        if (!IsAtEnd() && Current() == '=')
+        {
+            Advance();
+            return new Token(TokenType.SlashEqual, "/=", start, PreviousPosition());
+        }
+
+        return new Token(TokenType.Slash, "/", start, PreviousPosition());
     }
 
     private Token? ReadDouble(char next, TokenType doubleType, TokenType? singleType, Position start)

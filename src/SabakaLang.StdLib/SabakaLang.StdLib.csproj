@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <RootNamespace>SabakaLang.StdLib</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SabakaLang.Runtime\SabakaLang.Runtime.csproj"/>
+    </ItemGroup>
+
+</Project>

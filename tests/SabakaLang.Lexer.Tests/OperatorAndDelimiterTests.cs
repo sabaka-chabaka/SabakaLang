@@ -68,8 +68,7 @@ public class OperatorAndDelimiterTests
             TokenType.MinusMinus, // --
             TokenType.Star,       // *
             TokenType.Identifier, // d
-            TokenType.Slash,      // /
-            TokenType.Equal,      // = (since /= is Slash then Equal in this grammar!)
+            TokenType.SlashEqual, // /=
             TokenType.Identifier, // e
             TokenType.Percent,    // %
             TokenType.Identifier, // f

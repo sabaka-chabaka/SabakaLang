@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <RootNamespace>SabakaLang.Compiler</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SabakaLang.AST\SabakaLang.AST.csproj"/>
+        <ProjectReference Include="..\SabakaLang.Lexer\SabakaLang.Lexer.csproj"/>
+        <ProjectReference Include="..\SabakaLang.Binder\SabakaLang.Binder.csproj"/>
+        <ProjectReference Include="..\SabakaLang.Runtime\SabakaLang.Runtime.csproj"/>
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>SabakaLang.Runtime</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Using Include="SabakaLang.Runtime"/>
+        <Using Include="SabakaLang.Extensions"/>
+    </ItemGroup>
+
+</Project>

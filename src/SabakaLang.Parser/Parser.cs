@@ -127,10 +127,21 @@ public sealed class Parser
             TokenType.StructKeyword => ParseStruct(),
             TokenType.Enum      => ParseEnum(),
             TokenType.Import    => ParseImport(),
+            TokenType.Break    => ParseBreakContinue(),
+            TokenType.Continue => ParseBreakContinue(),
             _ => IsConstDecl() ? ParseConstDecl() :
                 IsFuncDecl() ? ParseFuncDecl() :
                 IsVarDecl() ? ParseVarDecl() : ParseExprStmt()
         };
+    }
+
+    private IStmt ParseBreakContinue()
+    {
+        var start = Current.Start;
+        var isBreak = Advance().Type == TokenType.Break;
+        Match(TokenType.Semicolon);
+        var span = SpanFrom(start);
+        return isBreak ? new BreakStmt(span) : new ContinueStmt(span);
     }
 
     private List<IStmt> ParseBlock()
@@ -172,6 +183,7 @@ public sealed class Parser
         if (cur == TokenType.Identifier)
         {
             offset++;
+            offset = SkipQualifiedName(offset);
             if (Peek(offset).Type == TokenType.Less)
                 offset = SkipAngles(offset);
             while (Peek(offset).Type == TokenType.LBracket && Peek(offset + 1).Type == TokenType.RBracket)
@@ -187,6 +199,13 @@ public sealed class Parser
         return false;
     }
     
+    private int SkipQualifiedName(int offset)
+    {
+        while (Peek(offset).Type == TokenType.Dot && Peek(offset + 1).Type == TokenType.Identifier)
+            offset += 2;
+        return offset;
+    }
+
     private bool IsConstDecl()
     {
         int offset = 0;
@@ -286,7 +305,7 @@ public sealed class Parser
         Expect(TokenType.LParen);
         var cond = ParseExpr();
         Expect(TokenType.RParen);
-        var body = ParseBlock();
+        var body = ParseBlockOrStmt();
         return new WhileStmt(cond, body, SpanFrom(start));
     }
  
@@ -322,7 +341,7 @@ public sealed class Parser
         Expect(TokenType.In);
         var col = ParseExpr();
         Expect(TokenType.RParen);
-        var body = ParseBlock();
+        var body = ParseBlockOrStmt();
         return new ForeachStmt(type, name, col, body, SpanFrom(start));
     }
  
@@ -331,7 +350,7 @@ public sealed class Parser
         var start = Current.Start;
         Expect(TokenType.Return);
         IExpr? val = null;
-        if (!Check(TokenType.Semicolon))
+        if (!Check(TokenType.Semicolon) && !Check(TokenType.RBrace) && !IsAtEnd())
             val = ParseExpr();
         Match(TokenType.Semicolon);
         return new ReturnStmt(val, SpanFrom(start));
@@ -377,7 +396,20 @@ public sealed class Parser
     {
         var start = Current.Start;
         Expect(TokenType.Import);
-        var path = Expect(TokenType.StringLiteral).Value;
+        string path;
+        if (Check(TokenType.Identifier))
+        {
+            path = Advance().Value;
+            while (Check(TokenType.Dot) && Peek().Type == TokenType.Identifier)
+            {
+                Advance();
+                path += "." + Advance().Value;
+            }
+        }
+        else
+        {
+            path = Expect(TokenType.StringLiteral).Value;
+        }
         var names = new List<string>();
         string? alias = null;
         if (Current is { Type: TokenType.Identifier, Value: "from" })
@@ -406,9 +438,9 @@ public sealed class Parser
         var interfaces = new List<string>();
         if (Match(TokenType.Colon))
         {
-            baseClass = Expect(TokenType.Identifier).Value;
+            baseClass = ParseBaseTypeName();
             while (Match(TokenType.Comma))
-                interfaces.Add(Expect(TokenType.Identifier).Value);
+                interfaces.Add(ParseBaseTypeName());
         }
         Expect(TokenType.LBrace);
         var fields = new List<VarDecl>();
@@ -416,7 +448,8 @@ public sealed class Parser
         while (!Check(TokenType.RBrace) && !IsAtEnd())
         {
             int posBeforeClass = _pos;
-            if (IsFuncDecl())       methods.Add(ParseFuncDecl());
+            if (IsShortCtor(name))  methods.Add(ParseShortCtor());
+            else if (IsFuncDecl())  methods.Add(ParseFuncDecl());
             else if (IsConstDecl()) fields.Add(ParseConstDecl().ToVarDecl());
             else                    fields.Add(ParseVarDecl());
             if (_pos == posBeforeClass) Advance();
@@ -425,6 +458,39 @@ public sealed class Parser
         return new ClassDecl(name, typeParams, baseClass, interfaces, fields, methods, SpanFrom(start));
     }
  
+    /// <summary>Base class / interface reference: <c>Name</c>, <c>mod.Name</c> or <c>Name&lt;int,string&gt;</c> (kept as text).</summary>
+    private string ParseBaseTypeName()
+    {
+        var name = Expect(TokenType.Identifier).Value;
+        while (Check(TokenType.Dot) && Peek().Type == TokenType.Identifier)
+        {
+            Advance();
+            name += "." + Advance().Value;
+        }
+        var args = TryParseTypeArgs();
+        return args.Count > 0 ? $"{name}<{string.Join(",", args)}>" : name;
+    }
+
+    private bool IsShortCtor(string className)
+    {
+        var o = IsAccessMod(Peek(0).Type) ? 1 : 0;
+        return Peek(o).Type == TokenType.Identifier && Peek(o).Value == className
+               && Peek(o + 1).Type == TokenType.LParen;
+    }
+
+    /// <summary>Parses <c>Name(params) { ... }</c> – sugar for <c>void Name(params) { ... }</c>.</summary>
+    private FuncDecl ParseShortCtor()
+    {
+        var start = Current.Start;
+        var access = TryConsumeAccessMod(AccessMod.Public);
+        var name = Expect(TokenType.Identifier).Value;
+        Expect(TokenType.LParen);
+        var parms = ParseParams();
+        Expect(TokenType.RParen);
+        var body = ParseBlock();
+        return new FuncDecl(new TypeRef("void", [], false), name, [], parms, body, access, false, SpanFrom(start));
+    }
+
     private InterfaceDecl ParseInterface()
     {
         var start = Current.Start;
@@ -434,9 +500,9 @@ public sealed class Parser
         var parents = new List<string>();
         if (Match(TokenType.Colon))
         {
-            parents.Add(Expect(TokenType.Identifier).Value);
+            parents.Add(ParseBaseTypeName());
             while (Match(TokenType.Comma))
-                parents.Add(Expect(TokenType.Identifier).Value);
+                parents.Add(ParseBaseTypeName());
         }
         Expect(TokenType.LBrace);
         var methods = new List<FuncDecl>();
@@ -519,7 +585,9 @@ public sealed class Parser
 
         if (Check(TokenType.PlusEqual) ||
             Check(TokenType.MinusEqual) ||
-            Check(TokenType.StarEqual))
+            Check(TokenType.StarEqual) ||
+            Check(TokenType.SlashEqual) ||
+            Check(TokenType.PercentEqual))
         {
             var op = Current.Type;
             Advance();
@@ -533,6 +601,8 @@ public sealed class Parser
                     TokenType.PlusEqual => TokenType.Plus,
                     TokenType.MinusEqual => TokenType.Minus,
                     TokenType.StarEqual => TokenType.Star,
+                    TokenType.SlashEqual => TokenType.Slash,
+                    TokenType.PercentEqual => TokenType.Percent,
                     _ => throw new Exception("Unexpected compound operator")
                 };
 
@@ -541,6 +611,7 @@ public sealed class Parser
             }
 
             AddError("Invalid assignment target", start);
+            return left;
         }
 
         return left;
@@ -627,7 +698,15 @@ public sealed class Parser
         {
             Advance();
 
-            var right = ParseTypeRef();
+            var right = ParseTypeRef(allowNullable: false);
+
+            // `x is int? ...` – a trailing '?' is a nullable suffix only when no expression follows it,
+            // otherwise it is the ternary operator: `x is int ? 1 : 2`.
+            if (Check(TokenType.Question) && !IsExprStart(Peek().Type))
+            {
+                Advance();
+                right = right with { IsNullable = true };
+            }
 
             left = new IsExpr(left, right, SpanFrom(start));
         }
@@ -683,6 +762,19 @@ public sealed class Parser
             var op = Advance().Type;
             var operand = ParseUnary();
             return new UnaryExpr(op, operand, SpanFrom(start));
+        }
+        if (Check(TokenType.PlusPlus) || Check(TokenType.MinusMinus))
+        {
+            var op = Advance().Type;
+            var operand = ParseUnary();
+            if (operand is NameExpr or MemberExpr or IndexExpr)
+            {
+                var binaryOp = op == TokenType.PlusPlus ? TokenType.Plus : TokenType.Minus;
+                var value = new BinaryExpr(operand, binaryOp, new IntLit(1, SpanFrom(start)), SpanFrom(start));
+                return new AssignExpr(operand, value, SpanFrom(start));
+            }
+            AddError("Invalid increment target", start);
+            return operand;
         }
         return ParsePostfix();
     }
@@ -748,18 +840,31 @@ public sealed class Parser
  
         if (Check(TokenType.IntLiteral))
         {
-            var v = int.Parse(Advance().Value, CultureInfo.InvariantCulture);
+            var text = Advance().Value;
+            if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var v))
+            {
+                AddError($"Integer literal '{text}' is out of range for int", start);
+                v = 0;
+            }
             return new IntLit(v, SpanFrom(start));
         }
         if (Check(TokenType.FloatLiteral))
         {
-            var v = double.Parse(Advance().Value, CultureInfo.InvariantCulture);
+            var text = Advance().Value;
+            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
+            {
+                AddError($"Invalid float literal '{text}'", start);
+                v = 0;
+            }
             return new FloatLit(v, SpanFrom(start));
         }
         if (Check(TokenType.StringLiteral))
             return new StringLit(Advance().Value, SpanFrom(start));
         if (Check(TokenType.CharLiteral))
-            return  new CharLit(Advance().Value[0], SpanFrom(start));
+        {
+            var text = Advance().Value;
+            return new CharLit(text.Length > 0 ? text[0] : '\0', SpanFrom(start));
+        }
         if (Check(TokenType.InterpolatedStringLiteral))
             return ParseInterpolatedString(start);
         if (Check(TokenType.True))  { Advance(); return new BoolLit(true,  SpanFrom(start)); }
@@ -783,7 +888,34 @@ public sealed class Parser
         if (Check(TokenType.New))
         {
             Advance();
+
+            // new int[n]  /  new Foo[n]
+            if (IsBuiltinType(Current.Type) && Current.Type != TokenType.VoidKeyword ||
+                Check(TokenType.Identifier) && IsArrayCreationAhead())
+            {
+                var elemStart = Current.Start;
+                var elemName = Current.Type switch
+                {
+                    TokenType.IntKeyword    => "int",
+                    TokenType.FloatKeyword  => "float",
+                    TokenType.BoolKeyword   => "bool",
+                    TokenType.StringKeyword => "string",
+                    TokenType.CharKeyword   => "char",
+                    _ => Current.Value
+                };
+                Advance();
+                Expect(TokenType.LBracket);
+                var size = ParseExpr();
+                Expect(TokenType.RBracket);
+                return new NewArrayExpr(new TypeRef(elemName, [], false, false, SpanFrom(elemStart)), size, SpanFrom(start));
+            }
+
             var typeName = Expect(TokenType.Identifier).Value;
+            while (Check(TokenType.Dot) && Peek().Type == TokenType.Identifier)
+            {
+                Advance();
+                typeName += "." + Advance().Value;
+            }
             var typeArgs = TryParseTypeArgs();
             Expect(TokenType.LParen);
             var args = ParseArgList();
@@ -817,6 +949,15 @@ public sealed class Parser
         throw new ParseException();
     }
     
+    private bool IsArrayCreationAhead() =>
+        Peek(0).Type == TokenType.Identifier && Peek(1).Type == TokenType.LBracket;
+
+    private static bool IsExprStart(TokenType t) => t is
+        TokenType.IntLiteral or TokenType.FloatLiteral or TokenType.StringLiteral or TokenType.CharLiteral or
+        TokenType.InterpolatedStringLiteral or TokenType.True or TokenType.False or TokenType.Null or
+        TokenType.Identifier or TokenType.LParen or TokenType.LBracket or TokenType.Minus or TokenType.Bang or
+        TokenType.New or TokenType.Super or TokenType.PlusPlus or TokenType.MinusMinus;
+
     private List<IExpr> ParseArgList()
     {
         var args = new List<IExpr>();
@@ -866,7 +1007,8 @@ public sealed class Parser
             }
  
             var exprSource = raw.Substring(braceOpen + 1, j - braceOpen - 1);
-            var subLexer  = new Lexer.Lexer().Tokenize(exprSource);
+            var origin = new Position(start.Line, start.Column + 2 + braceOpen + 1, start.Offset + 2 + braceOpen + 1);
+            var subLexer  = ShiftTokens(new Lexer.Lexer().Tokenize(exprSource), origin);
             var subParser = new Parser(subLexer);
             var subResult = subParser.Parse();
  
@@ -884,18 +1026,40 @@ public sealed class Parser
         return new InterpolatedStringExpr(parts, SpanFrom(start));
     }
     
+    private static LexerResult ShiftTokens(LexerResult r, Position origin)
+    {
+        Position Map(Position p) => new(
+            origin.Line + p.Line - 1,
+            p.Line == 1 ? origin.Column + p.Column - 1 : p.Column,
+            origin.Offset + p.Offset);
+
+        var tokens = r.Tokens.Select(t => t with { Start = Map(t.Start), End = Map(t.End) }).ToList();
+        var errors = r.Errors.Select(e => e with { Position = Map(e.Position) }).ToList();
+        return new LexerResult(tokens, errors);
+    }
+
     private List<Param> ParseParams()
     {
         var parms = new List<Param>();
         if (Check(TokenType.RParen)) return parms;
-        parms.Add(new Param(ParseTypeRef(), Expect(TokenType.Identifier).Value));
+        parms.Add(ParseParam());
         while (Match(TokenType.Comma))
-            parms.Add(new Param(ParseTypeRef(), Expect(TokenType.Identifier).Value));
+            parms.Add(ParseParam());
         return parms;
     }
     
-    private TypeRef ParseTypeRef()
+    private Param ParseParam()
     {
+        var start = Current.Start;
+        var type = ParseTypeRef();
+        var name = Expect(TokenType.Identifier).Value;
+        return new Param(type, name, SpanFrom(start));
+    }
+
+    private TypeRef ParseTypeRef(bool allowNullable = true)
+    {
+        var start = Current.Start;
+        var isIdentifier = Current.Type == TokenType.Identifier;
         var name = Current.Type switch
         {
             TokenType.IntKeyword    => "int",
@@ -907,20 +1071,41 @@ public sealed class Parser
             TokenType.Identifier    => Current.Value,
             _ => null
         };
-        if (name is null) { AddError($"Expected type, got {Current.Type}", Current.Start); return new TypeRef("?", [], false, false); }
+        if (name is null) { AddError($"Expected type, got {Current.Type}", Current.Start); return new TypeRef("?", [], false, false, SpanOf(Current)); }
         Advance();
+
+        // qualified name: module.Type
+        if (isIdentifier)
+        {
+            while (Check(TokenType.Dot) && Peek().Type == TokenType.Identifier)
+            {
+                Advance();
+                name += "." + Advance().Value;
+            }
+        }
+
         var typeArgs = TryParseTypeArgs();
-        bool isArray = false;
-        if (Check(TokenType.LBracket) && Peek().Type == TokenType.RBracket)
+        var depth = 0;
+        while (Check(TokenType.LBracket) && Peek().Type == TokenType.RBracket)
         {
             Advance(); Advance();
-            isArray = true;
+            depth++;
         }
-        
-        bool isNullable = Match(TokenType.Question);
-        return new TypeRef(name, typeArgs, isArray, isNullable);
+
+        var isNullable = allowNullable && Match(TokenType.Question);
+        return new TypeRef(name, typeArgs, depth > 0, isNullable, SpanFrom(start)) { ArrayDepth = depth };
     }
-    
+
+    /// <summary>Canonical textual form of a type, used for <see cref="TypeRef.TypeArgs"/> entries.</summary>
+    private static string TypeToString(TypeRef t)
+    {
+        var s = t.Name;
+        if (t.TypeArgs.Count > 0) s += "<" + string.Join(",", t.TypeArgs) + ">";
+        for (var i = 0; i < t.ArrayDepth; i++) s += "[]";
+        if (t.IsNullable) s += "?";
+        return s;
+    }
+
     private List<TypeParam> TryParseTypeParams()
     {
         if (!Check(TokenType.Less)) return [];
@@ -941,15 +1126,20 @@ public sealed class Parser
     {
         if (!Check(TokenType.Less)) return [];
         var saved = _pos;
-        Advance(); 
+        var savedErrors = _errors.Count;
+        Advance();
         var result = new List<string>();
         while (IsTypeStart(Current.Type))
         {
-            result.Add(Current.Value);
-            Advance();
+            result.Add(TypeToString(ParseTypeRef()));
             if (!Match(TokenType.Comma)) break;
         }
-        if (!Check(TokenType.Greater)) { _pos = saved; return []; }
+        if (result.Count == 0 || !Check(TokenType.Greater))
+        {
+            _pos = saved;
+            _errors.RemoveRange(savedErrors, _errors.Count - savedErrors);
+            return [];
+        }
         Advance();
         return result;
     }
@@ -964,7 +1154,9 @@ public sealed class Parser
             return true;
 
         if (!IsTypeStart(Peek(o).Type)) return false;
+        var typeIsIdent = Peek(o).Type == TokenType.Identifier;
         o++;
+        if (typeIsIdent) o = SkipQualifiedName(o);
         if (Peek(o).Type == TokenType.Less) o = SkipAngles(o);
         while (Peek(o).Type == TokenType.LBracket && Peek(o + 1).Type == TokenType.RBracket) o += 2;
         if (Peek(o).Type != TokenType.Identifier) return false;

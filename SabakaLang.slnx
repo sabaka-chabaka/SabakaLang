@@ -3,9 +3,20 @@
         <Project Path="src/SabakaLang.AST/SabakaLang.AST.csproj" />
         <Project Path="src/SabakaLang.Lexer/SabakaLang.Lexer.csproj" />
         <Project Path="src/SabakaLang.Parser/SabakaLang.Parser.csproj" />
+        <Project Path="src/SabakaLang.Runtime/SabakaLang.Runtime.csproj" />
+        <Project Path="src/SabakaLang.Binder/SabakaLang.Binder.csproj" />
+        <Project Path="src/SabakaLang.Compiler/SabakaLang.Compiler.csproj" />
+        <Project Path="src/SabakaLang.VM/SabakaLang.VM.csproj" />
+        <Project Path="src/SabakaLang.StdLib/SabakaLang.StdLib.csproj" />
+        <Project Path="src/SabakaLang.Engine/SabakaLang.Engine.csproj" />
+        <Project Path="src/SabakaLang.Cli/SabakaLang.Cli.csproj" />
+    </Folder>
+    <Folder Name="/samples/">
+        <Project Path="samples/SabakaLang.SampleExtension/SabakaLang.SampleExtension.csproj" />
     </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/SabakaLang.Lexer.Tests/SabakaLang.Lexer.Tests.csproj" />
         <Project Path="tests/SabakaLang.Parser.Tests/SabakaLang.Parser.Tests.csproj" />
+        <Project Path="tests/SabakaLang.Engine.Tests/SabakaLang.Engine.Tests.csproj" />
     </Folder>
 </Solution>

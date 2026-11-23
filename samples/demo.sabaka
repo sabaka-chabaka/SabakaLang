@@ -1,0 +1,11 @@
+import "texttools";
+
+print("version", VERSION);
+print(wordCount("the quick brown fox"));
+print("stressed".reversed());
+print([1, 2, 3, 4].sum());
+
+Stopwatch sw = new Stopwatch();
+sw.start();
+sw.stop();
+print("elapsed >= 0:", sw.elapsedMs >= 0);

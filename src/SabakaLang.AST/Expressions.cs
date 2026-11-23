@@ -26,3 +26,4 @@ public record InterpolatedStringExpr(List<IExpr> Parts, Span Span) : IExpr;
 
 public record CoalesceExpr(IExpr Left, IExpr Right, Span Span) : IExpr;
 public record IsExpr(IExpr Left, TypeRef Right, Span Span) : IExpr;
+public record NewArrayExpr(TypeRef ElementType, IExpr Size, Span Span) : IExpr;

@@ -11,3 +11,5 @@ public record ForStmt(IStmt? Init, IExpr? Condition, IExpr? Step, List<IStmt> Bo
 public record ForeachStmt(TypeRef ItemType, string ItemName, IExpr Collection, List<IStmt> Body, Span Span) : IStmt;
 public record SwitchStmt(IExpr Value, List<SwitchCase> Cases, Span Span) : IStmt;
 public record ImportStmt(string Path, List<string> Names, string? Alias, Span Span) : IStmt;
+public record BreakStmt(Span Span) : IStmt;
+public record ContinueStmt(Span Span) : IStmt;
