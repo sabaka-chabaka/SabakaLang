@@ -4,6 +4,12 @@
         <OutputType>Exe</OutputType>
         <AssemblyName>sabaka</AssemblyName>
         <RootNamespace>SabakaLang.Cli</RootNamespace>
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>sabaka</ToolCommandName>
+        <PackageId>SabakaLang.Cli</PackageId>
+        <Version>0.1.0</Version>
+        <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\nupkg</PackageOutputPath>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     </PropertyGroup>
 
     <ItemGroup>

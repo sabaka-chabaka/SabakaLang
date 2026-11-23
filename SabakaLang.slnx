@@ -13,6 +13,7 @@
     </Folder>
     <Folder Name="/samples/">
         <Project Path="samples/SabakaLang.SampleExtension/SabakaLang.SampleExtension.csproj" />
+        <File Path="samples/demo.sabaka"/>
     </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/SabakaLang.Lexer.Tests/SabakaLang.Lexer.Tests.csproj" />

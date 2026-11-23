@@ -13,6 +13,7 @@ public sealed class ExtensionRegistry
     private readonly Dictionary<string, NativeClass> _classes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<NativeExtension>> _extensionsByName = new(StringComparer.Ordinal);
     private readonly Dictionary<Type, NativeClass> _classesByClr = new();
+    private readonly HashSet<Assembly> _registeredAssemblies = [];
 
     public IReadOnlyCollection<NativeModule> Modules => _modules.Values;
 
@@ -65,6 +66,7 @@ public sealed class ExtensionRegistry
     /// <summary>Registers every module found in <paramref name="assembly"/> ([SabakaModule] types and <see cref="ISabakaExtension"/> implementations).</summary>
     public ExtensionRegistry RegisterAssembly(Assembly assembly)
     {
+        if (!_registeredAssemblies.Add(assembly)) return this;
         foreach (var m in ReflectionModuleLoader.LoadAssembly(assembly)) Register(m);
         return this;
     }
@@ -75,6 +77,32 @@ public sealed class ExtensionRegistry
 
     /// <summary>Registers a single [SabakaModule] class.</summary>
     public ExtensionRegistry RegisterType(Type moduleType) => Register(ReflectionModuleLoader.LoadModuleType(moduleType));
+    
+    public ExtensionRegistry RegisterDirectory(string directory, string searchPattern = "*.dll", bool recursive = false)
+    {
+        if (!Directory.Exists(directory))
+            throw new DirectoryNotFoundException($"Extension directory not found: {directory}");
+
+        var files = Directory
+            .EnumerateFiles(directory, searchPattern,
+                recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in files)
+        {
+            AssemblyName name;
+            try { name = AssemblyName.GetAssemblyName(file); }
+            catch (BadImageFormatException) { continue; }
+            catch (FileLoadException) { continue; }
+
+            if (AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == name.Name)
+                && !_registeredAssemblies.Any(a => a.GetName().Name == name.Name))
+                continue;
+
+            RegisterAssemblyFile(file);
+        }
+        return this;
+    }
 
     public ExtensionRegistry RegisterType<T>() => RegisterType(typeof(T));
 
