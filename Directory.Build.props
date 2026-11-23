@@ -6,6 +6,10 @@
         <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <OutputPath>$(MSBuildThisFileDirectory)publish\</OutputPath>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+
     </PropertyGroup>
     <!-- C# 15 features (unions, collection-expression arguments `with(...)`) exist only on the .NET 11 toolchain. -->
     <PropertyGroup Condition="'$(SabakaTfm)' == 'net11.0'">
