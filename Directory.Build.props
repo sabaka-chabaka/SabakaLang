@@ -1,23 +1,20 @@
 <Project>
     <PropertyGroup>
-        <!-- Target .NET 11 by default. CI/containers without the .NET 11 SDK can build with: -p:SabakaTfm=net10.0 -->
         <SabakaTfm Condition="'$(SabakaTfm)' == ''">net11.0</SabakaTfm>
         <TargetFramework>$(SabakaTfm)</TargetFramework>
         <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <OutputPath>$(MSBuildThisFileDirectory)publish\</OutputPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
 
     </PropertyGroup>
-    <!-- C# 15 features (unions, collection-expression arguments `with(...)`) exist only on the .NET 11 toolchain. -->
     <PropertyGroup Condition="'$(SabakaTfm)' == 'net11.0'">
         <DefineConstants>$(DefineConstants);SABAKA_CS15</DefineConstants>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
-        <PublishDir>$(MSBuildThisFileDirectory)PublishedAll\</PublishDir>
+        <PublishDir>$(MSBuildThisFileDirectory)publish\</PublishDir>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
