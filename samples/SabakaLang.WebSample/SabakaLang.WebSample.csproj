@@ -6,6 +6,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\SabakaLang.AspNet\SabakaLang.AspNet.csproj"/>
+        <ProjectReference Include="..\..\src\SabakaLang.Engine\SabakaLang.Engine.csproj" />
     </ItemGroup>
 
     <ItemGroup>
