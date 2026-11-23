@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <RootNamespace>SabakaLang.WebSample</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\SabakaLang.AspNet\SabakaLang.AspNet.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="site\**" CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
+
+</Project>

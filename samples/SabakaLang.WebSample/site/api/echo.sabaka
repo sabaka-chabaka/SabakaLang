@@ -1,0 +1,9 @@
+resType("text/plain; charset=utf-8");
+
+if (reqMethod() != "POST") {
+    resStatus(405);
+    resHeader("Allow", "POST");
+    print("POST only");
+} else {
+    print("you sent: " + reqBody());
+}

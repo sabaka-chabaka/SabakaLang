@@ -1,0 +1,5 @@
+string name = (reqQuery("name") ?? "world").htmlEscape();
+
+resType("text/html; charset=utf-8");
+print($"<h1>Hello, {name}!</h1>");
+print($"<p>{reqMethod()} {reqPath()}, visit number {visits()}, from {clientIp()}</p>");

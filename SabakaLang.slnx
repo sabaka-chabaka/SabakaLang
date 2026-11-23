@@ -10,9 +10,11 @@
         <Project Path="src/SabakaLang.StdLib/SabakaLang.StdLib.csproj" />
         <Project Path="src/SabakaLang.Engine/SabakaLang.Engine.csproj" />
         <Project Path="src/SabakaLang.Cli/SabakaLang.Cli.csproj" />
+        <Project Path="src/SabakaLang.AspNet/SabakaLang.AspNet.csproj" />
     </Folder>
     <Folder Name="/samples/">
         <Project Path="samples/SabakaLang.SampleExtension/SabakaLang.SampleExtension.csproj" />
+        <Project Path="samples/SabakaLang.WebSample/SabakaLang.WebSample.csproj" />
         <File Path="samples/demo.sabaka"/>
     </Folder>
     <Folder Name="/tests/">
