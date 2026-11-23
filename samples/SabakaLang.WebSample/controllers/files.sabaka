@@ -1,0 +1,20 @@
+Route.get("/files/{name}", "show");          // inline; content type from extension; Range requests work
+Route.get("/download/{name}", "download");   // as an attachment
+Route.post("/upload/{name}", "upload");      // multipart form, field "file"
+
+Response show(Request req) {
+    return Response.file(req.param("name") ?? "");
+}
+
+Response download(Request req) {
+    string name = req.param("name") ?? "";
+    return Response.download(name, name);
+}
+
+Response upload(Request req) {
+    string name = req.param("name") ?? "";
+    if (req.saveUpload("file", name)) {
+        return Response.json("{\"saved\": " + Json.quote(name) + "}").withStatus(201);
+    }
+    return Response.json("{\"error\": \"no file field\"}").withStatus(400);
+}

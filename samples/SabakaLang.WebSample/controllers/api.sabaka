@@ -1,0 +1,25 @@
+Route.get("/api/numbers", "numbers");
+Route.get("/api/users/{id:int}", "user");
+Route.post("/api/echo", "echo");
+
+class User {
+    int id;
+    string name;
+    User(int i, string n) { id = i; name = n; }
+}
+
+// Returning an array or an object serializes it to JSON automatically.
+int[] numbers(Request req) {
+    return [1, 2, 3];
+}
+
+Response user(Request req) {
+    int id = parseInt(req.param("id") ?? "0");
+    if (id > 100) { return Response.empty(404); }
+    return Response.jsonOf(new User(id, "user"));
+}
+
+Response echo(Request req) {
+    string who = Json.get(req.body, "name") ?? "anonymous";
+    return Response.json("{\"hello\": " + Json.quote(who) + "}");
+}

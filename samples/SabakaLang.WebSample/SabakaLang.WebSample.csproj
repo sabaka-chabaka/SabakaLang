@@ -9,7 +9,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="site\**" CopyToOutputDirectory="PreserveNewest"/>
+        <None Include="controllers\**;files\**" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
 
 </Project>

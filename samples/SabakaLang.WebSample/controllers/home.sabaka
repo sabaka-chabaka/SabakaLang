@@ -1,0 +1,12 @@
+Route.get("/", "index");
+Route.get("/hello/{name}", "hello");
+
+// A controller function takes the Request and returns a Response.
+Response index(Request req) {
+    return Response.html($"<h1>SabakaLang web</h1><p>Visit {visits()} from {req.ip}</p>");
+}
+
+Response hello(Request req) {
+    string name = req.param("name") ?? "world";
+    return Response.html($"<h1>Hello, {name.htmlEscape()}!</h1>");
+}
