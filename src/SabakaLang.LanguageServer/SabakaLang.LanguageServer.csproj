@@ -1,0 +1,10 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <AssemblyName>SabakaLang.LanguageServer</AssemblyName>
+        <RootNamespace>SabakaLang.LanguageServer</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\SabakaLang.Engine\SabakaLang.Engine.csproj" />
+    </ItemGroup>
+</Project>

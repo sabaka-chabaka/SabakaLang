@@ -1,6 +1,7 @@
 <Solution>
     <Folder Name="/src/">
         <Project Path="src/SabakaLang.AST/SabakaLang.AST.csproj" />
+        <Project Path="src/SabakaLang.LanguageServer/SabakaLang.LanguageServer.csproj" />
         <Project Path="src/SabakaLang.Lexer/SabakaLang.Lexer.csproj" />
         <Project Path="src/SabakaLang.Parser/SabakaLang.Parser.csproj" />
         <Project Path="src/SabakaLang.Runtime/SabakaLang.Runtime.csproj" />
@@ -15,7 +16,7 @@
     <Folder Name="/samples/">
         <Project Path="samples/SabakaLang.SampleExtension/SabakaLang.SampleExtension.csproj" />
         <Project Path="samples/SabakaLang.WebSample/SabakaLang.WebSample.csproj" />
-        <File Path="samples/demo.sabaka"/>
+        <File Path="samples/demo.sabaka" />
     </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/SabakaLang.Lexer.Tests/SabakaLang.Lexer.Tests.csproj" />
